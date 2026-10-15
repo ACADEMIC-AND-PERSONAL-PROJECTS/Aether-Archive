@@ -10,7 +10,7 @@ Statuses: `Proposed` · `Accepted` · `Superseded by ADR-NNN` · `Rejected`.
 
 | # | Date | Title | Status |
 | --- | --- | --- | --- |
-| [ADR-001](#adr-001--embedded-sqlite-as-the-database) | 2026-10-15 | Embedded SQLite as the database | Accepted |
+| [ADR-001](#adr-001--embedded-sqlite-as-the-database) | 2026-10-15 | Embedded SQLite as the database | Superseded by ADR-009 |
 | [ADR-002](#adr-002--merge-commits-only-append-only-history) | 2026-10-15 | Merge commits only, append-only history | Accepted |
 | [ADR-003](#adr-003--gitflow-lite-with-protected-main-and-develop) | 2026-10-15 | GitFlow-lite with protected `main` and `develop` | Accepted |
 | [ADR-004](#adr-004--tanstack-query-as-the-frontend-data-layer) | 2026-10-15 | TanStack Query as the frontend data layer | Accepted |
@@ -18,12 +18,14 @@ Statuses: `Proposed` · `Accepted` · `Superseded by ADR-NNN` · `Rejected`.
 | [ADR-006](#adr-006--image-derived-theme-colours-at-runtime) | 2026-10-15 | Image-derived theme colours at runtime | Accepted |
 | [ADR-007](#adr-007--scrum-artefacts-in-repository) | 2026-10-15 | Scrum artefacts in-repository | Accepted |
 | [ADR-008](#adr-008--no-spring-security-for-v1) | 2026-10-15 | No Spring Security for v1 | Accepted |
+| [ADR-009](#adr-009--postgresql-as-the-database) | 2026-10-15 | PostgreSQL as the database | Accepted |
+| [ADR-010](#adr-010--containerized-delivery-for-v10) | 2026-10-15 | Containerized delivery for v1.0 | Accepted |
 
 ---
 
 ## ADR-001 — Embedded SQLite as the database
 
-**Date**: 2026-10-15 · **Status**: Accepted
+**Date**: 2026-10-15 · **Status**: Superseded by [ADR-009](#adr-009--postgresql-as-the-database)
 
 **Context.** The spec mandates an embedded, file-based local database (SQLite or H2). The app is
 single-user and runs on one machine; there is no server process to manage and no concurrent writers
@@ -163,6 +165,56 @@ binds to the LAN; CORS is restricted to the configured origins; actuator exposur
 **Consequences.** Anyone on the same network can reach the app — accepted for a personal LAN. If the
 app is ever exposed beyond the LAN, this ADR must be superseded first (auth + TLS), and the change
 recorded. Revisit at E6-S5.
+
+---
+
+## ADR-009 — PostgreSQL as the database
+
+**Date**: 2026-10-15 · **Status**: Accepted (supersedes [ADR-001](#adr-001--embedded-sqlite-as-the-database))
+
+**Context.** The original spec mandated an embedded, file-based database (SQLite or H2). The owner has
+since changed the requirement: the database is **PostgreSQL**, decided together with the mandate that the
+whole stack ships containerized at v1.0 (ADR-010). Docker is already part of the toolchain (MCP gateway;
+the database service below), the app stays single-user and local, and a database *server* is therefore
+acceptable as long as it runs on the owner's machine.
+
+**Decision.** Use **PostgreSQL 17** (`postgres:17-alpine`), one server for development and release. Dev
+runs it as a Docker Compose service (`docker-compose.dev.yml`, E1-S11); Spring Data JPA (plain
+`org.postgresql:postgresql`, no community dialect) reads the connection from env (`POSTGRES_*`,
+`AETHER_DB_PORT`). Schema is versioned with Flyway (`ddl-auto=validate`, never `update`). Integration
+tests use **Testcontainers** with the same image tag — no test depends on a pre-running database. The
+H2/SQLite fallback is dropped; `aether.db` no longer exists.
+
+**Consequences.** No SQLite friction (type affinity, community dialect, pragmas) — Postgres types are
+native (`uuid`, `timestamptz`). The database is **not** part of `AETHER_DATA_DIR` anymore: its data lives
+in a Docker volume, and backup becomes `pg_dump` + a copy of the images (E6-S7 updated). Docker must be
+running for backend work. The spec was updated in the same change, with the owner's explicit approval
+(2026-10-15). Embedded databases are no longer an option: any further database change needs a new ADR.
+
+---
+
+## ADR-010 — Containerized delivery for v1.0
+
+**Date**: 2026-10-15 · **Status**: Accepted
+
+**Context.** The owner's requirement: the whole application must be dockerized at the end of the project
+("at the end, dockerize everything"). Docker is already present in the toolchain (ADR-009 database
+service, MCP gateway). The app is single-user, opened from a phone on the LAN, and v1.0 should start with
+one command on a machine without Java or Node installed.
+
+**Decision.** v1.0 ships as a **Docker Compose stack** (`compose.yml`, E6-S11/S12): `db`
+(`postgres:17-alpine`), `api` (multi-stage Maven → Temurin 21 JRE running the Spring Boot jar), `web`
+(multi-stage Node build → nginx serving the built SPA and reverse-proxying `/api/**` and `/images/**`
+to `api`). Single published port: `web` on **3000** (the phone URL from the spec) — one origin, so CORS
+is configurable but unused in the containerized runtime. Database data in the named volume
+`aether_pgdata`; images in a bind mount of `AETHER_DATA_DIR`. Pinned base tags (never `:latest`),
+non-root users, healthchecks, configuration exclusively from `.env`. Development keeps native toolchains
+with only the database containerized. Full target spec: `docs/engineering/DEPLOYMENT.md`; verified from
+a clean clone in E6-S12.
+
+**Consequences.** The v1.0 runbook becomes `docker compose up`; `./mvnw`/`npm` remain the development
+path. Registry publishing, remote deployment, TLS and auth stay out of scope (ADR-008) and would need
+new ADRs.
 
 ---
 

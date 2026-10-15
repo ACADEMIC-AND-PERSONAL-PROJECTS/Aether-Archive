@@ -18,6 +18,7 @@ Images are the product; the UI must be almost invisible.
 | Architecture | `docs/engineering/ARCHITECTURE.md` |
 | Design system (color, glass, type) | `docs/engineering/DESIGN-SYSTEM.md` |
 | Design references (soft & modern brief, inspiration) | `docs/engineering/DESIGN-REFERENCES.md` |
+| Deployment & containers | `docs/engineering/DEPLOYMENT.md` |
 | Decision log (ADRs) | `docs/scrum/DECISION-LOG.md` |
 | Sprint plans / retrospectives | `docs/scrum/sprints/`, `retrospectives/` |
 
@@ -27,7 +28,8 @@ user approval; the specs are the contract the backlog is built from.
 ## 2. Stack (mandated — substitution requires an ADR)
 
 - **Backend**: Java 21 + Spring Boot 3, Maven (`./mvnw`), REST under `/api/v1`, RFC 9457 errors.
-- **Database**: embedded SQLite (file-based); H2 file mode is the documented fallback.
+- **Database**: PostgreSQL 17, run locally as a Docker container. Dev uses `docker-compose.dev.yml`;
+  v1.0 ships the whole stack containerized (`docs/engineering/DEPLOYMENT.md`, ADR-009/010).
 - **Storage**: local filesystem only. Database + images never leave this machine.
 - **Frontend**: React + Vite + TypeScript, Tailwind CSS, Framer Motion, `@dnd-kit`, TanStack Query.
 - **Typography**: Fontsource NPM packages only. Zero external network requests at runtime.
@@ -49,6 +51,7 @@ reports/     Generated verification / analysis reports
 
 Backend (once scaffolded): `./mvnw spring-boot:run` · `./mvnw test` · `./mvnw verify`
 Frontend (once scaffolded): `npm install` · `npm run dev` · `npm run test` · `npm run build` · `npm run lint`
+Dev database (once scaffolded): `docker compose -f docker-compose.dev.yml up -d` · v1.0 stack: `docker compose up`
 Full check before a commit: the `verify` skill (`.claude/skills/verify/SKILL.md`).
 **Keep this section accurate** — every story that adds or renames a command updates it here.
 

@@ -10,7 +10,7 @@
 To achieve the high-fidelity UI and robust local backend requested, the following stack is mandated:
 *   **Frontend:** React.js (using Vite for fast local building), Tailwind CSS (for utility styling and glassmorphism), Framer Motion (for fluid, tactile animations and route transitions), `@dnd-kit/core` (for mobile-friendly drag-and-drop).
 *   **Backend:** Java Spring Boot (REST API).
-*   **Database:** SQLite or H2 (embedded, file-based to keep it strictly local and lightweight).
+*   **Database:** PostgreSQL (run locally in a Docker container; nothing ever leaves the machine).
 *   **Storage:** Local File System (directories managed by Spring Boot).
 
 ## 3. Core User Experience (UX) & UI Views
@@ -72,7 +72,7 @@ To achieve the high-fidelity UI and robust local backend requested, the followin
 
 **Phase 1: Foundation & Backend**
 *   Initialize Spring Boot project.
-*   Configure local SQLite/H2 database and file system storage utility.
+*   Configure local PostgreSQL database (Docker container) and file system storage utility.
 *   Create Entities, Repositories, and REST Controllers.
 *   Test API endpoints using Postman/curl.
 

@@ -6,7 +6,7 @@ color: green
 ---
 
 You are the backend engineer for **Aether Archive**, a local-first Spring Boot application.
-Java 21, Spring Boot 3, Maven, SQLite, local file storage.
+Java 21, Spring Boot 3, Maven, PostgreSQL (Docker), local file storage.
 
 ## Before writing code
 

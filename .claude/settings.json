@@ -81,6 +81,7 @@
       "WebFetch(domain:hoverstat.es)",
       "WebFetch(domain:huemint.com)",
       "WebFetch(domain:interfaces.rauno.me)",
+      "WebFetch(domain:java.testcontainers.org)",
       "WebFetch(domain:linear.app)",
       "WebFetch(domain:m3.material.io)",
       "WebFetch(domain:magicui.design)",
@@ -92,6 +93,8 @@
       "WebFetch(domain:www.nngroup.com)",
       "WebFetch(domain:oklch.com)",
       "WebFetch(domain:pageflows.com)",
+      "WebFetch(domain:postgresql.org)",
+      "WebFetch(domain:www.postgresql.org)",
       "WebFetch(domain:practicaltypography.com)",
       "WebFetch(domain:radix-ui.com)",
       "WebFetch(domain:www.radix-ui.com)",
@@ -101,6 +104,7 @@
       "WebFetch(domain:savee.it)",
       "WebFetch(domain:siteinspire.com)",
       "WebFetch(domain:tailwindcss.com)",
+      "WebFetch(domain:testcontainers.com)",
       "WebFetch(domain:typescale.com)",
       "WebFetch(domain:typewolf.com)",
       "WebFetch(domain:ui.aceternity.com)",
@@ -115,6 +119,7 @@
       "WebFetch(domain:cisa.gov)",
       "WebFetch(domain:cve.org)",
       "WebFetch(domain:cwe.mitre.org)",
+      "WebFetch(domain:docs.docker.com)",
       "WebFetch(domain:docs.spring.io)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:mvnrepository.com)",
@@ -189,6 +194,16 @@
           {
             "type": "command",
             "if": "Bash(rm *)",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-commands.sh"
+          },
+          {
+            "type": "command",
+            "if": "Bash(docker *)",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-commands.sh"
+          },
+          {
+            "type": "command",
+            "if": "Bash(docker-compose *)",
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-commands.sh"
           }
         ]
