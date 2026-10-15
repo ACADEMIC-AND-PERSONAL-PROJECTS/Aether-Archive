@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Product backlog (canonical)
+    url: https://github.com/ACADEMIC-AND-PERSONAL-PROJECTS/Aether-Archive/blob/main/docs/scrum/PRODUCT-BACKLOG.md
+    about: Every requirement originates in the backlog file — issues are a mirror.
+  - name: Sprint playbook
+    url: https://github.com/ACADEMIC-AND-PERSONAL-PROJECTS/Aether-Archive/blob/main/docs/scrum/SPRINT-PLAYBOOK.md
+    about: Process, branch policy and definition of done before opening an issue or a PR.
