@@ -27,7 +27,7 @@ Nothing leaves the machine: builds may pull base images, the running stack makes
 | Service | Image / build | Ports | Volumes | Notes |
 | --- | --- | --- | --- | --- |
 | `db` | `postgres:17-alpine` (pinned) | internal 5432 | `aether_pgdata` named volume | `POSTGRES_*` from `.env`; `pg_isready` healthcheck |
-| `api` | build `backend/` (multi-stage: Maven → Temurin 21 JRE) | internal 8080 | bind mount of `${AETHER_DATA_DIR}` (images) | `depends_on: db (healthy)`; HTTP healthcheck |
+| `api` | build `backend/` (multi-stage: Maven → Temurin 21 JRE) | internal 8080 | bind mount of `${AETHER_DATA_DIR}` (images) | `depends_on: db (healthy)`; HTTP healthcheck; **`SPRING_PROFILES_ACTIVE=prod`** (the app defaults to `dev`, so the container must set it) |
 | `web` | build `frontend/` (multi-stage: Node build → nginx) | `3000` published (LAN) | — | serves the SPA; proxies `/api/**` and `/images/**` to `api` |
 
 Exact base image tags are pinned at implementation time (major.minor at least, **never `:latest`**) and
