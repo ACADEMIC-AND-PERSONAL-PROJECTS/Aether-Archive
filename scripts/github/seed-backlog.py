@@ -235,7 +235,7 @@ def main() -> None:
         title = f"[{sid}] {story['title']}"
         if title in existing:
             continue
-        labels = ["type:story", AREA_BY_EPIC[story["epic"]], story["priority"]]
+        labels = ["type:story", AREA_BY_EPIC[story["epic"]], f"priority:{story['priority']}"]
         labels += AREA_EXTRA.get(sid, [])
         milestone = SPRINTS[story["sprint"]]["title"]
         url = gh(
