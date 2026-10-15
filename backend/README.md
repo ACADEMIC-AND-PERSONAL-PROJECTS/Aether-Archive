@@ -52,19 +52,33 @@ docker compose -f docker-compose.dev.yml up -d              # start (root of the
 docker compose -f docker-compose.dev.yml ps                 # wait for "healthy"
 ```
 
-The container reads `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` and `AETHER_DB_PORT` from the same
-`.env` the backend uses, so both sides always agree. It listens on **127.0.0.1 only** — never the LAN — and
-keeps its data in the named volume `aether_pgdata`, which `docker compose … down` leaves untouched.
+The container reads `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` and `AETHER_DB_PORT` from `.env` at
+the repository root; the backend reads the same keys from its environment — and from that file once E1-S3
+wires the local `.env` into the dev run. Both sides therefore agree by construction. The database listens on
+**127.0.0.1 only** — never the LAN — and keeps its data in the named volume `aether_pgdata`, which
+`docker compose … down` leaves untouched.
+
+`POSTGRES_*` takes effect on the container's **first** initialisation of that volume: changing it later does
+not rename an existing role or database, and the backend would fail to authenticate. Fix that inside `psql`
+(`ALTER ROLE …`) rather than with `down -v`, which deletes the archive.
 
 `docker compose -f docker-compose.dev.yml down` stops it and keeps the data; only `down -v` deletes the
-archive. Inspect it with:
+archive. Inspect it with (the values come from the environment inside the container, so this works whatever
+`POSTGRES_*` you set):
 
 ```bash
-docker compose -f docker-compose.dev.yml exec db psql -U aether -d aether
+docker compose -f docker-compose.dev.yml exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
 ```
 
-The backend does not connect to it yet: the JDBC driver, datasource and Flyway arrive in **E1-S3**, at which
-point `./mvnw spring-boot:run` will use the values documented in `.env.example` with no further setup.
+(The quoting is deliberate: `$POSTGRES_USER` is expanded *inside* the container, from its own environment.
+Written unquoted on the host it would expand to nothing, since those variables live in `.env`, not in your
+shell.)
+
+If port 5432 is already taken by another PostgreSQL, set `AETHER_DB_PORT=5433` in `.env`.
+
+The backend does not connect to it yet: the JDBC driver, datasource and Flyway arrive in **E1-S3**, which is
+also where the local `.env` import lands. Until then `./mvnw spring-boot:run` runs on the defaults in
+`application.yml` and needs no `.env` at all.
 
 ## Configuration
 
