@@ -24,7 +24,6 @@ backend/target/
 *.log
 hs_err_pid*
 .mvn/timing.properties
-!backend/.mvn/wrapper/maven-wrapper.jar
 
 # ── Node / Vite ───────────────────────────────────────────────────────────────
 frontend/node_modules/

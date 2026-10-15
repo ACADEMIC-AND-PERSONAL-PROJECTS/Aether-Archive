@@ -14,5 +14,10 @@ indent_size = 2
 indent_size = 4
 max_line_length = 120
 
+# Windows batch files (the Maven wrapper's mvnw.cmd) require CRLF to run at all —
+# the repository-wide `end_of_line = lf` above must not be applied to them.
+[*.{cmd,bat}]
+end_of_line = crlf
+
 [*.{md,mdx}]
 trim_trailing_whitespace = false

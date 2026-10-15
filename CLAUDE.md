@@ -49,7 +49,7 @@ reports/     Generated verification / analysis reports
 
 ## 4. Commands
 
-Backend (once scaffolded): `./mvnw spring-boot:run` · `./mvnw test` · `./mvnw verify`
+Backend (from `backend/`): `./mvnw spring-boot:run` · `./mvnw test` · `./mvnw verify` · `./mvnw package` (jar in `backend/target/`)
 Frontend (once scaffolded): `npm install` · `npm run dev` · `npm run test` · `npm run build` · `npm run lint`
 Dev database (once scaffolded): `docker compose -f docker-compose.dev.yml up -d` · v1.0 stack: `docker compose up`
 Full check before a commit: the `verify` skill (`.claude/skills/verify/SKILL.md`).
