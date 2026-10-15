@@ -209,13 +209,95 @@ the `category` field), because with equal ceilings the container refuses a file 
 before the service ever sees it. Parts are staged on disk from their first byte, never buffered in
 memory. The service then counts the bytes it actually copies rather than trusting `Content-Length` or
 `getSize()`, so a client that under-reports its length still hits the ceiling. A request over either
-ceiling is refused by the container with a `413` (mapped to a problem detail in E1-S8).
+ceiling is refused by the container with a `413` carrying the same `code` as the service's own refusal
+(see *Errors*): one upload behaves the same whichever of the two ceilings caught it.
 
 Refusals throw `UnsupportedImageTypeException`, `UploadTooLargeException` or `StorageException`, each
-carrying a stable `code` (`unsupported-image-type`, `upload-too-large`, `storage-failure`) that E1-S8 maps
-to an RFC 9457 problem detail. No message contains a filesystem path — the operator finds paths in the log.
+carrying a stable `code` (`unsupported-image-type`, `upload-too-large`, `storage-failure`) that
+`ApiExceptionHandler` turns into an RFC 9457 problem detail (see *Errors*). No message contains a
+filesystem path — the operator finds paths in the log.
+
+## Errors
+
+Every failure leaves as an RFC 9457 problem detail in `application/problem+json`, produced by one
+`@RestControllerAdvice` (`exception/ApiExceptionHandler`). A request whose body fails validation:
+
+```json
+{
+  "type": "about:blank",
+  "title": "Validation failed",
+  "status": 400,
+  "detail": "The request failed validation; the 'errors' collection lists the fields that were rejected.",
+  "instance": "/api/v1/dumps",
+  "code": "validation-failure",
+  "errors": [
+    { "field": "backgroundColor", "message": "must match \"^#[0-9a-fA-F]{6}$\"" },
+    { "field": "title", "message": "size must be between 0 and 80" }
+  ]
+}
+```
+
+`type` is always `about:blank`: the archive has no error-documentation site to link, and RFC 9457 defines
+that value as "nothing more to say about this problem". The machine-readable identity is `code` — switch
+on it, never on `detail` or `title`, which are prose for the person fixing the request and may be reworded.
+`instance` is the path the client asked for. `title` is a constant per situation and never an exception
+message; `detail` is one sentence, taken from the domain exception when it has one fit for a client.
+
+| `code` | Status | Meaning |
+| --- | --- | --- |
+| `unsupported-image-type` | 415 | an upload is not an accepted image format, by its declaration or by its bytes |
+| `upload-too-large` | 413 | an upload over `AETHER_MAX_UPLOAD_MB`, refused by the service or the container's ceiling |
+| `storage-failure` | 500 | the storage layer failed: an unreadable upload, an unusable data directory, a refused path |
+| `validation-failure` | 400 | a body or a method call failed its Jakarta Validation constraints; the fields are listed |
+| `invalid-parameter` | 400 | a path variable or query parameter does not parse as the type the endpoint declares |
+| `malformed-request` | 400 | the body is not JSON this endpoint can read, or a request declared multipart cannot be read as one |
+| `missing-request-part` | 400 | a multipart request arrived without a part the endpoint requires |
+| `not-found` | 404 | neither a controller nor a static resource serves the path |
+| `internal-failure` | 500 | a bug: no handler above claimed the exception |
+
+The table is the archive's own vocabulary (ADR-013). A refusal Spring raises before a controller runs
+borrows its code from the status instead: the status name in kebab-case — `bad-request` for a required
+parameter that is missing, `unsupported-media-type` for a `Content-Type` the endpoint does not take,
+`method-not-allowed`, `not-acceptable` — and `request-rejected` when no status name describes it.
+
+A validation failure lists the rejected fields in `errors`, so a client can mark them all at once instead
+of resubmitting to discover the next one. Where the violation was found makes no difference to the client:
+a request body, a handler parameter validated by Spring MVC itself, and an argument of a `@Validated` bean
+all answer alike. The collection holds at most **10** entries — a request rejected on a hundred fields
+still answers in one screen — and a violation with no field of its own, such as a class-level rule, is
+reported against `request` rather than dropped. Each entry carries the `field` as the client wrote it and
+the validator's `message`; the **rejected value itself is never echoed back** — a response body is copied
+into logs and screenshots — with the one exception named below for an upload's declared media type.
+
+A refusal the archive raises *itself*, after a controller saw the request — a 404 for a photo it does not
+hold — is its own statement: its `detail` is answered as written, and the `code` its problem detail set,
+when it set one. Only the refusals Spring MVC raises *before* a controller runs are flattened; those keep
+the framework's status and its own headers — `405` with the `Allow` header carrying the verbs that work,
+`406`, `415` — and take the status-derived code above, because their own message names converters and value
+classes. Both stay refusals rather than becoming `500`, which would report the client's mistake as a
+server failure.
+
+**Nothing internal leaves the process.** No stack trace and no filesystem path, which
+`.claude/rules/security.md` forbids, and no SQL, class or exception name either. The one value an error
+response may repeat is the media type an upload declared, which the 415 refusal names back (stripped of
+control characters and cut to 100 characters in `StorageService`) because a client cannot correct a
+`Content-Type` it cannot see, and a declared label is not the picture's bytes. The 5xx
+cases log the stack trace (`StorageException` and anything unclaimed), and the operator reads the cause
+there; even `StorageException`'s client-facing sentence is written without a path. The limits themselves are
+constants in `dto/ValidationConstraints` (title ≤ 80, `#RRGGBB`, exactly six photo ids), referenced from the
+DTO annotations so the annotation, the message and the test cannot drift.
+
+The codes are a stable vocabulary: renaming one is a contract change with an ADR, not a refactor.
+`_docs/openapi.yml` fixes the statuses it documents — the `400` of `POST /dumps` is the
+`validation-failure` above — but carries no error schema, so this table is where the vocabulary is written
+down; moving it into the spec is a contract change and needs an ADR.
 
 ## Tests
+
+A `@WebMvcTest` slice loads the web layer and its advice but not the typed configuration properties those
+beans are built from, so a slice that expects an error response needs
+`@EnableConfigurationProperties({ StorageProperties.class, CorsProperties.class })` — without it the context
+fails on the advice's constructor, not on the test.
 
 `./mvnw test` needs Docker, nothing else: every context-booting test runs against a throwaway
 PostgreSQL container (`postgres:17-alpine`, the same tag as the dev database, ADR-009) that

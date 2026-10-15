@@ -22,6 +22,7 @@ Statuses: `Proposed` · `Accepted` · `Superseded by ADR-NNN` · `Rejected`.
 | [ADR-010](#adr-010--containerized-delivery-for-v10) | 2026-10-15 | Containerized delivery for v1.0 | Accepted |
 | [ADR-011](#adr-011--api-contract-clarifications-for-sprint-1) | 2026-10-15 | API contract clarifications for Sprint 1 | Accepted |
 | [ADR-012](#adr-012--storage-and-cors-constraints) | 2026-10-15 | Storage and CORS constraints | Accepted |
+| [ADR-013](#adr-013--the-error-vocabulary-is-a-declared-part-of-the-contract) | 2026-10-15 | The error vocabulary is a declared part of the contract | Accepted |
 
 ---
 
@@ -310,6 +311,42 @@ because the files would then live outside the tree the backups copy. This is enf
 boot, so an existing archive keeps starting. The upload ceiling of point 1 is also enforced twice: at the
 servlet container (`spring.servlet.multipart.max-file-size`, wired to the same `AETHER_MAX_UPLOAD_MB`) and
 in the service while streaming, so a request that under-reports its length still meets the ceiling.
+
+---
+
+## ADR-013 — The error vocabulary is a declared part of the contract
+
+**Date**: 2026-10-15 · **Status**: Accepted
+
+**Context.** E1-S8 gives every failure one RFC 9457 shape, but `_docs/openapi.yml` documents no error schema
+at all (a single bare `400` on `POST /dumps`), and the standard leaves two things open that a client
+depends on: whether each problem gets a `type` URI of its own, and whether `title` is the status phrase
+(§4.2.1 says it *should* be). The codes are what the frontend switches on, so they cannot be left to drift.
+
+**Decision.** The codes are part of the contract, listed in `backend/README.md`: the archive's own
+situations have one each — `unsupported-image-type`, `upload-too-large`, `storage-failure`,
+`validation-failure`, `invalid-parameter`, `malformed-request`, `missing-request-part`, `not-found`,
+`internal-failure`. A refusal Spring MVC raises before a controller runs (405, 406, 415, a missing required
+parameter) borrows its code from the status instead: the status name in kebab-case —
+`method-not-allowed`, `bad-request`, `unsupported-media-type` — or `request-rejected` when no `HttpStatus`
+name describes the status. A refusal the archive raises itself keeps its own `detail` and, when its problem
+detail set one, its own `code`.
+
+1. **`type` stays `about:blank` for every problem** — no per-problem type URIs. A type URI promises
+   documentation at that URI; the archive has no error-documentation site and is not getting one, and
+   sending a client to a URI that answers nothing is worse than the standard's "nothing more to say about
+   this problem". Identity lives in `code`: short, stable, in the body, switchable in a frontend.
+2. **`title` names the situation, not the status.** RFC 9457 §4.2.1 *recommends* the status phrase; we
+   depart from it deliberately, because "Validation failed", "Malformed request" and "Not found" tell a
+   reader which failure this is, while the status is already in `status` — and there is more than one 400.
+   The borrowed refusals keep the framework's phrase (`Method Not Allowed`), which is all the framework
+   says about them.
+
+**Consequences.** Renaming a code, or changing its status, is an API change that needs an ADR — not a
+refactor. A new situation adds its code to the README table in the same change; nothing needs a spec
+revision until `_docs/openapi.yml` grows an error schema, which is itself a contract change needing the
+owner's approval (`_docs/` is read-only, ADR-011). Clients switch on `code`, never on `title` or `detail`,
+which the archive may reword.
 
 ---
 

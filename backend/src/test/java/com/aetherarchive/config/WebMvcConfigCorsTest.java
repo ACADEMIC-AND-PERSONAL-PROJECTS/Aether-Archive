@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @WebMvcTest(controllers = WebMvcConfigCorsTest.ProbeController.class)
 @Import(WebMvcConfig.class)
-@EnableConfigurationProperties(CorsProperties.class)
+@EnableConfigurationProperties({ CorsProperties.class, StorageProperties.class })
 class WebMvcConfigCorsTest {
 
     @Nested
