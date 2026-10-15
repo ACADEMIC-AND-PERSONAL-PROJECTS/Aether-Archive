@@ -168,6 +168,10 @@
       "Read(./.env.prod)",
       "Read(./.env.production)",
       "Read(./.env.staging)",
+      "Read(./.env.bak)",
+      "Read(./.env.old)",
+      "Read(./.env.save)",
+      "Read(./.env.backup)",
       "Read(**/secrets/**)"
     ]
   },
