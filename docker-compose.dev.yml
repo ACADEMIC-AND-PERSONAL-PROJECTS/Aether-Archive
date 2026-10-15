@@ -1,0 +1,47 @@
+# Aether Archive — local development database (ADR-009).
+#
+#   cp .env.example .env                              # once, then adjust if you like
+#   docker compose -f docker-compose.dev.yml up -d
+#   docker compose -f docker-compose.dev.yml ps        # wait for "healthy"
+#
+# Every value comes from `.env` at the repository root; the defaults below apply
+# when the file — or a single key — is missing, so a fresh clone starts without
+# one. `POSTGRES_*` is consumed by the container's first initialisation only:
+# changing it afterwards leaves the existing role and database untouched (use
+# `psql` and `ALTER ROLE`), because the alternative `down -v` deletes the archive.
+# The archive itself lives in the named volume `aether_pgdata`:
+# `docker compose ... down` keeps it, only an explicit `down -v` removes it.
+#
+# `restart: unless-stopped` is deliberate: the development database comes back
+# after a reboot, so the backend can start without a manual `up` first.
+
+name: aether-archive-dev
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-aether}
+      POSTGRES_USER: ${POSTGRES_USER:-aether}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-local}
+    ports:
+      # Loopback only, on purpose: the backend runs on this machine, and the
+      # archive database is never exposed to the local network.
+      - "127.0.0.1:${AETHER_DB_PORT:-5432}:5432"
+    volumes:
+      - aether_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # `-h 127.0.0.1` matters: without it `pg_isready` answers over the Unix
+      # socket, which the entrypoint's temporary initialisation server serves
+      # too — so "healthy" could precede a database that is actually usable.
+      # Only the real listener accepts TCP, which is what the backend uses.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-aether} -d ${POSTGRES_DB:-aether}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  aether_pgdata:
+    name: aether_pgdata
