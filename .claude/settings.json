@@ -137,6 +137,7 @@
       "Read(**/secrets/**)"
     ]
   },
+  "enabledMcpjsonServers": ["MCP_DOCKER", "web-search"],
   "hooks": {
     "SessionStart": [
       {
