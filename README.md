@@ -44,19 +44,26 @@ Backend and frontend are scaffolded in Sprint 1 and Sprint 2 (see `docs/scrum/PR
 
 ```bash
 # 1. Environment
-cp .env.example .env        # then edit AETHER_DATA_DIR and review the POSTGRES_* values
+cp .env.example .env        # optional; review the POSTGRES_* values, set AETHER_DATA_DIR if you want
+                            # another location than the default ~/AetherArchive_Data
 
-# 2. Dev database — Postgres container (after Sprint 1)
+# 2. Dev database — PostgreSQL 17 container, listening on 127.0.0.1 only
 docker compose -f docker-compose.dev.yml up -d
+docker compose -f docker-compose.dev.yml ps          # wait for "healthy"
 
-# 3. Backend (after Sprint 1)
+# 3. Backend (scaffolded; the /api/v1 endpoints land during Sprint 1)
 cd backend && ./mvnw spring-boot:run
 
-# 4. Frontend (after Sprint 2)
-cd frontend && npm install && npm run dev -- --host   # --host exposes it to your phone
+# 4. Frontend (from Sprint 2 onwards)
+cd ../frontend && npm install && npm run dev -- --host   # --host exposes it to your phone
 ```
 
 Then open `http://<your-LAN-IP>:5173` on your phone.
+
+The dev database keeps its data in the named volume `aether_pgdata`:
+`docker compose -f docker-compose.dev.yml down` stops it and keeps everything;
+only an explicit `down -v` deletes the archive. If port 5432 is already taken by another
+PostgreSQL, set `AETHER_DB_PORT=5433` in `.env` — the compose file and the backend both read it.
 
 **v1.0 (planned, Sprint 6):** the whole stack runs as containers —
 `cp .env.example .env && docker compose up`, then open `http://<your-LAN-IP>:3000`.
