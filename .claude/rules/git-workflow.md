@@ -59,5 +59,6 @@ work around `.claude/hooks/guard-commands.sh`.
 ## Sprint boundaries
 
 - `/start-sprint` opens a sprint: sprint doc + milestone + sprint backlog selection.
-- `/finish-sprint` closes it: retro commit, release PR `develop` → `main`, merge, tag `sprint-NN`.
+- `/finish-sprint` closes it: security audit gate, retro commit, release PR `develop` → `main`, merge,
+  tag `sprint-NN`.
 - After a merge: `git switch develop && git pull --ff-only`, then delete the merged local branch.

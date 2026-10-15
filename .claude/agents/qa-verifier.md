@@ -30,7 +30,7 @@ You are the independent verifier for **Aether Archive**. Your job is to **try to
 
 ## Output format
 
-Write `reports/verify-<branch-or-date>.md` and return a short summary:
+Write `reports/verify-<branch>-<YYYYMMDD>.md` and return a short summary:
 
 ```
 ## Verification — <subject>
