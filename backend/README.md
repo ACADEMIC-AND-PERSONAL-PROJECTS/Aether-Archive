@@ -18,14 +18,18 @@ backend/
     │   ├── dto/                     request/response records
     │   └── exception/               RFC 9457 error handling
     ├── main/resources/
-    │   ├── application.yml          base config (port, storage dir, CORS)
-    │   └── application-<profile>.yml  dev · test · prod overrides
-    └── test/java/com/aetherarchive/ JUnit 5 · @SpringBootTest · @WebMvcTest (controller slices grow with E1-S6)
+    │   ├── application.yml          base config (port, datasource, storage dir, CORS)
+    │   ├── application-<profile>.yml  dev · test · prod overrides
+    │   └── db/migration/            Flyway migrations: V1 creates the schema, V2 tightens it
+    └── test/java/com/aetherarchive/ JUnit 5 · @WebMvcTest slices · @DataJpaTest and @SpringBootTest
+                                     against a throwaway PostgreSQL (Testcontainers)
 ```
 
 ## Requirements
 
 - **JDK 21** — required by `java.version`; the build fails on older JDKs.
+- **Docker** — the development database is a container, and the test suite starts its own throwaway
+  PostgreSQL (Testcontainers). Nothing is skipped without it: a missing daemon fails the build.
 - Network access the first time Maven resolves dependencies; afterwards the local `~/.m2` cache is enough.
 
 ## Commands
@@ -53,10 +57,9 @@ docker compose -f docker-compose.dev.yml ps                 # wait for "healthy"
 ```
 
 The container reads `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` and `AETHER_DB_PORT` from `.env` at
-the repository root; the backend reads the same keys from its environment — and from that file once E1-S3
-wires the local `.env` into the dev run. Both sides therefore agree by construction. The database listens on
-**127.0.0.1 only** — never the LAN — and keeps its data in the named volume `aether_pgdata`, which
-`docker compose … down` leaves untouched.
+the repository root, and the backend imports that same file (see *How the backend reads `.env`* below), so
+both sides agree by construction. The database listens on **127.0.0.1 only** — never the LAN — and keeps
+its data in the named volume `aether_pgdata`, which `docker compose … down` leaves untouched.
 
 `POSTGRES_*` takes effect on the container's **first** initialisation of that volume: changing it later does
 not rename an existing role or database, and the backend would fail to authenticate. Fix that inside `psql`
@@ -76,9 +79,59 @@ shell.)
 
 If port 5432 is already taken by another PostgreSQL, set `AETHER_DB_PORT=5433` in `.env`.
 
-The backend does not connect to it yet: the JDBC driver, datasource and Flyway arrive in **E1-S3**, which is
-also where the local `.env` import lands. Until then `./mvnw spring-boot:run` runs on the defaults in
-`application.yml` and needs no `.env` at all.
+On the first boot against that database, Flyway applies the migrations in `db/migration/` (V1 creates the
+tables, V2 tightens their constraints) and records them in `flyway_schema_history`; afterwards Hibernate
+only checks that the entities still match the schema (`ddl-auto=validate`) and never creates or alters a
+table. Restarting the backend is therefore safe: a migration runs once and is then skipped.
+
+### How the backend reads `.env`
+
+Spring Boot does not read `.env` files — docker compose does — so `application.yml` imports it explicitly:
+
+```yaml
+spring:
+  config:
+    import:
+      - optional:file:../.env[.properties]
+      - optional:file:./.env[.properties]
+```
+
+What it does:
+
+- Both paths are relative to the **working directory of the JVM** — where you start the process, not where
+  the application or its `pom.xml` lives — and both are `optional:`, so the file that does not exist is
+  simply skipped and nothing requires a `.env`: `../.env` is the repository root when you run
+  `./mvnw spring-boot:run` from `backend/` (the documented flow), `./.env` covers a run from the repository
+  root. Those two are the supported working directories; started from anywhere else, the parent entry
+  imports whatever file happens to sit one level above that directory — an unrelated project's `.env` would
+  be read without a word. If both entries exist, the second (`./.env`) wins where they disagree.
+- The `[.properties]` hint makes Spring read the file as a Java properties file, which is exactly what the
+  `KEY=value` lines of `.env.example` are. Dotted keys (`spring.datasource.url=…`) work as well.
+- An imported value wins over the default `application.yml` writes for it — `.env` configures the run, it
+  is not a fallback.
+- The values are read **below** real environment variables and command-line arguments:
+  `POSTGRES_USER=someone ./mvnw spring-boot:run` wins over `.env`.
+- Only the keys the configuration actually asks for are looked up (`${POSTGRES_DB:aether}`,
+  `${POSTGRES_USER:aether}`, `${POSTGRES_PASSWORD:change-me-local}`, `${AETHER_DB_PORT:5432}`,
+  `${SPRING_DATASOURCE_URL:…}`, plus the E1-S2 storage and CORS keys) — the full list is the datasource and
+  `aether` sections of `application.yml`, and every default matches `.env.example` and
+  `docker-compose.dev.yml`.
+
+What it does not do:
+
+- It is a Java properties file, not a dotenv parser, and the two grammars disagree where it hurts:
+  `export KEY=value` and shell-style quoting are not part of it, a trailing `# comment` stays in the value,
+  and `\` starts an escape sequence — `AETHER_DATA_DIR=C:\Users\me\data` is read as `C:Usersmedata`, with
+  the separators gone, while a lowercase `\u` not followed by four hex digits is not skipped: it aborts the
+  boot with `Malformed \uxxxx encoding`. The file is also decoded as ISO-8859-1, the properties encoding, so
+  a non-ASCII character has to be written as a `\uXXXX` escape. Use `/` as the separator (or `\\`) and keep
+  `.env` to `KEY=value` with comments on their own line.
+- It never creates or writes `.env`. The file stays local and gitignored; the repository only carries
+  `.env.example`.
+- It does not decide which database the tests run against: they use their own PostgreSQL container
+  (Testcontainers), whose connection details replace `spring.datasource.*` entirely, whatever `.env` says.
+  The other keys reach the tests like anywhere else — the `test` profile overrides the data directory and
+  the logging level, not every value.
 
 ## Configuration
 
@@ -89,7 +142,35 @@ documented keys in `.env.example`. The values are bound to typed properties at s
 blank or relative `AETHER_DATA_DIR`, one pointing at the filesystem root or at the user's home
 directory, an `AETHER_MAX_UPLOAD_MB` outside 1–1024, an `AETHER_CORS_ALLOWED_ORIGINS` entry that is not
 a `scheme://host[:port]` pattern or whose host is only `*`, or a stray comma in that list, stop the boot
-with a `Reason:` line. PostgreSQL + Flyway arrive with E1-S3.
+with a `Reason:` line.
+
+### Database
+
+The datasource is built from the same keys the compose file reads, with the same defaults, so an
+unconfigured backend and an unconfigured container still meet:
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `SPRING_DATASOURCE_URL` | built from the keys below | full JDBC override, when the pieces are not enough |
+| `POSTGRES_DB` | `aether` | database name |
+| `POSTGRES_USER` | `aether` | role |
+| `POSTGRES_PASSWORD` | `change-me-local` | password (a placeholder: change it in `.env`) |
+| `AETHER_DB_PORT` | `5432` | host port `docker-compose.dev.yml` publishes on 127.0.0.1 |
+
+The default URL is `jdbc:postgresql://localhost:${AETHER_DB_PORT}/${POSTGRES_DB}`. The schema is
+Flyway's: `src/main/resources/db/migration/V*.sql` is applied at startup, and Hibernate runs with
+`ddl-auto=validate` — it refuses to map an entity to a table that is not there, but it never creates or
+changes one. A new table or column means a new migration file, not an annotation change.
+
+## Tests
+
+`./mvnw test` needs Docker, nothing else: every context-booting test runs against a throwaway
+PostgreSQL container (`postgres:17-alpine`, the same tag as the dev database, ADR-009) that
+`support/PostgresTestConfiguration` hands to Spring via `@ServiceConnection`. Flyway applies the real
+migration to it and `ddl-auto=validate` then runs against the real schema, so a drift between the
+entities and `db/migration` fails the suite. Docker must be running: a missing daemon fails the build
+loudly rather than skipping the database tests. Each test context gets its own container, and
+Testcontainers removes them when the run is over — nothing to stop by hand, nothing left behind.
 
 ### Data directory
 

@@ -8,12 +8,21 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
 import com.aetherarchive.config.StorageProperties;
+import com.aetherarchive.support.PostgresTestConfiguration;
 
+/**
+ * Boots the whole application, database included: Flyway applies the baseline to a throwaway
+ * PostgreSQL container and {@code ddl-auto=validate} then proves the entities still match it, so
+ * this context load is also the end-to-end check of the migration. No database has to be running
+ * before the suite (ADR-009).
+ */
 @SpringBootTest
 @ActiveProfiles("test")
+@Import(PostgresTestConfiguration.class)
 class AetherArchiveApplicationTests {
 
     @Value("${spring.application.name}")
