@@ -1,6 +1,8 @@
 package com.aetherarchive.config;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -43,6 +45,20 @@ class WebMvcConfigCorsTest {
             mockMvc.perform(get("/test/cors-probe").header("Origin", "http://192.168.1.42:5173"))
                     .andExpect(status().isOk())
                     .andExpect(header().string("Access-Control-Allow-Origin", "http://192.168.1.42:5173"));
+        }
+
+        @Test
+        void should_answer_preflight_when_the_origin_is_configured() throws Exception {
+            // The path the Vite frontend actually uses: it sends a non-simple request on every call
+            // with a JSON body, so the browser preflights it first.
+            mockMvc.perform(options("/test/cors-probe")
+                            .header("Origin", "http://localhost:5173")
+                            .header("Access-Control-Request-Method", "POST")
+                            .header("Access-Control-Request-Headers", "content-type"))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"))
+                    .andExpect(header().string("Access-Control-Allow-Methods", containsString("POST")))
+                    .andExpect(header().string("Access-Control-Allow-Headers", containsString("content-type")));
         }
 
         @Test

@@ -2,7 +2,6 @@ package com.aetherarchive.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
-import static org.assertj.core.api.Assumptions.assumeThat;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -11,6 +10,7 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.util.List;
 import java.util.stream.Stream;
 
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -82,10 +82,31 @@ class StorageInitializerTest {
     }
 
     @Test
+    void should_fail_without_deleting_the_target_when_staging_directory_is_a_symlink() throws IOException {
+        Path dataDir = Files.createDirectories(tempDir.resolve("aether-data"));
+        Path linkedDirectory = Files.createDirectories(tempDir.resolve("elsewhere"));
+        Path precious = Files.writeString(linkedDirectory.resolve("keep.txt"), "not a staging artefact");
+        Path tmpDir = dataDir.resolve(StorageInitializer.TMP_DIR);
+        createSymbolicLinkOrSkip(tmpDir, linkedDirectory);
+
+        assertThatExceptionOfType(IllegalStateException.class)
+                .isThrownBy(() -> initializer(dataDir).initialize())
+                .withMessageContaining("Aether Archive cannot start")
+                .withMessageContaining(tmpDir.toString())
+                .withMessageContaining("symbolic link")
+                .withMessageContaining("AETHER_DATA_DIR");
+
+        assertThat(Files.readString(precious)).isEqualTo("not a staging artefact");
+        assertThat(Files.isSymbolicLink(tmpDir)).isTrue();
+    }
+
+    @Test
     void should_fail_with_actionable_message_when_directory_cannot_be_created() throws IOException {
         Path readOnlyParent = Files.createDirectory(tempDir.resolve("read-only-parent"));
         Files.setPosixFilePermissions(readOnlyParent, PosixFilePermissions.fromString("r-xr-xr-x"));
-        assumeThat(Files.isWritable(readOnlyParent)).isFalse();
+        Assumptions.assumeFalse(Files.isWritable(readOnlyParent),
+                "the directory stayed writable (running as root or a permissions-ignoring filesystem): "
+                        + "the unwritable-parent case cannot be exercised");
         Path dataDir = readOnlyParent.resolve("aether-data");
 
         assertThatExceptionOfType(IllegalStateException.class)
@@ -102,12 +123,31 @@ class StorageInitializerTest {
         Files.createDirectories(dataDir.resolve(StorageInitializer.IMAGES_DIR));
         Files.createDirectories(dataDir.resolve(StorageInitializer.THUMBNAILS_DIR));
         Files.setPosixFilePermissions(tmpDir, PosixFilePermissions.fromString("r-xr-xr-x"));
-        assumeThat(Files.isWritable(tmpDir)).isFalse();
+        Assumptions.assumeFalse(Files.isWritable(tmpDir),
+                "the directory stayed writable (running as root or a permissions-ignoring filesystem): "
+                        + "the unwritable staging directory cannot be exercised");
 
         assertThatExceptionOfType(IllegalStateException.class)
                 .isThrownBy(() -> initializer(dataDir).initialize())
                 .withMessageContaining("Aether Archive cannot start")
                 .withMessageContaining(tmpDir.toString());
+    }
+
+    @Test
+    void should_fail_when_images_directory_exists_but_is_not_writable() throws IOException {
+        Path dataDir = tempDir.resolve("aether-data");
+        Path imagesDir = Files.createDirectories(dataDir.resolve(StorageInitializer.IMAGES_DIR));
+        Files.createDirectories(dataDir.resolve(StorageInitializer.THUMBNAILS_DIR));
+        Files.createDirectories(dataDir.resolve(StorageInitializer.TMP_DIR));
+        Files.setPosixFilePermissions(imagesDir, PosixFilePermissions.fromString("r-xr-xr-x"));
+        Assumptions.assumeFalse(Files.isWritable(imagesDir),
+                "the directory stayed writable (running as root or a permissions-ignoring filesystem): "
+                        + "the unwritable images directory cannot be exercised");
+
+        assertThatExceptionOfType(IllegalStateException.class)
+                .isThrownBy(() -> initializer(dataDir).initialize())
+                .withMessageContaining("Aether Archive cannot start")
+                .withMessageContaining(imagesDir.toString());
     }
 
     @Test
@@ -117,12 +157,24 @@ class StorageInitializerTest {
         assertThatExceptionOfType(IllegalStateException.class)
                 .isThrownBy(() -> initializer(dataDir).initialize())
                 .withMessageContaining("Aether Archive cannot start")
-                .withMessageContaining(dataDir.toString());
+                .withMessageContaining(dataDir.toString())
+                // The exception message of the failure *is* the path; it must not be printed twice.
+                .satisfies(exception -> assertThat(exception.getMessage())
+                        .doesNotContain("'" + dataDir + "' (" + dataDir + ")"));
     }
 
     private StorageInitializer initializer(Path dataDir) {
         // StorageProperties rejects relative paths; @TempDir may hand out a relative one.
         return new StorageInitializer(new StorageProperties(dataDir.toAbsolutePath(), MAX_UPLOAD_MB));
+    }
+
+    private static void createSymbolicLinkOrSkip(Path link, Path target) {
+        try {
+            Files.createSymbolicLink(link, target);
+        }
+        catch (UnsupportedOperationException | SecurityException | IOException ex) {
+            Assumptions.abort("this platform does not support symbolic links: " + ex);
+        }
     }
 
     private static List<Path> entries(Path directory) throws IOException {

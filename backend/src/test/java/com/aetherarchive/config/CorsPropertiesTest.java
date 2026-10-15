@@ -1,6 +1,7 @@
 package com.aetherarchive.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 import java.util.List;
 
@@ -57,11 +58,48 @@ class CorsPropertiesTest {
                 });
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = { "https://*", "http://*:5173", "http://*:*" })
+    void should_reject_origin_when_the_host_is_a_bare_wildcard(String configuredOrigins) {
+        // `https://*` matches every origin, i.e. the wildcard the rule above tries to prevent.
+        runner.withPropertyValues("aether.cors.allowed-origins=" + configuredOrigins)
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(ContextFailures.causeChainMessages(context.getStartupFailure()))
+                            .contains("matches every origin");
+                });
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = { ",", "http://localhost:5173,", ",http://localhost:5173" })
+    void should_reject_list_when_a_stray_comma_creates_a_blank_entry(String configuredOrigins) {
+        runner.withPropertyValues("aether.cors.allowed-origins=" + configuredOrigins)
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(ContextFailures.causeChainMessages(context.getStartupFailure()))
+                            .contains("must not contain a blank entry");
+                });
+    }
+
     @Test
-    void should_keep_origin_patterns_when_list_is_built_in_code() {
-        CorsProperties properties = new CorsProperties(List.of(" http://localhost:3000 ", ""));
+    void should_trim_origin_patterns_when_list_is_built_in_code() {
+        CorsProperties properties = new CorsProperties(List.of(" http://localhost:3000 "));
 
         assertThat(properties.allowedOrigins()).containsExactly("http://localhost:3000");
+    }
+
+    @Test
+    void should_allow_no_origin_when_a_single_blank_entry_is_built_in_code() {
+        CorsProperties properties = new CorsProperties(List.of(" "));
+
+        assertThat(properties.allowedOrigins()).isEmpty();
+    }
+
+    @Test
+    void should_reject_list_when_a_blank_entry_arrives_beside_another_one() {
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new CorsProperties(List.of("http://localhost:3000", "")))
+                .withMessageContaining("must not contain a blank entry");
     }
 
     @EnableConfigurationProperties(CorsProperties.class)

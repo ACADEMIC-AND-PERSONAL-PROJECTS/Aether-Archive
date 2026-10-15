@@ -21,6 +21,7 @@ Statuses: `Proposed` · `Accepted` · `Superseded by ADR-NNN` · `Rejected`.
 | [ADR-009](#adr-009--postgresql-as-the-database) | 2026-10-15 | PostgreSQL as the database | Accepted |
 | [ADR-010](#adr-010--containerized-delivery-for-v10) | 2026-10-15 | Containerized delivery for v1.0 | Accepted |
 | [ADR-011](#adr-011--api-contract-clarifications-for-sprint-1) | 2026-10-15 | API contract clarifications for Sprint 1 | Accepted |
+| [ADR-012](#adr-012--storage-and-cors-constraints) | 2026-10-15 | Storage and CORS constraints | Accepted |
 
 ---
 
@@ -270,6 +271,36 @@ all three values (`SINGLE_PIC | ANIME | MONTHLY_DUMP`) even though only `MONTHLY
 Sprint 1 — single-photo items arrive with the river feed (E5-S1). Any future change to the paths, to the
 `title` requirement, or to the on-upload assignment model re-opens this ADR; the stale `archives/*` text
 stays as it is until the owner approves a spec revision.
+
+---
+
+## ADR-012 — Storage and CORS constraints
+
+**Date**: 2026-10-15 · **Status**: Accepted
+
+**Context.** E1-S2 binds and validates the configuration before anything else runs, and the specs name
+the keys (`_docs/aether_archive_specs.md`, `.env.example`) without fixing their accepted values: the
+upload ceiling, what counts as a valid CORS entry, and how far `AETHER_DATA_DIR` may point. Without a
+record, each review round re-argues the same bounds.
+
+**Decision.**
+
+1. **Uploads**: `AETHER_MAX_UPLOAD_MB` is inclusive 1–1024; a value outside stops the boot. The ceiling
+   is a sanity bound, not a storage policy.
+2. **CORS**: `AETHER_CORS_ALLOWED_ORIGINS` is a comma-separated list of Spring origin *patterns*;
+   wildcards inside a host are supported (`http://192.168.*.*:5173`). A bare `*` and a host that is only
+   `*` (`https://*`) are rejected at boot — Spring resolves both to "every origin", which would silently
+   disable the restriction. An empty value disables cross-origin access entirely; a blank entry next to
+   another one (stray comma) is an error, never "disabled".
+3. **Data directory**: `AETHER_DATA_DIR` must be absolute, must not be the filesystem root and must not
+   be the user's home directory — the boot creates `images/`, `thumbnails/` and `tmp/` there and empties
+   `tmp/`. A symlinked data directory (e.g. `~/AetherArchive_Data -> /mnt/archive`) is supported, but
+   `tmp/`, whose contents the boot deletes, must be a real directory and not a symlink.
+
+**Consequences.** Boot fails early with an actionable message instead of writing into a location the
+operator did not mean. Wildcard CORS patterns stay usable on a LAN with a dynamic IP. A future story
+that needs a different upload ceiling, a non-pattern CORS entry or a symlinked staging directory must
+supersede this ADR first (e.g. `tmp/` on another volume would need an explicit allow-list, not silence).
 
 ---
 

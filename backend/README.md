@@ -86,13 +86,16 @@ Everything is env-driven: `SERVER_PORT`, `AETHER_DATA_DIR`, `AETHER_MAX_UPLOAD_M
 `AETHER_CORS_ALLOWED_ORIGINS` — the defaults live in `src/main/resources/application.yml`, the
 documented keys in `.env.example`. The values are bound to typed properties at startup
 (`config/StorageProperties`, `config/CorsProperties`) and validated before anything else happens: a
-blank or relative `AETHER_DATA_DIR`, an `AETHER_MAX_UPLOAD_MB` outside 1–1024, or an origin that is not
-a `scheme://host[:port]` pattern stop the boot with a `Reason:` line. PostgreSQL + Flyway arrive with
-E1-S3.
+blank or relative `AETHER_DATA_DIR`, one pointing at the filesystem root or at the user's home
+directory, an `AETHER_MAX_UPLOAD_MB` outside 1–1024, an `AETHER_CORS_ALLOWED_ORIGINS` entry that is not
+a `scheme://host[:port]` pattern or whose host is only `*`, or a stray comma in that list, stop the boot
+with a `Reason:` line. PostgreSQL + Flyway arrive with E1-S3.
 
 ### Data directory
 
-`AETHER_DATA_DIR` must be absolute and outside the repository (default `~/AetherArchive_Data`):
+`AETHER_DATA_DIR` must be absolute, must not be the filesystem root and must not be the user's home
+directory itself: the boot creates `images/`, `thumbnails/` and `tmp/` inside it and empties `tmp/` on
+every start, which neither of those two locations is meant for (default `~/AetherArchive_Data`):
 
 ```text
 ${AETHER_DATA_DIR}/
@@ -101,9 +104,12 @@ ${AETHER_DATA_DIR}/
 └── tmp/          staging for atomic writes; emptied on every boot
 ```
 
-`StorageInitializer` creates the three subdirectories (idempotently), writes and deletes a probe file
-to prove the directory is really writable, and clears `tmp/` — it only ever holds incomplete staging
-artefacts, never user data. When any of that fails the application does not start: it logs
+`StorageInitializer` creates the three subdirectories (idempotently), writes and deletes a probe file in
+each of them to prove they are really writable, and clears `tmp/` — it only ever holds incomplete
+staging artefacts, never user data. `tmp/` must be a real directory: a `tmp/` that is itself a symbolic
+link would send that cleanup into whatever it points at, so the boot refuses it instead of following the
+link (the data directory itself may be a symlink, e.g. `~/AetherArchive_Data -> /mnt/archive`). When any
+of that fails the application does not start: it logs
 
 ```text
 Aether Archive cannot start: failed to create the directory '<path>' (<reason>).
@@ -111,8 +117,10 @@ Check AETHER_DATA_DIR and that this process can write to the data directory.
 ```
 
 and exits with status `1`. CORS takes Spring origin *patterns*, so the documented
-`http://192.168.*.*:5173` works; an empty `AETHER_CORS_ALLOWED_ORIGINS` disables cross-origin access
-entirely, and requests from any other origin are rejected by Spring with `403 Invalid CORS request`.
+`http://192.168.*.*:5173` works, while a `*` host (`https://*`) is rejected at boot because it matches
+every origin; an empty `AETHER_CORS_ALLOWED_ORIGINS` disables cross-origin access entirely (a stray comma
+is an error, not an empty value), and requests from any other origin are rejected by Spring with
+`403 Invalid CORS request`.
 
 Rules: `.claude/rules/backend.md` · security: `.claude/rules/security.md` · tests: `.claude/rules/testing.md`.
 Contract: `_docs/openapi.yml` (read-only).

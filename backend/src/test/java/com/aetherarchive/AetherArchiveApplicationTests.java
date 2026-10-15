@@ -38,4 +38,12 @@ class AetherArchiveApplicationTests {
         assertThat(dataDir.resolve("thumbnails")).isDirectory();
         assertThat(dataDir.resolve("tmp")).isDirectory();
     }
+
+    @Test
+    void should_keep_the_data_directory_under_the_system_temp_directory() {
+        // Self-enforcing version of the promise in application-test.yml: tests never touch the real
+        // data directory (AETHER_DATA_DIR stays unread in this profile).
+        assertThat(storageProperties.dataDir().normalize())
+                .startsWith(Path.of(System.getProperty("java.io.tmpdir")).normalize());
+    }
 }

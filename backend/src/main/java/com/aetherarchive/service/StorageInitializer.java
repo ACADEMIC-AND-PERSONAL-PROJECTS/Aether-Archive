@@ -18,9 +18,13 @@ import com.aetherarchive.config.StorageProperties;
 /**
  * Prepares the data directory at startup.
  *
- * <p>Creates {@code images/}, {@code thumbnails/} and {@code tmp/} idempotently, proves the data
- * directory is really writable by writing and deleting a probe file, and empties {@code tmp/} — it only
- * ever holds incomplete staging artefacts, never user data (ARCHITECTURE §5).
+ * <p>Creates {@code images/}, {@code thumbnails/} and {@code tmp/} idempotently, proves each of them is
+ * really writable by writing and deleting a probe file, and empties {@code tmp/} — it only ever holds
+ * incomplete staging artefacts, never user data (ARCHITECTURE §5).
+ *
+ * <p>A symlinked <em>data directory</em> (for example {@code ~/AetherArchive_Data -> /mnt/archive}) is
+ * legitimate and keeps working. {@code tmp/} itself may not be a symbolic link: emptying it would follow
+ * the link and delete entries the archive does not own.
  *
  * <p>Initialisation runs while the context is still refreshing, so an unusable data directory aborts the
  * boot instead of leaving a half-configured archive serving requests.
@@ -50,23 +54,47 @@ public class StorageInitializer implements InitializingBean {
 
     /**
      * Creates and validates the data directory. Idempotent: running it again on a prepared directory
-     * changes nothing except clearing stale staging files.
+     * changes nothing except clearing stale staging entries.
      *
-     * @throws IllegalStateException when the data directory cannot be created, written to or emptied
+     * @throws IllegalStateException when the data directory cannot be created, written to or emptied, or
+     *     when the staging directory is a symbolic link
      */
     public void initialize() {
         Path dataDir = properties.dataDir();
         createDirectory(dataDir);
-        SUBDIRECTORIES.forEach(name -> createDirectory(dataDir.resolve(name)));
 
         Path tmpDir = dataDir.resolve(TMP_DIR);
-        verifyWritable(tmpDir);
+        refuseSymlinkedStagingDirectory(tmpDir);
+        SUBDIRECTORIES.forEach(name -> prepareDirectory(dataDir.resolve(name)));
 
         int removed = emptyTmp(tmpDir);
         if (removed > 0) {
-            log.info("Emptied the staging directory on boot: {} stale file(s) removed from {}", removed, tmpDir);
+            log.info("Emptied the staging directory on boot: {} stale entries removed from {}", removed, tmpDir);
         }
         log.info("Data directory ready: {}", dataDir);
+    }
+
+    /** Creates the subdirectory and proves it is writable, so a permission problem fails the boot. */
+    private void prepareDirectory(Path directory) {
+        createDirectory(directory);
+        verifyWritable(directory);
+    }
+
+    /**
+     * Refuses a staging directory that is itself a symbolic link: {@link Files#list} follows the link, so
+     * emptying the staging area would delete entries outside the archive. The link is neither followed nor
+     * deleted, and the check runs before anything reads or writes {@code tmp/}.
+     */
+    private void refuseSymlinkedStagingDirectory(Path tmpDir) {
+        if (!Files.isSymbolicLink(tmpDir)) {
+            return;
+        }
+        String message = "Aether Archive cannot start: the staging directory '" + tmpDir
+                + "' is a symbolic link and its contents are deleted on every boot. The data directory "
+                + "must contain real directories: point AETHER_DATA_DIR at the target location instead "
+                + "(the data directory itself may be a symlink).";
+        log.error(message);
+        throw new IllegalStateException(message);
     }
 
     private void createDirectory(Path directory) {
@@ -136,9 +164,15 @@ public class StorageInitializer implements InitializingBean {
         }
     }
 
+    /**
+     * Builds the boot-failure message. The reason is only appended when it says more than the path:
+     * {@code AccessDeniedException.getMessage()} is the path itself.
+     */
     private IllegalStateException storageFailure(String action, Path path, Exception cause) {
-        String message = "Aether Archive cannot start: " + action + " '" + path + "' (" + describe(cause)
-                + "). Check AETHER_DATA_DIR and that this process can write to the data directory.";
+        String reason = describe(cause);
+        String detail = path.toString().equals(reason) ? "" : " (" + reason + ")";
+        String message = "Aether Archive cannot start: " + action + " '" + path + "'" + detail
+                + ". Check AETHER_DATA_DIR and that this process can write to the data directory.";
         log.error(message);
         return new IllegalStateException(message, cause);
     }
