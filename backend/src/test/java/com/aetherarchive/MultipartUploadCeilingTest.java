@@ -68,11 +68,11 @@ class MultipartUploadCeilingTest {
         Path dataDir = storageProperties.dataDir();
         long maxFileBytes = maxFileBytes();
 
-        ResponseEntity<Map<String, String>> response = upload(
+        ResponseEntity<Map<String, Object>> response = upload(
                 ImageFixtures.padded(ImageFixtures.png(), (int) maxFileBytes));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        Path stored = dataDir.resolve(response.getBody().get("path"));
+        Path stored = dataDir.resolve((String) response.getBody().get("path"));
         assertThat(stored).hasParent(dataDir.resolve(StorageInitializer.IMAGES_DIR));
         assertThat(Files.size(stored)).isEqualTo(maxFileBytes);
         // The test owns the file it stored: the data directory is the shared test one, not a developer's.
@@ -85,11 +85,16 @@ class MultipartUploadCeilingTest {
         Path dataDir = storageProperties.dataDir();
         List<Path> storedBefore = imagesOf(dataDir);
 
-        ResponseEntity<Map<String, String>> response = upload(
+        ResponseEntity<Map<String, Object>> response = upload(
                 ImageFixtures.padded(ImageFixtures.png(), (int) maxFileBytes() + 1));
 
         // The container's own file ceiling, one byte over: the archive refuses it before the service.
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE);
+        // And the refusal is the API's own problem detail, through the real container: the same code the
+        // service's own refusal carries, not the container's error page. A client that switches on the
+        // code cannot tell which of the two ceilings caught it.
+        assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
+        assertThat(response.getBody()).containsEntry("code", "upload-too-large");
         assertThat(imagesOf(dataDir)).isEqualTo(storedBefore);
     }
 
@@ -100,10 +105,11 @@ class MultipartUploadCeilingTest {
 
         // The file ceiling plus the whole envelope headroom and a byte: no request may hide a larger
         // upload behind multipart framing, and it is refused before a byte is written.
-        ResponseEntity<Map<String, String>> response = upload(ImageFixtures.padded(ImageFixtures.png(),
+        ResponseEntity<Map<String, Object>> response = upload(ImageFixtures.padded(ImageFixtures.png(),
                 (int) (maxFileBytes() + 1024L * 1024L) + 1));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE);
+        assertThat(response.getBody()).containsEntry("code", "upload-too-large");
         assertThat(imagesOf(dataDir)).isEqualTo(storedBefore);
     }
 
@@ -116,7 +122,7 @@ class MultipartUploadCeilingTest {
      * filename — without one the container treats the part as a form field — and the {@code category}
      * field whose headers, with the boundaries, make up the envelope in question.
      */
-    private ResponseEntity<Map<String, String>> upload(byte[] payload) {
+    private ResponseEntity<Map<String, Object>> upload(byte[] payload) {
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         HttpHeaders partHeaders = new HttpHeaders();
         partHeaders.setContentType(MediaType.IMAGE_PNG);
