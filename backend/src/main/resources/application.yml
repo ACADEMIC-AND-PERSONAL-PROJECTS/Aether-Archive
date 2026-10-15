@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: aether-archive
+  profiles:
+    default: dev
+
+server:
+  port: ${SERVER_PORT:8080}
+
+# Read as plain properties for now; typed binding and startup validation arrive in E1-S2.
+aether:
+  storage:
+    data-dir: ${AETHER_DATA_DIR:${user.home}/AetherArchive_Data}
+    max-upload-mb: ${AETHER_MAX_UPLOAD_MB:15}
+  cors:
+    allowed-origins: ${AETHER_CORS_ALLOWED_ORIGINS:http://localhost:5173}
