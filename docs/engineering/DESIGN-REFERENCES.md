@@ -21,7 +21,7 @@ below is a translation of that brief into rules a reviewer can check.
 | Space as a feature | Generous margins; nothing touches the screen edge; section spacing on the 8-pt scale at the *large* end (32–64). |
 | Rounded, organic geometry | Panels 20–24 px radius, controls 10–14 px, nothing with sharp 90° corners. |
 | Gentle depth | One soft, wide, low-opacity shadow at most (`0 8px 24px rgba(0,0,0,0.24)`). Never stacked shadows. |
-| Calm motion | 300–600 ms, `cubic-bezier(0.22, 1, 0.36, 1)`, 12–16 px travel. Nothing snaps, nothing bounces, nothing loops. |
+| Calm motion | Transitions 300–600 ms (micro-feedback 180 ms), `cubic-bezier(0.22, 1, 0.36, 1)`, 12–16 px travel. Nothing snaps, nothing bounces, nothing loops. |
 | Quiet hierarchy | One focal element per view. If two things compete for attention, remove or mute one. |
 
 ### 1.2 Modern (how it should *read*)
@@ -98,7 +98,7 @@ scrim · animated anything that the user did not trigger.
 | [Radix Colors](https://www.radix-ui.com/colors) | How to structure accessible dark ramps (we do not install the package) |
 | [Huemint](https://huemint.com) | Sanity-check a generated palette against a UI mock |
 | [Realtime Colors](https://realtimecolors.com) | Quickly *see* a palette applied to type and surfaces |
-| [WebAIM Contrast Checker](https://webaim.org/resources/contrastchecker/) | The 4.5:1 verification the Definition of Done requires |
+| [WebAIM Contrast Checker](https://webaim.org/resources/contrastchecker/) | The 4.5:1 check required by the design system and `.claude/rules/design-language.md` |
 | [WCAG 2.2 Quick Reference](https://www.w3.org/WAI/WCAG22/quickref/) | The AA criteria we target for interactive UI |
 
 ## 6. Typography
@@ -148,7 +148,8 @@ is a template marketplace or an AI-generated mockup gallery, close it — it is 
 ## 10. Working method (how inspiration becomes code)
 
 1. **Read this page**, then fetch **2–3 references** matching the story (Mobbin/Refero for structure,
-   Hoverstat/Dark.design for feel, official docs for technique).
+   Hoverstat/Dark.design for feel, official docs for technique) — the domains listed here are
+   pre-allowed in `.claude/settings.json`.
 2. Write down **3–5 extracted principles** in the PR description ("glass only over imagery",
    "menu drifts up 16 px, never slides from the side", "markers are the only serif on the feed").
 3. Implement with our tokens and primitives only (`GlassPanel`, `--aura-*`, `--font-*`).

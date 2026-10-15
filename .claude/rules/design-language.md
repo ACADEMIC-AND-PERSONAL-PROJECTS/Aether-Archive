@@ -10,15 +10,16 @@ paths:
 
 Full specification: `docs/engineering/DESIGN-SYSTEM.md`. Procedure to implement or extend it:
 `.claude/skills/design-system/SKILL.md`. **Inspiration to consult at the start of every UI story:
-`docs/engineering/DESIGN-REFERENCES.md`** (fetch 2–3 references, extract principles, cite them in the PR).
+`docs/engineering/DESIGN-REFERENCES.md`** (fetch 2–3 references, extract principles, cite them in the
+PR; development-time only — nothing from them is ever loaded or requested at runtime).
 Hard rules:
 
 ## The brief: soft & modern
 
 - **Soft** — low-contrast elegance: never pure black or pure white (base `#0B0B0D`–`#121215`, text
   `#E8E6E3`); muted, desaturated accents; generous negative space; rounded organic geometry
-  (panels 20–24 px, controls 10–14 px); at most one wide low-opacity shadow; calm 300–600 ms motion;
-  one focal element per view.
+  (panels 20–24 px, controls 10–14 px); at most one wide low-opacity shadow; calm motion
+  (transitions 300–600 ms, micro-feedback 180 ms); one focal element per view.
 - **Modern** — fluid `clamp()` typography, one consistent glass material over imagery only, ambient
   colour derived from the content in view, tactile micro-interactions without overshoot, mobile-native
   feel (safe areas, `100dvh`, thumb-reachable controls).
@@ -35,8 +36,9 @@ Hard rules:
 - **Dark Glassmorphism** only: dark tinted glass (`rgba(0,0,0,0.4)`), `backdrop-filter: blur(15px)`,
   hairline highlights (`1px solid rgba(255,255,255,0.08)`), generous negative space.
   No heavy drop shadows, no neon, no decorative gradients, no emoji in the UI.
-- **Motion is soft and tactile**: fade + small upward translate (12–16 px), 300–600 ms,
-  `cubic-bezier(0.22, 1, 0.36, 1)`. No bounce, no attention-seeking loops, `prefers-reduced-motion` respected.
+- **Motion is soft and tactile**: fade + small upward drift (12–16 px; transitions 300–600 ms,
+  micro-feedback 180 ms), `cubic-bezier(0.22, 1, 0.36, 1)`. No bounce, no attention-seeking loops,
+  `prefers-reduced-motion` respected.
 - Empty and loading states are silent: opacity pulse or a blurred dominant-colour placeholder,
   never a labelled spinner.
 

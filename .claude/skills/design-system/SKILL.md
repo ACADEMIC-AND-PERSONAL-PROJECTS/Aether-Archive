@@ -1,7 +1,7 @@
 ---
 name: design-system
 description: Implement or extend the visual foundation — dominant-colour extraction from uploaded images, the Dark Glassmorphism theme generated from those hues, and the Fontsource typography. Use for colour, theme, glass, or typography work in the frontend.
-allowed-tools: Read, Write, Edit, Grep, Glob, Bash
+allowed-tools: Read, Write, Edit, Grep, Glob, Bash, WebFetch, WebSearch
 ---
 
 # Design system — extraction, theme, typography
@@ -18,11 +18,12 @@ The mandate (user requirement, do not substitute):
 Read `docs/engineering/DESIGN-SYSTEM.md` (tokens, scales, targets) and `.claude/rules/design-language.md`
 (hard rules) before starting. The full-mandate paragraphs above are the acceptance criteria, not suggestions.
 
-## Part 0 — Inspiration (do this first, every UI story)
+## Part 0 — Inspiration (do this first; the path-loaded rules carry the same requirement for every UI story)
 
 1. Read `docs/engineering/DESIGN-REFERENCES.md` — the target feeling ("soft & modern"), the curated
    references, the anti-patterns and the review questions.
-2. Fetch **2–3 references** matching the story with WebFetch:
+2. Fetch **2–3 references** matching the story with WebFetch (the referenced domains are pre-allowed
+   in `.claude/settings.json`):
    - structure/pattern → Mobbin or Refero (search the exact screen type: empty state, menu overlay, photo viewer),
    - feel/motion → Hoverstat.es, Dark.design, Animations.dev, Web Interface Guidelines,
    - technique → the official docs (Motion, Tailwind, Fontsource, MDN).
