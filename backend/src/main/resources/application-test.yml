@@ -1,3 +1,8 @@
+# Tests never touch the real data directory (AETHER_DATA_DIR): they work under the system temp dir.
+aether:
+  storage:
+    data-dir: ${java.io.tmpdir}/aether-archive-test-data
+
 logging:
   level:
     root: WARN
