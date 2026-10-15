@@ -20,7 +20,7 @@ backend/
     ├── main/resources/
     │   ├── application.yml          base config (port, storage dir, CORS)
     │   └── application-<profile>.yml  dev · test · prod overrides
-    └── test/java/com/aetherarchive/ JUnit 5 · MockMvc · @SpringBootTest
+    └── test/java/com/aetherarchive/ JUnit 5 · @SpringBootTest (MockMvc arrives with the controllers)
 ```
 
 ## Requirements
