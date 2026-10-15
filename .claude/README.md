@@ -20,7 +20,7 @@ shared, reviewable, and versioned with the code.
 │   ├── start-feature/    Branch per user story, DoR check
 │   ├── open-pr/          Push + open the PR into develop with evidence
 │   ├── merge-pr/         Review gate + merge commit + cleanup
-│   ├── finish-sprint/    Retro + release PR develop→main + tag
+│   ├── finish-sprint/    Security audit gate + retro + release PR develop→main + tag
 │   ├── backlog-sync/     Mirror docs/scrum/PRODUCT-BACKLOG.md to GitHub issues/labels/milestones
 │   ├── design-system/    Reference-driven colour extraction + Dark Glassmorphism + Fontsource typography
 │   └── verify/           Project verification recipe (also runs before commits automatically)
@@ -32,6 +32,7 @@ shared, reviewable, and versioned with the code.
 │   ├── frontend-engineer.md  React/Vite/design implementation
 │   ├── code-reviewer.md      Read-only review against DoD + conventions
 │   ├── qa-verifier.md        Runs verification, writes evidence reports
+│   ├── security-auditor.md   Web-researched security audit each sprint close (release gate)
 │   └── scrum-master.md       Backlog, sprint docs, retrospectives
 ├── hooks/            Deterministic guardrails (shell scripts wired in settings.json)
 │   ├── guard-commands.sh     Blocks rebase/force-push/direct pushes/squash merges/destructive ops

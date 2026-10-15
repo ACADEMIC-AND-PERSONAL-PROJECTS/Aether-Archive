@@ -64,8 +64,8 @@ Branch model: `main` (released) ← `develop` (integration) ← `feature/*` (one
 - Before opening a PR: run `/verify` and paste the evidence into the PR.
 - Open the PR into `develop` with `gh pr create --base develop`, then review it (`/review-pr` or the
   `code-reviewer` subagent) and merge with **`gh pr merge <n> --merge`** (merge commit).
-- At the end of a sprint: `/finish-sprint` → release PR `develop` → `main`, tag `sprint-NN`, then write
-  `retrospectives/sprintNN.md` (see `retrospectives/TEMPLATE.md`).
+- At the end of a sprint: `/finish-sprint` → security audit gate, retrospective, release PR
+  `develop` → `main`, tag `sprint-NN` (see `retrospectives/TEMPLATE.md`).
 
 ### Hard rules (hooks enforce several of these — do not try to bypass them)
 
@@ -83,7 +83,8 @@ Branch model: `main` (released) ← `develop` (integration) ← `feature/*` (one
 
 - **Plan before multi-file work**: use plan mode, then implement. One story = one plan = one branch.
 - **Use subagents to protect the main context** (`backend-engineer`, `frontend-engineer`, `qa-verifier`,
-  `scrum-master`) for exploration, implementation, or verification that would flood the conversation.
+  `security-auditor`, `scrum-master`) for exploration, implementation, verification or security
+  auditing that would flood the conversation.
 - **Keep context healthy**: `/clear` between unrelated tasks, `/compact` when a long task must continue;
   prefer `/rewind` over piling corrections on a failed attempt.
 - **Tests and docs are part of the story**, not a follow-up: a story is done only when the DoD checklist
