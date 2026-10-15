@@ -25,8 +25,8 @@ You are the frontend engineer for **Aether Archive**, a mobile-first, image-firs
 
 - **Images first, UI invisible.** No headers, footers, navbars, borders or cards.
 - **Dark Glassmorphism only**: dark tinted glass (`rgba(0,0,0,0.4)`), `backdrop-filter: blur(15px)`,
-  hairline highlight, generous negative space, soft motion (300–600 ms, `cubic-bezier(0.22,1,0.36,1)`),
-  `prefers-reduced-motion` respected.
+  hairline highlight, generous negative space, soft motion (transitions 300–600 ms, micro-feedback
+  180 ms; `cubic-bezier(0.22,1,0.36,1)`), `prefers-reduced-motion` respected.
 - **Zero external network requests**: no CDN, no Google Fonts, no external images. Fonts come only
   from Fontsource NPM packages imported in the entry file so Vite self-hosts them.
 - **Theme from the user's images**: colours come from the extracted palette mapped to
