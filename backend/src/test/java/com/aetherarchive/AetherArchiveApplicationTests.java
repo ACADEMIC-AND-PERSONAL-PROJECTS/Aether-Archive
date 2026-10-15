@@ -4,10 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Path;
 
+import jakarta.servlet.MultipartConfigElement;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -29,7 +32,13 @@ class AetherArchiveApplicationTests {
     private String applicationName;
 
     @Autowired
+    private ApplicationContext applicationContext;
+
+    @Autowired
     private StorageProperties storageProperties;
+
+    @Autowired
+    private MultipartConfigElement multipartConfigElement;
 
     @Test
     void should_load_application_context_when_started() {
@@ -54,5 +63,20 @@ class AetherArchiveApplicationTests {
         // data directory (AETHER_DATA_DIR stays unread in this profile).
         assertThat(storageProperties.dataDir().normalize())
                 .startsWith(Path.of(System.getProperty("java.io.tmpdir")).normalize());
+    }
+
+    @Test
+    void should_apply_the_upload_ceiling_to_the_servlet_container_too() {
+        // The service enforces the limit while copying; the container must not refuse a legitimate
+        // upload first (Spring Boot's default is 1 MB). Both ceilings come from the same property, and
+        // the request ceiling carries the multipart envelope on top of the file ceiling.
+        long maxFileBytes = storageProperties.maxUploadMb() * 1024L * 1024L;
+
+        assertThat(multipartConfigElement.getMaxFileSize()).isEqualTo(maxFileBytes);
+        assertThat(multipartConfigElement.getMaxRequestSize()).isGreaterThan(maxFileBytes);
+        assertThat(multipartConfigElement.getFileSizeThreshold()).isZero();
+        // Exactly one: Spring Boot's auto-configuration backs off in favour of config/MultipartConfig,
+        // so a `spring.servlet.multipart.*` key could not quietly take over.
+        assertThat(applicationContext.getBeanNamesForType(MultipartConfigElement.class)).hasSize(1);
     }
 }

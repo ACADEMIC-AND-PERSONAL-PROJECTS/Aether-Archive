@@ -5,6 +5,8 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
+.metals/
+.bloop/
 
 # ── Secrets & personal agent config ───────────────────────────────────────────
 .env

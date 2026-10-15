@@ -3,6 +3,10 @@ spring:
     name: aether-archive
   profiles:
     default: dev
+  # The container's multipart ceilings are deliberately absent here: `config/MultipartConfig` computes
+  # them from `aether.storage.max-upload-mb`, so the servlet container and the upload service that
+  # enforces the same property cannot disagree (ADR-012). Setting `spring.servlet.multipart.*` would
+  # look like configuration and change nothing.
   # Spring Boot does not read `.env` on its own — docker compose does. Importing it as a properties
   # file is what lets the backend and the compose stack share the keys documented in `.env.example`.
   # Both entries are `optional:`, so tests and machines without a `.env` start unchanged, and the
