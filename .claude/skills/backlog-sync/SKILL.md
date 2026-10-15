@@ -10,6 +10,17 @@ allowed-tools: Read, Write, Edit, Grep, Glob, Bash
 `docs/scrum/PRODUCT-BACKLOG.md` is **canonical**. GitHub issues are a mirror for tracking and linking.
 Never edit the backlog only on GitHub: change the file, then re-run this skill.
 
+**Fast path** — a reference implementation of everything below lives in
+`scripts/github/seed-backlog.py` (idempotent: it parses the backlog file, ensures labels, milestones
+and one issue per epic/story, and never deletes anything):
+
+```bash
+python3 scripts/github/seed-backlog.py --dry-run   # inspect the plan
+python3 scripts/github/seed-backlog.py             # apply it
+```
+
+Use the manual commands below when the script does not cover a one-off change.
+
 ## Label taxonomy (create or update, idempotent)
 
 ```bash
