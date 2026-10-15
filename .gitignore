@@ -1,0 +1,40 @@
+# ── OS / editors ──────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# ── Secrets & personal agent config ───────────────────────────────────────────
+.env
+.env.*
+!.env.example
+CLAUDE.local.md
+.claude/settings.local.json
+.claude/tmp/
+
+# ── Local data (images, SQLite database) — never committed ────────────────────
+AetherArchive_Data/
+data/
+
+# ── Java / Maven ──────────────────────────────────────────────────────────────
+backend/target/
+*.class
+*.log
+hs_err_pid*
+.mvn/timing.properties
+!backend/.mvn/wrapper/maven-wrapper.jar
+
+# ── Node / Vite ───────────────────────────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+npm-debug.log*
+yarn-error.log*
+*.tsbuildinfo
+
+# ── Coverage / generated ──────────────────────────────────────────────────────
+**/coverage/
+**/.pytest_cache/
+reports/*.tmp
