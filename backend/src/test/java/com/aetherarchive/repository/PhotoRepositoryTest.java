@@ -3,6 +3,8 @@ package com.aetherarchive.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -125,6 +127,39 @@ class PhotoRepositoryTest {
                         .isInstanceOf(DataIntegrityViolationException.class);
     }
 
+    @Test
+    void should_reject_a_position_without_an_item_when_persisting() {
+        Photo positionedOrphan = ArchiveFixtures.photo(ArchiveFixtures.id(43), null, 3);
+
+        // ck_photo_position_requires_item: the unique index is partial, so before V2 this row was
+        // accepted — a photo claiming position 3 of nothing.
+        assertThatThrownBy(() -> photos.saveAndFlush(positionedOrphan))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void should_reject_a_photo_of_a_missing_item_when_inserted_raw() {
+        // fk_photo_archive_item, which had no test: no repository call writes a dangling reference
+        // (the item would have to be absent from the database already), so the orphan row is written
+        // with plain SQL to pin the constraint itself. ArchiveFixtures.id(9999) is never persisted.
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "insert into photo (id, archive_item_id, local_file_path, display_order, category, created_at)"
+                        + " values (?, ?, ?, null, 'PICS', ?)",
+                ArchiveFixtures.id(44), ArchiveFixtures.id(9999), "images/orphan.jpg", utcCreatedAt()))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void should_reject_an_unknown_category_when_inserted_raw() {
+        // ck_photo_category: whatever writes the row, the column holds only the names
+        // @Enumerated(EnumType.STRING) persists.
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "insert into photo (id, archive_item_id, local_file_path, display_order, category, created_at)"
+                        + " values (?, null, ?, null, 'SNAPSHOT', ?)",
+                ArchiveFixtures.id(45), "images/unknown-category.jpg", utcCreatedAt()))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
     @ParameterizedTest
     @EnumSource(PhotoCategory.class)
     void should_round_trip_every_category_when_persisting(PhotoCategory category) {
@@ -148,5 +183,10 @@ class PhotoRepositoryTest {
         // ADR-011: the column holds the Java name, the JSON value is lowercase.
         assertThat(storedCategory).isEqualTo("UNCATEGORIZED");
         assertThat(storedCategory).isNotEqualTo(PhotoCategory.UNCATEGORIZED.wireValue());
+    }
+
+    /** The fixture instant as {@code timestamptz}, for the raw inserts that bypass the entities. */
+    private static OffsetDateTime utcCreatedAt() {
+        return OffsetDateTime.ofInstant(ArchiveFixtures.CREATED_AT, ZoneOffset.UTC);
     }
 }

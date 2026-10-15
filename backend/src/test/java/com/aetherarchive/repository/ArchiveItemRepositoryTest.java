@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -17,6 +19,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 import com.aetherarchive.domain.ArchiveItem;
@@ -39,6 +42,9 @@ class ArchiveItemRepositoryTest {
 
     @Autowired
     private TestEntityManager entityManager;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Test
     void should_read_back_every_field_when_an_item_is_persisted() {
@@ -112,6 +118,17 @@ class ArchiveItemRepositoryTest {
         // whatever writes it: ck_archive_item_background_color rejects a value that is not #RRGGBB,
         // and varchar(7) rejects one that is merely too long.
         assertThatThrownBy(() -> items.saveAndFlush(item)).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void should_reject_an_unknown_type_when_inserted_raw() {
+        // ck_archive_item_type: whatever writes the row, the column holds only the constants of
+        // ItemType.
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "insert into archive_item (id, type, title, \"timestamp\", background_color)"
+                        + " values (?, 'VIDEO', null, ?, '#1B2A41')",
+                ArchiveFixtures.id(6), OffsetDateTime.ofInstant(ArchiveFixtures.CREATED_AT, ZoneOffset.UTC)))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     private static List<UUID> ids(List<ArchiveItem> items) {

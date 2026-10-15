@@ -20,7 +20,7 @@ backend/
     ├── main/resources/
     │   ├── application.yml          base config (port, datasource, storage dir, CORS)
     │   ├── application-<profile>.yml  dev · test · prod overrides
-    │   └── db/migration/            Flyway migrations, V1__baseline.sql owns the schema
+    │   └── db/migration/            Flyway migrations: V1 creates the schema, V2 tightens it
     └── test/java/com/aetherarchive/ JUnit 5 · @WebMvcTest slices · @DataJpaTest and @SpringBootTest
                                      against a throwaway PostgreSQL (Testcontainers)
 ```
@@ -79,10 +79,10 @@ shell.)
 
 If port 5432 is already taken by another PostgreSQL, set `AETHER_DB_PORT=5433` in `.env`.
 
-On the first boot against that database, Flyway applies `db/migration/V1__baseline.sql` and records it in
-`flyway_schema_history`; afterwards Hibernate only checks that the entities still match the schema
-(`ddl-auto=validate`) and never creates or alters a table. Restarting the backend is therefore safe: the
-migration runs once and is then skipped.
+On the first boot against that database, Flyway applies the migrations in `db/migration/` (V1 creates the
+tables, V2 tightens their constraints) and records them in `flyway_schema_history`; afterwards Hibernate
+only checks that the entities still match the schema (`ddl-auto=validate`) and never creates or alters a
+table. Restarting the backend is therefore safe: a migration runs once and is then skipped.
 
 ### How the backend reads `.env`
 
@@ -98,10 +98,13 @@ spring:
 
 What it does:
 
-- Both paths are relative to the **working directory** and both are `optional:`, so the one that does not
-  exist is simply skipped and nothing requires a `.env`: `../.env` is the repository root when you run
+- Both paths are relative to the **working directory of the JVM** — where you start the process, not where
+  the application or its `pom.xml` lives — and both are `optional:`, so the file that does not exist is
+  simply skipped and nothing requires a `.env`: `../.env` is the repository root when you run
   `./mvnw spring-boot:run` from `backend/` (the documented flow), `./.env` covers a run from the repository
-  root. If both exist, the second entry (`./.env`) wins where they disagree.
+  root. Those two are the supported working directories; started from anywhere else, the parent entry
+  imports whatever file happens to sit one level above that directory — an unrelated project's `.env` would
+  be read without a word. If both entries exist, the second (`./.env`) wins where they disagree.
 - The `[.properties]` hint makes Spring read the file as a Java properties file, which is exactly what the
   `KEY=value` lines of `.env.example` are. Dotted keys (`spring.datasource.url=…`) work as well.
 - An imported value wins over the default `application.yml` writes for it — `.env` configures the run, it
@@ -116,9 +119,13 @@ What it does:
 
 What it does not do:
 
-- It is not a dotenv parser: `export KEY=value`, shell-style quoting and a trailing `# comment` after a
-  value are not part of the properties grammar. Lines it cannot read are ignored rather than guessed at;
-  keep `.env` to `KEY=value` and comments on their own line.
+- It is a Java properties file, not a dotenv parser, and the two grammars disagree where it hurts:
+  `export KEY=value` and shell-style quoting are not part of it, a trailing `# comment` stays in the value,
+  and `\` starts an escape sequence — `AETHER_DATA_DIR=C:\Users\me\data` is read as `C:Usersmedata`, with
+  the separators gone, while a lowercase `\u` not followed by four hex digits is not skipped: it aborts the
+  boot with `Malformed \uxxxx encoding`. The file is also decoded as ISO-8859-1, the properties encoding, so
+  a non-ASCII character has to be written as a `\uXXXX` escape. Use `/` as the separator (or `\\`) and keep
+  `.env` to `KEY=value` with comments on their own line.
 - It never creates or writes `.env`. The file stays local and gitignored; the repository only carries
   `.env.example`.
 - It does not decide which database the tests run against: they use their own PostgreSQL container

@@ -6,9 +6,11 @@ spring:
   # Spring Boot does not read `.env` on its own — docker compose does. Importing it as a properties
   # file is what lets the backend and the compose stack share the keys documented in `.env.example`.
   # Both entries are `optional:`, so tests and machines without a `.env` start unchanged, and the
-  # paths are relative to the working directory: `../.env` covers `./mvnw spring-boot:run` from
-  # `backend/`, `./.env` a run from the repository root. Real environment variables still win over
-  # the file. See backend/README.md.
+  # paths are relative to the working directory — where the JVM is started, not where the application
+  # lives: `../.env` covers `./mvnw spring-boot:run` from `backend/`, `./.env` a run from the
+  # repository root. Those two are the supported working directories; started anywhere else, the
+  # parent entry may pick up an unrelated `.env`. Real environment variables still win over the file.
+  # See backend/README.md.
   config:
     import:
       - optional:file:../.env[.properties]
