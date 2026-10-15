@@ -47,6 +47,11 @@ shared, reviewable, and versioned with the code.
 - `.claude/rules/*.md` load every session (or when a matching file is touched, with `paths:`).
   Keep them short and factual; procedures belong in a skill.
 - `settings.json` permissions apply after you accept the workspace trust prompt on first launch.
+- `permissions.deny` **enumerates** the secret-bearing env files (`.env`, `.env.local`, `.env.*.local`,
+  `.env.dev|development|test|prod|production|staging|bak|old|save|backup`). **A new env-file variant must be
+  added there.** Unlike `.gitignore` (which re-includes `.env.example` with `!`), the permission list cannot
+  express "every `.env.*` except `.env.example`": deny rules are evaluated first and beat any allow rule, so
+  the exemption has to be carved into the deny list itself. Keep the two lists in step when one changes.
 - Project MCP servers live in the repo-root `.mcp.json`: `MCP_DOCKER` and `web-search` (Docker MCP
   gateway, profile `research` — Docker must be running). `enabledMcpjsonServers` in `settings.json`
   pre-approves them (once the workspace is trusted), so no per-session approval prompt appears. They
