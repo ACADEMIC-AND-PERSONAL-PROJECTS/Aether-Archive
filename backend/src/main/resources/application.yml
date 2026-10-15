@@ -7,7 +7,7 @@ spring:
 server:
   port: ${SERVER_PORT:8080}
 
-# Read as plain properties for now; typed binding and startup validation arrive in E1-S2.
+# Bound and validated at startup by StorageProperties / CorsProperties (E1-S2).
 aether:
   storage:
     data-dir: ${AETHER_DATA_DIR:${user.home}/AetherArchive_Data}
