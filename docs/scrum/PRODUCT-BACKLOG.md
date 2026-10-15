@@ -48,17 +48,17 @@ serves images and exposes the `/api/v1` contract from `_docs/openapi.yml` — fu
 
 | ID | Story | P | Pts | Sprint | Status |
 | --- | --- | --- | --- | --- | --- |
-| E1-S1 | Scaffold the Spring Boot project | p0 | 3 | 1 | Todo |
-| E1-S2 | Configuration & local data directory | p0 | 2 | 1 | Todo |
-| E1-S3 | PostgreSQL persistence + Flyway baseline | p0 | 5 | 1 | Todo |
-| E1-S4 | StorageService — safe local file storage | p0 | 5 | 1 | Todo |
+| E1-S1 | Scaffold the Spring Boot project | p0 | 3 | 1 | Done |
+| E1-S2 | Configuration & local data directory | p0 | 2 | 1 | Done |
+| E1-S3 | PostgreSQL persistence + Flyway baseline | p0 | 5 | 1 | Done |
+| E1-S4 | StorageService — safe local file storage | p0 | 5 | 1 | Done |
 | E1-S5 | Serve images at `/images/**` | p0 | 2 | 2 | Todo |
 | E1-S6 | Photo API — upload, list, random | p0 | 5 | 1 | Todo |
 | E1-S7 | Dump API — create and list 6-photo dumps | p0 | 5 | 1 | Todo |
 | E1-S8 | Error handling (RFC 9457) & validation | p0 | 2 | 1 | Todo |
 | E1-S9 | Backend test suite | p0 | 5 | 1 | Todo |
 | E1-S10 | Dev seed script & curl smoke collection | p2 | 2 | 2 | Todo |
-| E1-S11 | Dev PostgreSQL via Docker Compose | p0 | 2 | 1 | Todo |
+| E1-S11 | Dev PostgreSQL via Docker Compose | p0 | 2 | 1 | Done |
 
 ### E1-S1 — Scaffold the Spring Boot project · 3 pts · p0
 
@@ -542,3 +542,4 @@ delivery, documentation, and a clean v1.0.
 | Search / tags / favourites | Out of the personal-sanctuary scope for v1. |
 | Multi-user access | Explicitly a single-user local app; would change the security model. |
 | Automatic monthly dump suggestion | Nice, but the curation act is the point; revisit post-v1. |
+| Soft delete + explicit purge (photos, dumps) | `docs/engineering/ARCHITECTURE.md` §3 and `.claude/rules/backend.md` mandate soft deletion with a separate purge action, but `_docs/openapi.yml` defines **no delete endpoint**, so nothing in v1 can trigger it and the baseline has no deletion columns. Surfaced by the E1-S3 review; needs a spec decision (and probably an ADR) before it becomes a story — parked deliberately rather than quietly dropped. |
