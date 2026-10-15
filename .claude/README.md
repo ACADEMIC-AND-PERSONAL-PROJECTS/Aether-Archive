@@ -22,7 +22,7 @@ shared, reviewable, and versioned with the code.
 │   ├── merge-pr/         Review gate + merge commit + cleanup
 │   ├── finish-sprint/    Retro + release PR develop→main + tag
 │   ├── backlog-sync/     Mirror docs/scrum/PRODUCT-BACKLOG.md to GitHub issues/labels/milestones
-│   ├── design-system/    Colour extraction + Dark Glassmorphism theme + Fontsource typography
+│   ├── design-system/    Reference-driven colour extraction + Dark Glassmorphism + Fontsource typography
 │   └── verify/           Project verification recipe (also runs before commits automatically)
 ├── commands/         Lightweight, human-typed slash commands
 │   ├── sprint-status.md  Where are we right now?
