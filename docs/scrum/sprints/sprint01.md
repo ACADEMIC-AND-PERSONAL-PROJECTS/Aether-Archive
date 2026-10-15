@@ -4,7 +4,12 @@
   updated to the real dates.
 - **Goal**: The archive can store and serve images and dumps on PostgreSQL through a tested local API.
 - **Capacity**: 34 points committed — the sprint-1 column of the backlog (all of epic E1 except the two
-  stories scheduled in Sprint 2). Playbook capacity band: 25–34.
+  stories scheduled in Sprint 2). This is the playbook's ceiling (25–34), chosen deliberately for the
+  bootstrap sprint, where every story is tightly specified and the work is mostly mechanical scaffolding;
+  the `start-sprint` skill's narrower 25–30 band leaves slack this sprint does not take. **Zero slack is
+  accepted with a named consequence**: if a defect or an estimate overrun appears, E1-S9 (the test-suite
+  consolidation story, 5 pts) moves to Sprint 2 — the goal is not renegotiated, and no story is quietly
+  dropped. The skill text is reconciled with the playbook in the same PR so the two stop disagreeing.
 - **Branch base**: `develop`
 - **Milestone**: `Sprint 01 — Foundation & Backend` (the 9 issues were already seeded by
   `scripts/github/seed-backlog.py` and attached to it)
@@ -64,3 +69,9 @@ consolidation story and is treated as a technical enabler.
   no issue churn was needed; only the sprint doc, the playbook row and ADR-011 are new.
 - 2026-10-15 — ADR-011 recorded (contract clarifications: `openapi.yml` wins over the stale spec §4.2,
   `title` optional on `DumpCreate` as a superset of both readings, uploads create unassigned photos).
+- 2026-10-15 — Review round 1 on this plan (request changes) → ADR-011 tightened so an implementer cannot
+  read it two ways: the curation order is the **array position** in `Dump.photos` (the contract's `Photo`
+  schema has no `displayOrder` field), `category` uses the contract's **lowercase** wire values and stays
+  **required** on upload, `createdAt`/`uploadedAt` and `url` (`/images/<uuid>.<ext>`, served in E1-S5) are
+  named explicitly. The `archives/*` supersession now covers specs §5 as well as §4.2, and the capacity
+  band was reconciled with the `start-sprint` skill (which said 25–30 while the playbook says 25–34).

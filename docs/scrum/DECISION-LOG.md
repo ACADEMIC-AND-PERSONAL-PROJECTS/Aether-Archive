@@ -225,8 +225,9 @@ new ADRs.
 
 **Context.** Two canonical documents describe the HTTP contract and they do not agree. `_docs/openapi.yml`
 defines `/photos` (GET, POST), `/photos/random` (GET) and `/dumps` (GET, POST); the narrative
-`_docs/aether_archive_specs.md` §4.2 still lists `/api/v1/archives/random`, `/archives/river`,
-`/archives/dump` and `/archives/single`. Separately, `DumpCreate.title` is listed as `required` in
+`_docs/aether_archive_specs.md` still lists `/api/v1/archives/random`, `/archives/river`, `/archives/dump`
+and `/archives/single` — in §4.2 and again in the phase list of §5, which later frontend stories read.
+Separately, `DumpCreate.title` is listed as `required` in
 `openapi.yml`, while the domain model (`_docs/aether_archive_specs.md` §4.1: "title … nullable"), the
 backlog (E1-S7 `title?`, E4-S5 "title (optional)") and the workshop flow all treat it as optional. The
 `Photo` schema also exposes `uploadedAt` and `category`, which are not among the entity fields listed in
@@ -236,24 +237,39 @@ editing the specs.
 **Decision.**
 
 1. **`_docs/openapi.yml` is the API contract of record.** Sprint 1 implements `/api/v1/photos` (GET, POST),
-   `/api/v1/photos/random` (GET) and `/api/v1/dumps` (GET, POST). The `/api/v1/archives/*` table in the
-   specs §4.2 is superseded and is not implemented.
+   `/api/v1/photos/random` (GET) and `/api/v1/dumps` (GET, POST). Every `/api/v1/archives/*` reference in
+   the narrative spec (§4.2 and §5) is superseded and is not implemented.
 2. **`title` is optional on `DumpCreate`** (null when absent, ≤ 80 characters when present). Accepting a
-   request *without* a title is a strict superset of the OpenAPI schema: any client that sends the fields
-   OpenAPI marks `required` still works unchanged, so no client is broken by this reading.
+   request *without* a title is a strict superset of the *accepted request bodies*: OpenAPI's `required`
+   list is a constraint on what clients send, and relaxing it server-side cannot break a conforming
+   client — every request OpenAPI describes still succeeds.
 3. **An upload creates an *unassigned* photo**: `archiveItem` and `displayOrder` are null until the curator
    publishes a dump, which is when the `ArchiveItem` (`MONTHLY_DUMP`) is created and the six photos are
    attached in order. This matches the `Photo` schema of `openapi.yml` and the workshop flow (E4-S1/S5).
-4. **`Photo` carries `createdAt` (Instant, UTC) and `category`** (enum `PICS | ANIME | DUMP |
-   UNCATEGORIZED`, default `UNCATEGORIZED`) in addition to the fields listed in `.claude/rules/backend.md`,
-   because the contract exposes `uploadedAt` and `category` on every photo response.
+   The curation order is **expressed by the position of each photo in `Dump.photos`** — the contract's
+   `Photo` schema has no `displayOrder` field, so no such field is added to responses; `displayOrder` is
+   persisted server-side and used to build the ordered array.
+4. **`Photo` carries `createdAt` (Instant, UTC) and `category`** in addition to the fields listed in
+   `.claude/rules/backend.md`, because the contract exposes `uploadedAt` and `category` on every photo
+   response. Wire format, stated once so no implementer has to guess:
+   - `category` is serialised with the contract's **lowercase** values — `pics | anime | dump |
+     uncategorized`; the Java enum constants are `PICS | ANIME | DUMP | UNCATEGORIZED` and map to those
+     wire values explicitly (the persistence column stores the enum name).
+   - `POST /api/v1/photos` **requires** `category` and accepts all four values (E1-S6 names `pics|anime`
+     because those are the two the workshop sends); a missing or unknown value is a 400. The default
+     `UNCATEGORIZED` applies only to photos created without an explicit category by later server-side
+     flows, never to an upload omitting the field.
+   - `createdAt` is serialised as `uploadedAt` (ISO-8601 UTC) on `Photo`, and the dump's item timestamp as
+     `createdAt` on `Dump` — the Java field names differ from the JSON names by design.
+   - `Photo.url` is the **relative** static path `/images/<uuid>.<ext>` (never an absolute path, never a
+     filesystem location). Serving that path is E1-S5, in Sprint 2; Sprint 1 stores and returns the path.
 
 **Consequences.** Sprint 1 has one unambiguous contract to implement and test against, and reviewers have a
 written reason for the two readings that could otherwise look like improvisation. `ArchiveItem.type` keeps
 all three values (`SINGLE_PIC | ANIME | MONTHLY_DUMP`) even though only `MONTHLY_DUMP` is created in
 Sprint 1 — single-photo items arrive with the river feed (E5-S1). Any future change to the paths, to the
-`title` requirement, or to the on-upload assignment model re-opens this ADR; the stale specs §4.2 text stays
-as it is until the owner approves a spec revision.
+`title` requirement, or to the on-upload assignment model re-opens this ADR; the stale `archives/*` text
+stays as it is until the owner approves a spec revision.
 
 ---
 

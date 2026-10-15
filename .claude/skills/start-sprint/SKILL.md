@@ -15,7 +15,8 @@ Input: sprint number (default: next number in `docs/scrum/sprints/`). Read
 
 - Take stories in priority order (`priority:p0` → `priority:p1` → `priority:p2`), respecting
   dependencies and the sprint order in the backlog.
-- Capacity: **25–30 points** per 2-week sprint. Do not over-commit; leave slack for defects.
+- Capacity: **25–34 points** per 2-week sprint — the band in `docs/scrum/SPRINT-PLAYBOOK.md`, and never
+  above 34. Do not over-commit; leave slack for defects.
 - Every selected story must satisfy the **Definition of Ready**. If one does not, refine it first
   (or push it to the next sprint with a one-line reason).
 
