@@ -4,10 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Path;
 
+import jakarta.servlet.MultipartConfigElement;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -28,14 +31,14 @@ class AetherArchiveApplicationTests {
     @Value("${spring.application.name}")
     private String applicationName;
 
-    @Value("${spring.servlet.multipart.max-file-size}")
-    private String multipartMaxFileSize;
-
-    @Value("${spring.servlet.multipart.max-request-size}")
-    private String multipartMaxRequestSize;
+    @Autowired
+    private ApplicationContext applicationContext;
 
     @Autowired
     private StorageProperties storageProperties;
+
+    @Autowired
+    private MultipartConfigElement multipartConfigElement;
 
     @Test
     void should_load_application_context_when_started() {
@@ -65,10 +68,15 @@ class AetherArchiveApplicationTests {
     @Test
     void should_apply_the_upload_ceiling_to_the_servlet_container_too() {
         // The service enforces the limit while copying; the container must not refuse a legitimate
-        // upload first (Spring's default is 1 MB). Both limits come from the same property.
-        String expected = storageProperties.maxUploadMb() + "MB";
+        // upload first (Spring Boot's default is 1 MB). Both ceilings come from the same property, and
+        // the request ceiling carries the multipart envelope on top of the file ceiling.
+        long maxFileBytes = storageProperties.maxUploadMb() * 1024L * 1024L;
 
-        assertThat(multipartMaxFileSize).isEqualTo(expected);
-        assertThat(multipartMaxRequestSize).isEqualTo(expected);
+        assertThat(multipartConfigElement.getMaxFileSize()).isEqualTo(maxFileBytes);
+        assertThat(multipartConfigElement.getMaxRequestSize()).isGreaterThan(maxFileBytes);
+        assertThat(multipartConfigElement.getFileSizeThreshold()).isZero();
+        // Exactly one: Spring Boot's auto-configuration backs off in favour of config/MultipartConfig,
+        // so a `spring.servlet.multipart.*` key could not quietly take over.
+        assertThat(applicationContext.getBeanNamesForType(MultipartConfigElement.class)).hasSize(1);
     }
 }

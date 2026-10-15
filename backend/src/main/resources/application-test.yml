@@ -2,6 +2,9 @@
 aether:
   storage:
     data-dir: ${java.io.tmpdir}/aether-archive-test-data
+    # The smallest limit StorageProperties accepts: the container and service ceilings are exercised at
+    # their boundary, and a test upload costs a megabyte instead of fifteen.
+    max-upload-mb: 1
 
 logging:
   level:
