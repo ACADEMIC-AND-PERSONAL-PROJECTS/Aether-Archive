@@ -1,0 +1,40 @@
+# Aether Archive — local development database (ADR-009).
+#
+#   cp .env.example .env                              # once, then adjust if you like
+#   docker compose -f docker-compose.dev.yml up -d
+#   docker compose -f docker-compose.dev.yml ps        # wait for "healthy"
+#
+# Every value comes from `.env` at the repository root; the defaults below apply
+# when the file — or a single key — is missing, so a fresh clone starts without
+# one. The archive itself lives in the named volume `aether_pgdata`:
+# `docker compose ... down` keeps it, only an explicit `down -v` removes it.
+
+name: aether-archive-dev
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: aether-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-aether}
+      POSTGRES_USER: ${POSTGRES_USER:-aether}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-local}
+    ports:
+      # Loopback only, on purpose: the backend runs on this machine, and the
+      # archive database is never exposed to the local network.
+      - "127.0.0.1:${AETHER_DB_PORT:-5432}:5432"
+    volumes:
+      - aether_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # `docker compose ps` reports "healthy" only once the database accepts
+      # connections, which is what makes the backend's startup deterministic.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aether} -d ${POSTGRES_DB:-aether}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  aether_pgdata:
+    name: aether_pgdata
