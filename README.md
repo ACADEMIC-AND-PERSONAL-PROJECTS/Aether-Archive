@@ -20,9 +20,10 @@ requests are made at runtime, and every image and record stays in a local folder
 
 - **Frontend** — React + Vite + TypeScript, Tailwind CSS, Framer Motion, `@dnd-kit`, TanStack Query
 - **Backend** — Java 21, Spring Boot 3, Maven, REST under `/api/v1`
-- **Database** — embedded SQLite (file-based)
+- **Database** — PostgreSQL 17, running locally as a Docker container (nothing leaves your machine)
 - **Storage** — local filesystem, images served by Spring at `/images/**`
 - **Typography** — Fontsource NPM packages (self-hosted, zero external requests)
+- **Packaging** — Docker Compose at v1.0 (db + api + web); see `docs/engineering/DEPLOYMENT.md`
 
 ## Repository layout
 
@@ -42,16 +43,23 @@ Backend and frontend are scaffolded in Sprint 1 and Sprint 2 (see `docs/scrum/PR
 
 ```bash
 # 1. Environment
-cp .env.example .env        # then edit AETHER_DATA_DIR and VITE_API_BASE_URL
+cp .env.example .env        # then edit AETHER_DATA_DIR and review the POSTGRES_* values
 
-# 2. Backend (after Sprint 1)
+# 2. Dev database — Postgres container (after Sprint 1)
+docker compose -f docker-compose.dev.yml up -d
+
+# 3. Backend (after Sprint 1)
 cd backend && ./mvnw spring-boot:run
 
-# 3. Frontend (after Sprint 2)
+# 4. Frontend (after Sprint 2)
 cd frontend && npm install && npm run dev -- --host   # --host exposes it to your phone
 ```
 
 Then open `http://<your-LAN-IP>:5173` on your phone.
+
+**v1.0 (planned, Sprint 6):** the whole stack runs as containers —
+`cp .env.example .env && docker compose up`, then open `http://<your-LAN-IP>:3000`.
+Details: `docs/engineering/DEPLOYMENT.md`.
 
 ## How this project is built
 

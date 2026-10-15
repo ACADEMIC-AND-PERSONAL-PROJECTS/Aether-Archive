@@ -95,10 +95,14 @@ esac
 case "$FLAT" in
   *"rm -rf"*|*"rm -fr"*|*"rm -r"*)
     case "$FLAT" in
-      *"AetherArchive_Data"*|*"aether.db"*|*"images/"*|*"thumbnails/"*)
-        deny "this would delete local archive data (images or database). Ask the user for explicit approval first." ;;
+      *"AetherArchive_Data"*|*"aether_pgdata"*|*"images/"*|*"thumbnails/"*)
+        deny "this would delete local archive data (images or database volume). Ask the user for explicit approval first." ;;
     esac
     ;;
+esac
+case "$FLAT" in
+  *"docker volume rm"*|*"docker compose down -v"*|*"docker compose down --volumes"*)
+    deny "this would delete the PostgreSQL data volume (the archive database). Ask the user for explicit approval first." ;;
 esac
 if printf '%s' "$FLAT" | grep -Eqi '(drop +(table|database))|(delete +from +(photo|archive_item))|(truncate +table)'; then
   deny "destructive SQL is forbidden. Data loss must be an explicit, user-approved migration."

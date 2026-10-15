@@ -12,8 +12,8 @@ manually verified in the PR (with the command or the device used). Untested beha
   - **Unit** — services and utilities (storage service, ordering logic, validation). Use `@TempDir`
     for anything touching the filesystem.
   - **Slice** — `@WebMvcTest` for controllers (status codes, payload shape, validation errors).
-  - **Integration** — `@SpringBootTest` + the real embedded DB for persistence and the full HTTP path
-    of critical flows (create dump, upload photo).
+  - **Integration** — `@SpringBootTest` + PostgreSQL via Testcontainers (same image tag as dev) for
+    persistence and the full HTTP path of critical flows (create dump, upload photo).
 - Naming: `should_<expectedBehaviour>_when_<condition>`.
 - Deterministic: no sleeps, no time-dependent assertions (inject a `Clock`), no random without a seed.
 - Test data builders live in `backend/src/test/java/.../support/`; never reuse production fixtures.

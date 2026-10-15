@@ -50,7 +50,8 @@ no entities in responses, no repository calls from controllers.
 
 - `StorageService` owns the data directory (default `~/AetherArchive_Data`, configurable via
   `aether.storage.data-dir` from `AETHER_DATA_DIR`):
-  `images/` (originals), `thumbnails/` (P1), `tmp/` (atomic write staging), `aether.db` (SQLite).
+  `images/` (originals), `thumbnails/` (P1), `tmp/` (atomic write staging). The database is **not** a file
+  here: PostgreSQL runs in its own Docker volume (ADR-009).
 - Writes are atomic: write to `tmp/` then `Files.move(... , ATOMIC_MOVE)`. On failure, clean up `tmp/`.
 - Filenames are UUIDs + validated extension. Original client filenames are stored only in metadata
   (if a story needs them), never used on disk.
@@ -61,16 +62,19 @@ no entities in responses, no repository calls from controllers.
 
 ## Persistence
 
-- SQLite via the Hibernate community dialect; schema managed by Flyway migrations in
-  `backend/src/main/resources/db/migration/V*.sql`. Never use `hibernate.ddl-auto=update` outside
-  a throwaway test profile.
-- SQLite pragmas on connect: `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout`.
+- PostgreSQL 17 via Spring Data JPA (`org.postgresql:postgresql`); schema managed by Flyway migrations
+  in `backend/src/main/resources/db/migration/V*.sql` (Postgres dialect). Never use
+  `hibernate.ddl-auto=update` — `validate` everywhere.
+- Dev server: `docker compose -f docker-compose.dev.yml up -d` (ADR-009 / E1-S11); connection from env
+  (`.env.example`). No community dialects, no embedded-DB fallbacks.
 - Repositories: derived queries or `@Query` with bound parameters. Never concatenate SQL.
 
 ## Tests (see `.claude/rules/testing.md`)
 
-- `@WebMvcTest` per controller, `@DataJpaTest` for repositories, unit tests for services with `@TempDir`.
-- At least one `@SpringBootTest` covering the dump creation flow end to end (HTTP → DB → files).
+- `@WebMvcTest` per controller; `@DataJpaTest` for repositories against a real Postgres via Testcontainers
+  (test-only dependency — justified in the PR); unit tests for services with `@TempDir`.
+- At least one `@SpringBootTest` covering the dump creation flow end to end (HTTP → DB → files) —
+  Testcontainers, no pre-running database required.
 
 ## Performance & logging
 

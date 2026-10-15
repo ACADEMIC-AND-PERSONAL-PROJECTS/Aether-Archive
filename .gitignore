@@ -14,7 +14,7 @@ CLAUDE.local.md
 .claude/settings.local.json
 .claude/tmp/
 
-# ── Local data (images, SQLite database) — never committed ────────────────────
+# ── Local data (images, database dumps) — never committed ─────────────────────
 AetherArchive_Data/
 data/
 
