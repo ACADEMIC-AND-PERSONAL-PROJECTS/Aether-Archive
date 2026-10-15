@@ -48,8 +48,8 @@ shared, reviewable, and versioned with the code.
 - `settings.json` permissions apply after you accept the workspace trust prompt on first launch.
 - Project MCP servers live in the repo-root `.mcp.json`: `MCP_DOCKER` and `web-search` (Docker MCP
   gateway, profile `research` — Docker must be running). `enabledMcpjsonServers` in `settings.json`
-  pre-approves them, so no per-session prompt appears. They are development-time tools only — the
-  shipped app never calls them.
+  pre-approves them (once the workspace is trusted), so no per-session approval prompt appears. They
+  are development-time tools only — the shipped app never calls them.
 - The `verify` skill is special: Claude Code's built-in commit instructions run a project skill named
   `verify` right before each commit, which is exactly what we want here.
 - `statusLine` is set in project settings; if your version ignores it there, copy the block into
