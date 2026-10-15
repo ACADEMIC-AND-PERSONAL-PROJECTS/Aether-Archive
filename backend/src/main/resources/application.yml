@@ -3,6 +3,13 @@ spring:
     name: aether-archive
   profiles:
     default: dev
+  servlet:
+    multipart:
+      # Wired to the same property the upload service enforces (ADR-012): without this the container
+      # would refuse anything above Spring's 1 MB default before StorageService ever sees the bytes.
+      # Referencing `aether.storage.max-upload-mb` rather than the env var keeps one source of truth.
+      max-file-size: ${aether.storage.max-upload-mb:15}MB
+      max-request-size: ${aether.storage.max-upload-mb:15}MB
   # Spring Boot does not read `.env` on its own — docker compose does. Importing it as a properties
   # file is what lets the backend and the compose stack share the keys documented in `.env.example`.
   # Both entries are `optional:`, so tests and machines without a `.env` start unchanged, and the

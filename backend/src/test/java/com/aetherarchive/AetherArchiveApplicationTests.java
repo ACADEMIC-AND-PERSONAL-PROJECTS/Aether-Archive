@@ -28,6 +28,12 @@ class AetherArchiveApplicationTests {
     @Value("${spring.application.name}")
     private String applicationName;
 
+    @Value("${spring.servlet.multipart.max-file-size}")
+    private String multipartMaxFileSize;
+
+    @Value("${spring.servlet.multipart.max-request-size}")
+    private String multipartMaxRequestSize;
+
     @Autowired
     private StorageProperties storageProperties;
 
@@ -54,5 +60,15 @@ class AetherArchiveApplicationTests {
         // data directory (AETHER_DATA_DIR stays unread in this profile).
         assertThat(storageProperties.dataDir().normalize())
                 .startsWith(Path.of(System.getProperty("java.io.tmpdir")).normalize());
+    }
+
+    @Test
+    void should_apply_the_upload_ceiling_to_the_servlet_container_too() {
+        // The service enforces the limit while copying; the container must not refuse a legitimate
+        // upload first (Spring's default is 1 MB). Both limits come from the same property.
+        String expected = storageProperties.maxUploadMb() + "MB";
+
+        assertThat(multipartMaxFileSize).isEqualTo(expected);
+        assertThat(multipartMaxRequestSize).isEqualTo(expected);
     }
 }

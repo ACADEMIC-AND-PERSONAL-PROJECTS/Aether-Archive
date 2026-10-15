@@ -302,6 +302,15 @@ operator did not mean. Wildcard CORS patterns stay usable on a LAN with a dynami
 that needs a different upload ceiling, a non-pattern CORS entry or a symlinked staging directory must
 supersede this ADR first (e.g. `tmp/` on another volume would need an explicit allow-list, not silence).
 
+**Amendment — 2026-10-15 (E1-S4).** Point 3 covered only `tmp/`, the directory whose contents the boot
+deletes. For the *write* path the rule is now uniform: `images/` and `thumbnails/` may be symlinks, but a
+link whose **real** path leaves the real data directory is refused whenever the archive writes through it,
+because the files would then live outside the tree the backups copy. This is enforced per write in
+`StorageService` (every path resolved with `toRealPath()` and proved to start with the data root), not at
+boot, so an existing archive keeps starting. The upload ceiling of point 1 is also enforced twice: at the
+servlet container (`spring.servlet.multipart.max-file-size`, wired to the same `AETHER_MAX_UPLOAD_MB`) and
+in the service while streaming, so a request that under-reports its length still meets the ceiling.
+
 ---
 
 ## Template for new ADRs

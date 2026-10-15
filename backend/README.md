@@ -162,6 +162,48 @@ Flyway's: `src/main/resources/db/migration/V*.sql` is applied at startup, and Hi
 `ddl-auto=validate` — it refuses to map an entity to a table that is not there, but it never creates or
 changes one. A new table or column means a new migration file, not an annotation change.
 
+## Uploads
+
+`StorageService.store(MultipartFile)` is the only way bytes reach the disk, and it trusts nothing about
+an upload: the client's file name is discarded, and the declared media type is only checked *against*
+the bytes. An upload is accepted when, in order:
+
+1. it is not empty;
+2. it declares an accepted image media type — `image/jpeg` (or `image/jpg`), `image/png`, `image/gif`,
+   `image/webp`, `image/avif`; case and parameters (`; charset=…`) are ignored, a missing type is refused;
+3. its first bytes carry the signature of that same format;
+4. it fits in `AETHER_MAX_UPLOAD_MB`.
+
+| Format | Signature (at offset 0 unless stated) |
+| --- | --- |
+| JPEG | `FF D8 FF` |
+| PNG | `89 50 4E 47 0D 0A 1A 0A` |
+| GIF | `GIF87a` or `GIF89a` |
+| WEBP | `RIFF` at 0 and `WEBP` at 8 |
+| AVIF | `ftyp` at 4 and the brand `avif` or `avis` at 8 |
+
+Anything else is refused. `service/ImageFormat` is the single source of truth for signatures, extensions
+and media types, and the stored extension is the one of the *sniffed* format: a text file named
+`holiday.jpg` is refused, a JPEG named `holiday.png` lands as `.jpg`.
+
+The name on disk is `<uuid>.<ext>` — never the client's. Writes are atomic: the bytes go to a temporary
+file in `tmp/` (same filesystem) and are moved into `images/` with `ATOMIC_MOVE`, so a reader sees either
+the whole file or none of it; every failure path deletes the temporary file, and a failed store leaves
+`tmp/` empty. Before writing, the destination is resolved and checked to stay inside the data directory:
+`../` in a client file name is inert, and an `images/` or `tmp/` symlinked *outside* the data directory is
+refused, while a link that stays inside it is accepted (the data directory itself may be a symlink,
+ADR-012).
+
+The size limit is enforced twice, from the same key: `spring.servlet.multipart.max-file-size` and
+`max-request-size` are wired to `AETHER_MAX_UPLOAD_MB`, so the container does not refuse a legitimate
+upload before the service sees it; and the service counts the bytes it actually copies rather than
+trusting `Content-Length` or `getSize()`, so a client that under-reports its length still hits the
+ceiling. A request over the limit is refused by the container (mapped to a problem detail in E1-S8).
+
+Refusals throw `UnsupportedImageTypeException`, `UploadTooLargeException` or `StorageException`, each
+carrying a stable `code` (`unsupported-image-type`, `upload-too-large`, `storage-failure`) that E1-S8 maps
+to an RFC 9457 problem detail. No message contains a filesystem path — the operator finds paths in the log.
+
 ## Tests
 
 `./mvnw test` needs Docker, nothing else: every context-booting test runs against a throwaway
