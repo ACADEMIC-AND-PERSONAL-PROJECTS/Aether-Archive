@@ -21,13 +21,19 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
+import org.springframework.validation.ObjectError;
+import org.springframework.validation.method.MethodValidationException;
+import org.springframework.validation.method.MethodValidationResult;
 import org.springframework.validation.method.ParameterValidationResult;
 import org.springframework.web.ErrorResponse;
+import org.springframework.web.ErrorResponseException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -45,17 +51,21 @@ import com.aetherarchive.config.StorageProperties;
  *       The values are part of the API: renaming one is a change to the contract, not a refactor;</li>
  *   <li>{@code title} is a constant per situation, never an exception message;</li>
  *   <li>{@code detail} is one sentence for whoever has to fix the request, taken from a domain exception
- *       written for exactly that ({@link StorageException}) or written here;</li>
+ *       written for exactly that ({@link StorageException}), or from a {@link ProblemDetail} the archive
+ *       raised itself, or written here;</li>
  *   <li>{@code instance} is the path the client asked for, and nothing more.</li>
  * </ul>
  * A validation failure also lists the rejected fields as {@link FieldViolation} — at most
  * {@value #MAX_FIELD_VIOLATIONS} of them, so a request rejected on a hundred fields still answers in one
  * screen — and the response media type is always {@code application/problem+json}.
  *
- * <p><strong>Nothing internal leaves the process.</strong> No stack trace, no SQL, no file path, no class
- * or exception name and no rejected value: {@code .claude/rules/security.md} forbids all five in a
- * response body, and the log is where the operator reads them instead (a 5xx logs its stack trace, its
- * body does not).
+ * <p><strong>Nothing internal leaves the process.</strong> No stack trace and no file path, which
+ * {@code .claude/rules/security.md} forbids, and no SQL, class or exception name either: the log is where
+ * the operator reads them instead (a 5xx logs its stack trace, its body does not). A rejected value is not
+ * echoed either, with one deliberate exception: the media type an upload declared is named in the 415
+ * refusal, stripped of control characters and cut to a bounded length by
+ * {@link com.aetherarchive.service.StorageService}, because a client cannot correct a {@code Content-Type}
+ * it cannot see.
  *
  * <p>The storage family is mapped by <em>type</em>, not by status: the exception layer knows nothing about
  * HTTP, so {@link StorageException} decides the code and this class only decides the status.
@@ -68,6 +78,9 @@ public class ApiExceptionHandler {
 
     /** Wire code of a body that could not be read as JSON for the endpoint. */
     private static final String CODE_MALFORMED_REQUEST = "malformed-request";
+
+    /** Wire code of a path variable or request parameter whose value does not parse. */
+    private static final String CODE_INVALID_PARAMETER = "invalid-parameter";
 
     /** Wire code of a multipart request that arrives without a part the endpoint requires. */
     private static final String CODE_MISSING_REQUEST_PART = "missing-request-part";
@@ -86,6 +99,12 @@ public class ApiExceptionHandler {
     private static final String PROPERTY_ERRORS = "errors";
 
     private static final String TITLE_UPLOAD_TOO_LARGE = "Upload too large";
+
+    /**
+     * The field a violation is reported against when it has none of its own: a class-level rule, or a
+     * constraint spanning several parameters, is still a rejection of the request.
+     */
+    private static final String FIELD_REQUEST = "request";
 
     private static final String REFUSAL_DETAIL = "The request was refused before it reached the archive.";
 
@@ -140,6 +159,24 @@ public class ApiExceptionHandler {
                 ex.getMessage(), request));
     }
 
+    /**
+     * A path variable or a request parameter whose value does not parse as the type the endpoint
+     * declares — the client's typo, so a 400, and one Spring MVC would have answered the same way had the
+     * advice not claimed it. Without this mapping the catch-all below would report it as an archive bug
+     * (500), which is exactly backwards.
+     *
+     * <p>The rejected value is not echoed, and neither is the Java type it failed to parse as: a response
+     * body carries no class name. The sentence names the parameter, so the client knows what to correct,
+     * and points at the format the endpoint documents for it.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    ResponseEntity<ProblemDetail> handleArgumentTypeMismatch(MethodArgumentTypeMismatchException ex,
+            HttpServletRequest request) {
+        return problemResponse(problemBody(HttpStatus.BAD_REQUEST, CODE_INVALID_PARAMETER, "Invalid parameter",
+                "The parameter '" + ex.getName() + "' does not have the format this endpoint expects.",
+                request));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ProblemDetail> handleMethodArgumentNotValid(MethodArgumentNotValidException ex,
             HttpServletRequest request) {
@@ -147,20 +184,29 @@ public class ApiExceptionHandler {
         for (FieldError error : ex.getBindingResult().getFieldErrors()) {
             addViolation(violations, error.getField(), error.getDefaultMessage());
         }
+        // A constraint on the object itself has no field to attach to; it is reported against the request,
+        // so a body that failed only a class-level rule is not answered with an empty collection.
+        for (ObjectError error : ex.getBindingResult().getGlobalErrors()) {
+            addViolation(violations, FIELD_REQUEST, error.getDefaultMessage());
+        }
         return validationFailure(violations, request);
     }
 
     @ExceptionHandler(HandlerMethodValidationException.class)
     ResponseEntity<ProblemDetail> handleHandlerMethodValidation(HandlerMethodValidationException ex,
             HttpServletRequest request) {
-        List<FieldViolation> violations = new ArrayList<>();
-        for (ParameterValidationResult result : ex.getParameterValidationResults()) {
-            String field = parameterName(result);
-            for (MessageSourceResolvable error : result.getResolvableErrors()) {
-                addViolation(violations, field, error.getDefaultMessage());
-            }
-        }
-        return validationFailure(violations, request);
+        return validationFailure(violationsOf(ex), request);
+    }
+
+    /**
+     * The same rules raised outside the web layer: Spring's own method validation refuses a call before it
+     * is made, whether the argument that broke a constraint belongs to a handler or to a service. It
+     * carries the results in the same shape, so it answers the same way.
+     */
+    @ExceptionHandler(MethodValidationException.class)
+    ResponseEntity<ProblemDetail> handleMethodValidation(MethodValidationException ex,
+            HttpServletRequest request) {
+        return validationFailure(violationsOf(ex), request);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -179,6 +225,17 @@ public class ApiExceptionHandler {
         // value of type `java.util.UUID`"), so it is never echoed: the client gets a sentence instead.
         return problemResponse(problemBody(HttpStatus.BAD_REQUEST, CODE_MALFORMED_REQUEST, "Malformed request",
                 "The request body could not be read; it is not valid JSON for this endpoint.", request));
+    }
+
+    /**
+     * A request that declares itself multipart and then cannot be read as one: a broken envelope, a part
+     * header the container refuses. That is the client's mistake — the framework itself answers 400 for
+     * one — so it is never reported as an archive failure.
+     */
+    @ExceptionHandler(MultipartException.class)
+    ResponseEntity<ProblemDetail> handleUnreadableMultipart(HttpServletRequest request) {
+        return problemResponse(problemBody(HttpStatus.BAD_REQUEST, CODE_MALFORMED_REQUEST, "Malformed request",
+                "The multipart request could not be read; check the part headers and the boundary.", request));
     }
 
     @ExceptionHandler(MissingServletRequestPartException.class)
@@ -203,18 +260,27 @@ public class ApiExceptionHandler {
     /**
      * The last line of defence: everything no handler above claimed.
      *
-     * <p>An {@link ErrorResponse} is Spring MVC refusing the request before a controller saw it — the
-     * wrong verb (405), a content type the endpoint does not take (415), a refused parameter. Those keep
-     * the framework's status and their own headers ({@code Allow}, {@code Accept}), and borrow their code
-     * from the status, because answering 500 to a client mistake would misreport whose fault the refusal
-     * is. Everything the framework says about them stays out of the body: the detail is fixed, so no
-     * framework message reaches the client.
+     * <p>An {@link ErrorResponseException} is the archive refusing the request itself, after a controller
+     * saw it — a {@code GET /photos/random} over an empty archive, for one. Its own {@link ProblemDetail}
+     * is the statement it wrote for the client, so its detail is kept, and its {@code code} when the body
+     * set one; flattening that into a fixed sentence would make a resource that is genuinely absent from
+     * the archive indistinguishable from a path that was never mapped.
+     *
+     * <p>Any other {@link ErrorResponse} is Spring MVC refusing the request before a controller ran — the
+     * wrong verb (405), a content type the endpoint does not take (415), a required parameter that is
+     * missing (400). Those keep the framework's status and their own headers ({@code Allow},
+     * {@code Accept}) and borrow their code from the status, because answering 500 to a client mistake
+     * would misreport whose fault the refusal is. What the framework says about them stays out of the
+     * body: their detail is fixed, so no framework message reaches the client.
      *
      * <p>Anything else is a bug: the stack trace goes to the log, where the operator can act on it, and
      * the response is a status, a code and a sentence that say nothing about the internals.
      */
     @ExceptionHandler(Exception.class)
     ResponseEntity<ProblemDetail> handleUnexpected(Exception ex, HttpServletRequest request) {
+        if (ex instanceof ErrorResponseException archiveRefusal) {
+            return problemResponse(archiveRefused(archiveRefusal, request));
+        }
         if (ex instanceof ErrorResponse refusal) {
             return problemResponse(refused(refusal.getStatusCode(), request), refusal.getHeaders());
         }
@@ -224,9 +290,10 @@ public class ApiExceptionHandler {
     }
 
     /**
-     * A validation failure is a 400 listing the fields that were rejected. Only field-level violations
-     * appear: a class-level constraint has no field of its own, and naming the DTO class would put a class
-     * name in the body, which no response may contain.
+     * A validation failure is a 400 listing the fields that were rejected. A violation that has no field
+     * of its own is reported against {@value #FIELD_REQUEST}: naming the DTO class instead would put a
+     * class name in the body, which no response may contain, and listing nothing would break the promise
+     * the detail makes.
      */
     private static ResponseEntity<ProblemDetail> validationFailure(List<FieldViolation> violations,
             HttpServletRequest request) {
@@ -235,6 +302,21 @@ public class ApiExceptionHandler {
                 request);
         body.setProperty(PROPERTY_ERRORS, violations);
         return problemResponse(body);
+    }
+
+    /** The violations of one method-validation result, whatever bean or handler parameter produced it. */
+    private static List<FieldViolation> violationsOf(MethodValidationResult result) {
+        List<FieldViolation> violations = new ArrayList<>();
+        for (ParameterValidationResult parameter : result.getParameterValidationResults()) {
+            String field = parameterName(parameter);
+            for (MessageSourceResolvable error : parameter.getResolvableErrors()) {
+                addViolation(violations, field, error.getDefaultMessage());
+            }
+        }
+        for (MessageSourceResolvable error : result.getCrossParameterValidationResults()) {
+            addViolation(violations, FIELD_REQUEST, error.getDefaultMessage());
+        }
+        return violations;
     }
 
     /** Keeps the collection bounded: a request with more than {@value #MAX_FIELD_VIOLATIONS} rejected fields
@@ -257,20 +339,51 @@ public class ApiExceptionHandler {
         for (Path.Node node : path) {
             field = node.getName();
         }
-        return field != null ? field : "request";
+        return field != null ? field : FIELD_REQUEST;
+    }
+
+    /**
+     * The archive's own refusal keeps the sentence it wrote: its {@code detail}, and its {@code code} when
+     * the body set one ({@code GET /photos/random} naming the empty archive, say). Nothing else is taken
+     * from the body — the title comes from the status, because a status with no reason phrase leaves the
+     * framework's own title empty.
+     */
+    private static ProblemDetail archiveRefused(ErrorResponseException refusal, HttpServletRequest request) {
+        ProblemDetail body = refusal.getBody();
+        return problemBody(refusal.getStatusCode(), codeOf(refusal.getStatusCode(), body), titleOf(
+                refusal.getStatusCode()), detailOf(body), request);
     }
 
     /** A refusal that never reached a controller keeps the framework's status, and is named after it. */
     private static ProblemDetail refused(HttpStatusCode status, HttpServletRequest request) {
-        if (status instanceof HttpStatus httpStatus) {
-            return problemBody(status, codeOf(httpStatus), httpStatus.getReasonPhrase(), REFUSAL_DETAIL, request);
-        }
-        return problemBody(status, CODE_REQUEST_REJECTED, "Request rejected", REFUSAL_DETAIL, request);
+        return problemBody(status, codeOf(status), titleOf(status), REFUSAL_DETAIL, request);
     }
 
     /** {@code METHOD_NOT_ALLOWED} becomes {@code method-not-allowed}: stable, readable, not invented. */
     private static String codeOf(HttpStatus status) {
         return status.name().toLowerCase(Locale.ROOT).replace('_', '-');
+    }
+
+    /** The status-derived code, unless a status no enum names is behind it. */
+    private static String codeOf(HttpStatusCode status) {
+        return status instanceof HttpStatus httpStatus ? codeOf(httpStatus) : CODE_REQUEST_REJECTED;
+    }
+
+    /** The code the refusing body chose, when it chose one; the status family's otherwise. */
+    private static String codeOf(HttpStatusCode status, ProblemDetail body) {
+        Object code = body.getProperties() == null ? null : body.getProperties().get(PROPERTY_CODE);
+        return code instanceof String value ? value : codeOf(status);
+    }
+
+    /** The status phrase, which is what RFC 9457 asks a title to be, with a fallback for an unnamed one. */
+    private static String titleOf(HttpStatusCode status) {
+        return status instanceof HttpStatus httpStatus ? httpStatus.getReasonPhrase() : "Request rejected";
+    }
+
+    /** The refusing body's own sentence, or the fixed one when it carries none. */
+    private static String detailOf(ProblemDetail body) {
+        String detail = body.getDetail();
+        return detail != null && !detail.isBlank() ? detail : REFUSAL_DETAIL;
     }
 
     private static ProblemDetail problemBody(HttpStatusCode status, String code, String title, String detail,
