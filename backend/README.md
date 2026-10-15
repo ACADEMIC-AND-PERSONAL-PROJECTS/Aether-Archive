@@ -42,6 +42,30 @@ Run from `backend/`:
 Profiles: `dev` (default via `spring.profiles.default`), `test`, `prod`. An explicit
 `SPRING_PROFILES_ACTIVE` wins over the default.
 
+## Dev database
+
+The development database is a PostgreSQL 17 container (ADR-009). Start it once per machine:
+
+```bash
+cp .env.example .env                                        # from the repository root
+docker compose -f docker-compose.dev.yml up -d              # start (root of the repository)
+docker compose -f docker-compose.dev.yml ps                 # wait for "healthy"
+```
+
+The container reads `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` and `AETHER_DB_PORT` from the same
+`.env` the backend uses, so both sides always agree. It listens on **127.0.0.1 only** — never the LAN — and
+keeps its data in the named volume `aether_pgdata`, which `docker compose … down` leaves untouched.
+
+`docker compose -f docker-compose.dev.yml down` stops it and keeps the data; only `down -v` deletes the
+archive. Inspect it with:
+
+```bash
+docker compose -f docker-compose.dev.yml exec db psql -U aether -d aether
+```
+
+The backend does not connect to it yet: the JDBC driver, datasource and Flyway arrive in **E1-S3**, at which
+point `./mvnw spring-boot:run` will use the values documented in `.env.example` with no further setup.
+
 ## Configuration
 
 Everything is env-driven: `SERVER_PORT`, `AETHER_DATA_DIR`, `AETHER_MAX_UPLOAD_MB`,
