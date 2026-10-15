@@ -1,0 +1,164 @@
+openapi: 3.0.3
+info:
+  title: Aether Archive API
+  description: API locale pour la galerie esthétique. Gère l'affichage immersif, l'upload de captures (nature, anime) et la création des Dumps mensuels.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Serveur Local Spring Boot
+tags:
+  - name: Photos
+    description: Gestion des photos individuelles et du flux temporel
+  - name: Dumps
+    description: Gestion de l'atelier du curateur (compilations de 6 photos)
+paths:
+  /photos:
+    get:
+      tags:
+        - Photos
+      summary: Récupérer toutes les photos
+      description: Retourne le flux de photos, trié par date décroissante pour le "Fleuve Temporel".
+      responses:
+        '200':
+          description: Liste des photos récupérée avec succès
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Photo'
+    post:
+      tags:
+        - Photos
+      summary: Uploader une nouvelle capture
+      description: Upload d'un fichier image physique et sauvegarde de ses métadonnées.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+                - category
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Le fichier image (JPEG, PNG, etc.)
+                category:
+                  type: string
+                  enum: [pics, anime, dump, uncategorized]
+      responses:
+        '201':
+          description: Photo uploadée et traitée avec succès
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Photo'
+  /photos/random:
+    get:
+      tags:
+        - Photos
+      summary: Récupérer une photo aléatoire
+      description: API appelée lors de l'ouverture de l'application pour l'écran "Accueil Dopamine" en plein écran.
+      responses:
+        '200':
+          description: Une photo sélectionnée aléatoirement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Photo'
+  /dumps:
+    get:
+      tags:
+        - Dumps
+      summary: Récupérer tous les Dumps
+      description: Retourne les compilations mensuelles pour la vue chronologique.
+      responses:
+        '200':
+          description: Liste des dumps mensuels
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Dump'
+    post:
+      tags:
+        - Dumps
+      summary: Créer un nouveau Dump mensuel
+      description: Sauvegarde l'organisation de l'Atelier du Curateur (6 photos spécifiques, ordre précis, couleur de fond).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DumpCreate'
+      responses:
+        '201':
+          description: Dump esthétique créé avec succès
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dump'
+        '400':
+          description: Erreur de validation (ex. le nombre de photos n'est pas exactement 6)
+components:
+  schemas:
+    Photo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        url:
+          type: string
+          description: Chemin local statique ou URL interne pour accéder à l'image
+        category:
+          type: string
+          enum: [pics, anime, dump, uncategorized]
+        uploadedAt:
+          type: string
+          format: date-time
+          description: Date et heure de l'upload
+    Dump:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          description: Le nom du Dump (ex. "Septembre", "Late Summer")
+        backgroundColor:
+          type: string
+          description: Code hexadécimal de la couleur de fond (#RRGGBB) choisie dans l'atelier
+        photos:
+          type: array
+          description: Les 6 photos organisées dans l'ordre de présentation
+          items:
+            $ref: '#/components/schemas/Photo'
+        createdAt:
+          type: string
+          format: date-time
+    DumpCreate:
+      type: object
+      required:
+        - title
+        - backgroundColor
+        - photoIds
+      properties:
+        title:
+          type: string
+          example: "Septembre"
+        backgroundColor:
+          type: string
+          example: "#1A1A1A"
+          description: La couleur de fond choisie pour mettre en valeur les photos
+        photoIds:
+          type: array
+          description: Tableau contenant exactement 6 UUID de photos, triés dans l'ordre voulu
+          items:
+            type: string
+            format: uuid
