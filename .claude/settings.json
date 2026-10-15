@@ -195,6 +195,16 @@
             "type": "command",
             "if": "Bash(rm *)",
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-commands.sh"
+          },
+          {
+            "type": "command",
+            "if": "Bash(docker *)",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-commands.sh"
+          },
+          {
+            "type": "command",
+            "if": "Bash(docker-compose *)",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-commands.sh"
           }
         ]
       }

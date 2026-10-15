@@ -10,12 +10,12 @@ backend and the frontend build; a phone on the same LAN opens the app in a brows
 machine: no cloud, no external request at runtime, no telemetry.
 
 ```text
-┌──────────────┐        LAN (http://192.168.x.x:8080)        ┌───────────────────────────┐
+┌──────────────┐        LAN (http://192.168.x.x:3000)        ┌───────────────────────────┐
 │   Phone      │ ──────────────────────────────────────────▶ │  Owner's machine          │
 │  (browser)   │ ◀────────────────────────────────────────── │                           │
 └──────────────┘                                             │  ┌─────────────────────┐  │
                                                              │  │ Spring Boot :8080   │  │
-   Static frontend (built bundle, served locally)  ────────▶ │  │  /api/v1   REST     │  │
+   Static frontend (dev :5173 · v1.0 :3000)        ────────▶ │  │  /api/v1   REST     │  │
                                                              │  │  /images/** files   │  │
                                                              │  └─────────┬───────────┘  │
                                                              │            │ JDBC          │

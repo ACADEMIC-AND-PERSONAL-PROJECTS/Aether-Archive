@@ -14,7 +14,8 @@ How this project is run. Short, explicit, and meant to be obeyed by both the hum
 ## Cadence
 
 - **Sprint length**: 2 weeks (adjustable; recorded in the sprint doc).
-- **Capacity**: ~25–30 points per sprint for agent-driven work. Never plan above 30 to protect against defects and interruptions.
+- **Capacity**: ~25–34 points per sprint for agent-driven work (see the sprint map in the backlog).
+  Never plan above 34; excess p2 stories roll to the next sprint.
 - **Sprint goal**: exactly one sentence, outcome-shaped ("The archive can store and serve images"), never a list.
 - **Cadence of commits**: many, per logical unit (`.claude/rules/git-workflow.md`).
 

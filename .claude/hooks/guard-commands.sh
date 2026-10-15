@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Aether Archive — PreToolUse guard.
-# Registered for Bash(git *), Bash(gh *) and Bash(rm *) in .claude/settings.json.
+# Registered for Bash(git *), Bash(gh *), Bash(rm *), Bash(docker *) and Bash(docker-compose *)
+# in .claude/settings.json.
 # Exit code 2 blocks the command and returns the message to the agent as feedback.
 # Policy: .claude/rules/git-workflow.md — never bypass or edit this script silently.
 set -uo pipefail
@@ -100,10 +101,9 @@ case "$FLAT" in
     esac
     ;;
 esac
-case "$FLAT" in
-  *"docker volume rm"*|*"docker compose down -v"*|*"docker compose down --volumes"*)
-    deny "this would delete the PostgreSQL data volume (the archive database). Ask the user for explicit approval first." ;;
-esac
+if printf '%s' "$FLAT" | grep -Eqi 'docker' && printf '%s' "$FLAT" | grep -Eq '(--volumes|volume +(rm|prune)|compose[^|;]*down +-v|system +prune)'; then
+  deny "this would delete the PostgreSQL data volume (the archive database). Ask the user for explicit approval first."
+fi
 if printf '%s' "$FLAT" | grep -Eqi '(drop +(table|database))|(delete +from +(photo|archive_item))|(truncate +table)'; then
   deny "destructive SQL is forbidden. Data loss must be an explicit, user-approved migration."
 fi

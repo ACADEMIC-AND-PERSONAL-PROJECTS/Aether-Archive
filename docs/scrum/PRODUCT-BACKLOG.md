@@ -31,8 +31,8 @@ A story is `Done` only when the Definition of Done (`DEFINITION-OF-DONE.md`) is 
 **Total: 43 stories · 181 points · 6 sprints (~2 weeks each, 25–34 points per sprint).**
 
 ```text
-Sprint 1  E1  Foundation & Backend              (36)
-Sprint 2  E2  Frontend Foundation & Design Sys  (31)
+Sprint 1  E1  Foundation & Backend              (34)
+Sprint 2  E2 + E1-S5/S10  Frontend Foundation & Design Sys  (33)
 Sprint 3  E3 + E4-S1/S2  Splash · Menu · Upload (28)
 Sprint 4  E4 + E6-S1/S2  Workshop · CI          (25)
 Sprint 5  E5 + E6-S3/S4  Time River · A11y      (27)
@@ -52,7 +52,7 @@ serves images and exposes the `/api/v1` contract from `_docs/openapi.yml` — fu
 | E1-S2 | Configuration & local data directory | p0 | 2 | 1 | Todo |
 | E1-S3 | PostgreSQL persistence + Flyway baseline | p0 | 5 | 1 | Todo |
 | E1-S4 | StorageService — safe local file storage | p0 | 5 | 1 | Todo |
-| E1-S5 | Serve images at `/images/**` | p0 | 2 | 1 | Todo |
+| E1-S5 | Serve images at `/images/**` | p0 | 2 | 2 | Todo |
 | E1-S6 | Photo API — upload, list, random | p0 | 5 | 1 | Todo |
 | E1-S7 | Dump API — create and list 6-photo dumps | p0 | 5 | 1 | Todo |
 | E1-S8 | Error handling (RFC 9457) & validation | p0 | 2 | 1 | Todo |
@@ -520,7 +520,7 @@ delivery, documentation, and a clean v1.0.
 - [ ] `backend/Dockerfile`: multi-stage (Maven build → Temurin 21 JRE), non-root user, pinned base tags, `.dockerignore`.
 - [ ] `frontend/Dockerfile`: multi-stage (Node build → nginx serving the SPA and reverse-proxying `/api/**` + `/images/**` to `api`), pinned tags, `.dockerignore`.
 - [ ] Runtime makes zero external requests; no secrets baked into any image layer.
-- [ ] Healthchecks defined for every service (consumed by E6-S12).
+- [ ] Healthchecks defined for `db` and `api` (consumed by E6-S12).
 
 ### E6-S12 — One-command stack & clean-clone verification · 5 pts | p0
 

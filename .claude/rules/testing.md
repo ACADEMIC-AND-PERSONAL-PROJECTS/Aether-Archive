@@ -7,7 +7,8 @@ manually verified in the PR (with the command or the device used). Untested beha
 
 ## Backend (Java / Spring Boot)
 
-- Frameworks: JUnit 5, Spring Boot Test, MockMvc, AssertJ. No network, no external services.
+- Frameworks: JUnit 5, Spring Boot Test, MockMvc, AssertJ. No network, no remote service dependencies —
+  local Testcontainers (Docker) are fine.
 - Layers to test:
   - **Unit** — services and utilities (storage service, ordering logic, validation). Use `@TempDir`
     for anything touching the filesystem.

@@ -4,8 +4,9 @@
 > Images are the product — the interface stays almost invisible.
 
 Aether Archive runs entirely on your own machine and is designed to be opened from a phone on the
-same local network (`http://<LAN-IP>:8080`). Nothing is uploaded to the cloud, no third-party
-requests are made at runtime, and every image and record stays in a local folder you own.
+same local network — `http://<LAN-IP>:5173` in development, `http://<LAN-IP>:3000` in the containerized
+v1.0. Nothing is uploaded to the cloud, no third-party requests are made at runtime, and every image
+and record stays on your machine.
 
 ## Concept
 
