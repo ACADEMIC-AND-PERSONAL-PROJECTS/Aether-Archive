@@ -83,7 +83,8 @@ Branch model: `main` (released) ← `develop` (integration) ← `feature/*` (one
 
 - **Plan before multi-file work**: use plan mode, then implement. One story = one plan = one branch.
 - **Use subagents to protect the main context** (`backend-engineer`, `frontend-engineer`, `qa-verifier`,
-  `scrum-master`) for exploration, implementation, or verification that would flood the conversation.
+  `security-auditor`, `scrum-master`) for exploration, implementation, verification or security
+  auditing that would flood the conversation.
 - **Keep context healthy**: `/clear` between unrelated tasks, `/compact` when a long task must continue;
   prefer `/rewind` over piling corrections on a failed attempt.
 - **Tests and docs are part of the story**, not a follow-up: a story is done only when the DoD checklist

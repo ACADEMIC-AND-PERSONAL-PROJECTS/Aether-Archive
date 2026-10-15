@@ -9,7 +9,7 @@ How this project is run. Short, explicit, and meant to be obeyed by both the hum
 | Product Owner | **The user** | Vision, priority calls, acceptance, access to the machine |
 | Scrum Master | Agent (`scrum-master` subagent) | Backlog, sprint docs, milestones, retrospectives |
 | Dev team | Agent (`backend-engineer`, `frontend-engineer` subagents) | Implementation, tests, PRs |
-| Reviewers | Agent (`code-reviewer`, `qa-verifier` subagents) | Independent review, verification evidence |
+| Reviewers | Agent (`code-reviewer`, `qa-verifier`, `security-auditor` subagents) | Independent review, verification evidence, sprint security audit |
 
 ## Cadence
 
@@ -27,6 +27,7 @@ How this project is run. Short, explicit, and meant to be obeyed by both the hum
 | Daily stand-up | On request | `/standup` (read-only digest) |
 | Sprint review | End of sprint | Release PR description + summary to the user |
 | Retrospective | End of sprint | `/finish-sprint` → `retrospectives/sprintNN.md` |
+| Security audit | End of sprint, before the release PR | `security-auditor` subagent → `reports/security-audit-sprintNN.md`; Critical/High blocks the release |
 | Backlog sync | Whenever the file changes | `/backlog-sync` |
 
 ## Branch & release policy

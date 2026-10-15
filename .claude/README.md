@@ -32,6 +32,7 @@ shared, reviewable, and versioned with the code.
 │   ├── frontend-engineer.md  React/Vite/design implementation
 │   ├── code-reviewer.md      Read-only review against DoD + conventions
 │   ├── qa-verifier.md        Runs verification, writes evidence reports
+│   ├── security-auditor.md   Web-researched security audit each sprint close (release gate)
 │   └── scrum-master.md       Backlog, sprint docs, retrospectives
 ├── hooks/            Deterministic guardrails (shell scripts wired in settings.json)
 │   ├── guard-commands.sh     Blocks rebase/force-push/direct pushes/squash merges/destructive ops
