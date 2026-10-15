@@ -1,0 +1,65 @@
+name: User story
+description: A story from docs/scrum/PRODUCT-BACKLOG.md (mirror — the file is canonical)
+title: "[E1-S1] "
+labels: ["type:story"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This issue mirrors `docs/scrum/PRODUCT-BACKLOG.md`. If you change scope here, change the file too
+        (the file always wins). Use `/backlog-sync` to re-mirror.
+  - type: input
+    id: story_id
+    attributes:
+      label: Story ID
+      description: Stable id from the backlog (e.g. E2-S4)
+      placeholder: E1-S1
+    validations:
+      required: true
+  - type: textarea
+    id: statement
+    attributes:
+      label: Story
+      description: "As a …, I want …, so that …"
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Testable, observable behaviours — one per line
+      value: |
+        - [ ] 
+        - [ ] 
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - p0 — must ship this sprint
+        - p1 — should ship soon
+        - p2 — nice to have
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - backend
+        - frontend
+        - design
+        - data
+        - devops
+    validations:
+      required: true
+  - type: input
+    id: estimate
+    attributes:
+      label: Estimate (points)
+      description: Fibonacci — 1, 2, 3, 5, 8. Above 8, split the story.
+      placeholder: "5"
+    validations:
+      required: true

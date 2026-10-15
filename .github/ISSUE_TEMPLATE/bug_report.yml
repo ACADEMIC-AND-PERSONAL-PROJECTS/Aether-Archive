@@ -1,0 +1,51 @@
+name: Bug report
+description: Something in Aether Archive does not behave as specified
+title: "[bug] "
+labels: ["type:bug"]
+body:
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened
+      description: Observed behaviour, with the exact steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should happen
+      description: Expected behaviour, and the story/acceptance criterion it violates if known
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Device, browser, branch/commit, data-directory state
+      placeholder: "Pixel 7 · Chrome 140 · develop @ a1b2c3d"
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Logs, screenshots, failing command output. Reports go in reports/.
+    validations:
+      required: false
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - p0 — data loss / app unusable / security
+        - p1 — a main flow is broken
+        - p2 — cosmetic or minor
+    validations:
+      required: true
+  - type: checkboxes
+    id: additions
+    attributes:
+      label: Follow-ups
+      options:
+        - label: I added this to docs/scrum/PRODUCT-BACKLOG.md (the file is canonical)
+          required: false

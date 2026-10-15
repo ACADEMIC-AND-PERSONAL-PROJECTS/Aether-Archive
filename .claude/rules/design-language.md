@@ -1,0 +1,61 @@
+---
+paths:
+  - "frontend/src/styles/**"
+  - "frontend/src/components/**"
+  - "frontend/src/features/**"
+  - "frontend/**/*.css"
+---
+
+# Design language — Dark Glassmorphism (loaded for UI files)
+
+Full specification: `docs/engineering/DESIGN-SYSTEM.md`. The procedure to implement or extend it:
+`.claude/skills/design-system/SKILL.md`. Hard rules:
+
+## Aesthetic contract
+
+- **Images first, UI invisible.** No persistent header, footer, navbar, borders, cards or chrome.
+  The only text on screen is intentional: month/year markers and Dump titles.
+- **Dark Glassmorphism** only: dark tinted glass (`rgba(0,0,0,0.4)`), `backdrop-filter: blur(15px)`,
+  hairline highlights (`1px solid rgba(255,255,255,0.08)`), generous negative space.
+  No heavy drop shadows, no neon, no decorative gradients, no emoji in the UI.
+- **Motion is soft and tactile**: fade + small upward translate (12–16 px), 300–600 ms,
+  `cubic-bezier(0.22, 1, 0.36, 1)`. No bounce, no attention-seeking loops, `prefers-reduced-motion` respected.
+- Empty and loading states are silent: opacity pulse or a blurred dominant-colour placeholder,
+  never a labelled spinner.
+
+## Colour — derived from the images
+
+- The theme is **generated from the user's own photos**, not hardcoded:
+  - **Dominant colour extraction**: implement the algorithm locally in TypeScript
+    (`frontend/src/lib/color/`), on downscaled bitmap data. Requirements:
+    - input: an uploaded `File`/`ImageBitmap`; output: 5–8 ranked colours with weights,
+    - work in a perceptual space (OKLCH) — not raw RGB averaging,
+    - ignore near-black/near-white pixels and low-information clusters,
+    - deterministic for the same input (stable seeds), and fast (< 50 ms for a 64 px downscale),
+    - unit-tested against fixture images with expected palettes.
+  - **Theme generation**: map the palette to semantic CSS custom properties
+    (`--aura-bg`, `--aura-surface`, `--aura-glass`, `--aura-text`, `--aura-muted`, `--aura-accent`)
+    and apply them at runtime on the document root. Every colour in the UI reads from these variables.
+  - **Guarantees**: contrast-checked (text ≥ 4.5:1 on its background), monotonic lightness for
+    surfaces, and a neutral fallback palette when extraction fails.
+- The River drives `--aura-bg` from the `backgroundColor` of the dump currently in view; the
+  transition between dumps is smooth (≥ 600 ms) and interruptible (no jank while scrolling).
+- The Curator's Workshop shows the extracted palette as tappable "aura" suggestions next to the
+  colour picker, with a live preview of the resulting glass theme.
+
+## Typography — local, elegant, zero network
+
+- **Serif for titles** (Dump titles, month/year markers) and **sans-serif for the UI/menu**.
+- Fonts are installed **strictly as Fontsource NPM packages** (`@fontsource/<font>` or
+  `@fontsource-variable/<font>`) and imported from the frontend entry point so Vite self-hosts them.
+  Google Fonts, CDN `<link>`s and any runtime font request are forbidden.
+- Typographic variables live in the global stylesheet (`frontend/src/styles/global.css`):
+  `--font-display`, `--font-ui`, plus the scale `--text-xs … --text-2xl`, weights and tracking.
+  Components use the variables (or Tailwind theme aliases) — never a raw `font-family`.
+- Baseline choice (record the final pick as an ADR before implementing): **Playfair Display**
+  (`@fontsource/playfair-display`) for display, **Inter** (`@fontsource-variable/inter`) for UI.
+  Alternatives allowed by the spec: Cormorant Garamond, Fraunces (display); Work Sans, Manrope (UI).
+  The chosen pair must have a Fontsource package, ship latin subsets, and keep total added weight
+  under ~200 KB.
+- Weights: display 400/500 (never bold-heavy), UI 300/400/500. Tracking tight on display,
+  slightly open on small UI text. `font-display: swap` semantics via Fontsource defaults.
