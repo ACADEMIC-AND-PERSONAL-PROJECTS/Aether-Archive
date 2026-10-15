@@ -6,7 +6,9 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,10 +35,18 @@ import com.aetherarchive.exception.UploadTooLargeException;
  * The stored extension comes from the sniffed format ({@link ImageFormat#extension()}), so a text file
  * named {@code holiday.jpg} is refused and a JPEG named {@code holiday.png} is stored as {@code .jpg}.
  *
- * <p><strong>Writes are atomic.</strong> The bytes go to a temporary file in the staging directory
- * {@code tmp/} — created on boot by {@link StorageInitializer} on the same filesystem as {@code images/}
- * — and are then moved with {@link StandardCopyOption#ATOMIC_MOVE}. A reader sees either the complete
- * file or no file at all, and every failure path deletes the temporary file.
+ * <p><strong>Writes are atomic and durable.</strong> The bytes go to a temporary file in the staging
+ * directory {@code tmp/} — created on boot by {@link StorageInitializer} on the same filesystem as
+ * {@code images/} — written through a synchronised stream, and then moved with
+ * {@link StandardCopyOption#ATOMIC_MOVE}. A reader sees either the complete file or no file at all, and
+ * every failure path deletes the temporary file.
+ *
+ * <p><strong>Stored files are private.</strong> {@link Files#createTempFile} creates the staged file with
+ * the owner-only mode ({@code 0600} on POSIX filesystems) and the move preserves it, so an image is
+ * never readable by other users of the machine — deliberately, for an archive that is one person's. The
+ * processes that read these files again run as the same user, so nothing has to change for the backups
+ * of E6-S7 or the {@code /images/**} handler of E1-S5; a deployment that serves them as a different
+ * user would have to revisit the mode rather than the other way round.
  *
  * <p><strong>Every write stays inside the data directory.</strong> The destination is built from
  * generated values only and is checked, resolved, against the archive's real directories, so a {@code ../}
@@ -61,6 +71,15 @@ public class StorageService {
     private static final String STAGING_SUFFIX = ".part";
 
     private static final int COPY_BUFFER_SIZE = 8192;
+
+    /**
+     * The longest declared media type echoed back in a refusal. Nothing about an upload is trusted, its
+     * labels included: the value ends up in a problem detail and in a log line, so it is bounded.
+     */
+    private static final int MAX_ECHOED_MEDIA_TYPE_LENGTH = 100;
+
+    /** Control characters, which would let a client forge lines or carry escapes into those messages. */
+    private static final Pattern CONTROL_CHARACTERS = Pattern.compile("\\p{Cntrl}");
 
     private static final long BYTES_PER_MB = 1024L * 1024L;
 
@@ -95,8 +114,8 @@ public class StorageService {
                         "the content of the upload is not a recognised image; the archive accepts "
                                 + ACCEPTED_FORMATS));
         if (declared != detected) {
-            throw new UnsupportedImageTypeException("the upload declares '" + declaredMediaType
-                    + "' but its bytes are " + detected.name());
+            throw new UnsupportedImageTypeException("the upload declares '"
+                    + sanitiseMediaType(declaredMediaType) + "' but its bytes are " + detected.name());
         }
         return writeAtomically(file, detected);
     }
@@ -117,6 +136,7 @@ public class StorageService {
         Path staging = null;
         long size;
         try {
+            // createTempFile gives the staged file the owner-only mode it keeps after the move.
             staging = Files.createTempFile(tmpDir, STAGING_PREFIX, STAGING_SUFFIX);
             size = copyWithLimit(file, staging);
             Files.move(staging, destination, StandardCopyOption.ATOMIC_MOVE);
@@ -139,13 +159,22 @@ public class StorageService {
      * Copies the upload into the staged file, counting the bytes actually read and stopping at the first
      * one over the limit, so neither a header nor {@link MultipartFile#getSize()} can let a larger file
      * through.
+     *
+     * <p>This is the second stream opened on the upload — {@link #readHeader} opened the first — so it
+     * relies on {@link MultipartFile#getInputStream()} starting a fresh stream at the first byte every
+     * time, which is what Tomcat's servlet parts do (see {@link #readHeader}).
      */
     private long copyWithLimit(MultipartFile file, Path staging) throws IOException {
         long limit = maxUploadBytes();
         long written = 0;
         byte[] buffer = new byte[COPY_BUFFER_SIZE];
+        // SYNC: every byte is on the device before the move below publishes the file, so a power loss
+        // cannot leave a correctly named file with unflushed content — data loss is this archive's top
+        // risk. One flush per upload, negligible for a personal archive; a bulk import would revisit it.
         try (InputStream input = file.getInputStream();
-                OutputStream output = Files.newOutputStream(staging)) {
+                OutputStream output = Files.newOutputStream(staging, StandardOpenOption.CREATE,
+                        StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE,
+                        StandardOpenOption.SYNC)) {
             int read = input.read(buffer);
             while (read != -1) {
                 written += read;
@@ -164,7 +193,16 @@ public class StorageService {
         return properties.maxUploadMb() * BYTES_PER_MB;
     }
 
-    /** The first bytes of the upload: emptiness is judged from them, not from a declared size. */
+    /**
+     * The first bytes of the upload: emptiness is judged from them, not from a declared size.
+     *
+     * <p>The store opens two streams on the same upload — this one, then the copy in
+     * {@link #copyWithLimit} — which is only correct because {@link MultipartFile#getInputStream()}
+     * returns a fresh stream positioned at the first byte on every call. That holds for the servlet
+     * parts of Tomcat 10.1 (the container this application runs on), whose {@code getInputStream()}
+     * re-opens the part; it is a property of the multipart implementation, not of the interface, and
+     * {@code MockMultipartFile} cannot catch a regression. Verify it before changing containers.
+     */
     private static byte[] readHeader(MultipartFile file) {
         try (InputStream input = file.getInputStream()) {
             return input.readNBytes(ImageFormat.HEADER_LENGTH);
@@ -183,7 +221,23 @@ public class StorageService {
         if (mediaType == null || mediaType.isBlank()) {
             return "the upload does not declare an image media type; the archive accepts " + ACCEPTED_FORMATS;
         }
-        return "'" + mediaType + "' is not an image media type; the archive accepts " + ACCEPTED_FORMATS;
+        return "'" + sanitiseMediaType(mediaType) + "' is not an image media type; the archive accepts "
+                + ACCEPTED_FORMATS;
+    }
+
+    /**
+     * The client's declared media type, made safe to repeat. It is echoed in the two refusals that
+     * mention it — never the file name, which is discarded entirely — and it arrives from a client, so it
+     * is stripped of control characters (which could forge a line in the log) and cut to
+     * {@link #MAX_ECHOED_MEDIA_TYPE_LENGTH} characters (which is all a reader needs to recognise the
+     * mistake, and bounds what a client can push into a response).
+     */
+    private static String sanitiseMediaType(String mediaType) {
+        String printable = CONTROL_CHARACTERS.matcher(mediaType).replaceAll("");
+        if (printable.length() <= MAX_ECHOED_MEDIA_TYPE_LENGTH) {
+            return printable;
+        }
+        return printable.substring(0, MAX_ECHOED_MEDIA_TYPE_LENGTH) + "...";
     }
 
     /** Removes the staged file after a failure; a successful move has already taken it away. */

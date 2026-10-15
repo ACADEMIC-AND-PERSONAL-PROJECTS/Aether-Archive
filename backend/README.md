@@ -10,7 +10,7 @@ backend/
 └── src/
     ├── main/java/com/aetherarchive/
     │   ├── AetherArchiveApplication   @SpringBootApplication entry point
-    │   ├── config/                  WebMvc, CORS, storage properties
+    │   ├── config/                  WebMvc, CORS, storage properties, multipart ceilings
     │   ├── domain/                  ArchiveItem, Photo, enums
     │   ├── repository/              Spring Data repositories
     │   ├── service/                 StorageService, ArchiveService, DumpService
@@ -180,25 +180,36 @@ the bytes. An upload is accepted when, in order:
 | PNG | `89 50 4E 47 0D 0A 1A 0A` |
 | GIF | `GIF87a` or `GIF89a` |
 | WEBP | `RIFF` at 0 and `WEBP` at 8 |
-| AVIF | `ftyp` at 4 and the brand `avif` or `avis` at 8 |
+| AVIF | an `ftyp` box at 0 whose major brand (at 8) or compatible brands are `avif` or `avis` |
 
 Anything else is refused. `service/ImageFormat` is the single source of truth for signatures, extensions
 and media types, and the stored extension is the one of the *sniffed* format: a text file named
-`holiday.jpg` is refused, a JPEG named `holiday.png` lands as `.jpg`.
+`holiday.jpg` is refused, a JPEG named `holiday.png` lands as `.jpg`. The AVIF box is parsed rather than
+probed at a fixed offset: its declared length bounds the brand walk, the walk also stops at the bytes that
+were read, and a box too short to carry a brand — or truncated — is refused. A file majoring in `mif1`
+with `avif`/`avis` among its compatible brands is an AVIF, as HEIF tooling writes them.
 
-The name on disk is `<uuid>.<ext>` — never the client's. Writes are atomic: the bytes go to a temporary
-file in `tmp/` (same filesystem) and are moved into `images/` with `ATOMIC_MOVE`, so a reader sees either
-the whole file or none of it; every failure path deletes the temporary file, and a failed store leaves
-`tmp/` empty. Before writing, the destination is resolved and checked to stay inside the data directory:
-`../` in a client file name is inert, and an `images/` or `tmp/` symlinked *outside* the data directory is
-refused, while a link that stays inside it is accepted (the data directory itself may be a symlink,
-ADR-012).
+The name on disk is `<uuid>.<ext>` — never the client's. Writes are atomic and durable: the bytes go to a
+temporary file in `tmp/` (same filesystem) through a synchronised stream and are moved into `images/` with
+`ATOMIC_MOVE`, so a reader sees either the whole file or none of it and a power loss cannot publish a
+correctly named file with unflushed content; every failure path deletes the temporary file, and a failed
+store leaves `tmp/` empty. The moved file keeps the owner-only mode (`0600`) `createTempFile` gives the
+staged one: the archive's images are readable by the user running the backend and nobody else, which is
+the same user that serves `/images/**` (E1-S5) and writes the backups (E6-S7) — a deployment that served
+or backed up the data directory as another user would have to revisit that. Before writing, the
+destination is resolved and checked to stay inside the data directory: `../` in a client file name is
+inert, and an `images/` or `tmp/` symlinked *outside* the data directory is refused, while a link that
+stays inside it is accepted (the data directory itself may be a symlink, ADR-012).
 
-The size limit is enforced twice, from the same key: `spring.servlet.multipart.max-file-size` and
-`max-request-size` are wired to `AETHER_MAX_UPLOAD_MB`, so the container does not refuse a legitimate
-upload before the service sees it; and the service counts the bytes it actually copies rather than
-trusting `Content-Length` or `getSize()`, so a client that under-reports its length still hits the
-ceiling. A request over the limit is refused by the container (mapped to a problem detail in E1-S8).
+The size limit is enforced twice, from the same key. The container's ceilings are computed by
+`config/MultipartConfig` from `AETHER_MAX_UPLOAD_MB` — `spring.servlet.multipart.*` is deliberately left
+unset, so the bean is the one source of truth: the file ceiling is the configured maximum itself, and the
+request ceiling is that plus a megabyte of headroom for the multipart envelope (boundaries, part headers,
+the `category` field), because with equal ceilings the container refuses a file *at* the documented limit
+before the service ever sees it. Parts are staged on disk from their first byte, never buffered in
+memory. The service then counts the bytes it actually copies rather than trusting `Content-Length` or
+`getSize()`, so a client that under-reports its length still hits the ceiling. A request over either
+ceiling is refused by the container with a `413` (mapped to a problem detail in E1-S8).
 
 Refusals throw `UnsupportedImageTypeException`, `UploadTooLargeException` or `StorageException`, each
 carrying a stable `code` (`unsupported-image-type`, `upload-too-large`, `storage-failure`) that E1-S8 maps

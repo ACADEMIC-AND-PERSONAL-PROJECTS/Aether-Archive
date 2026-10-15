@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
@@ -64,7 +65,28 @@ class StorageServiceTest {
                 Arguments.of("PNG", ImageFixtures.png(), "image/png", "png"),
                 Arguments.of("GIF", ImageFixtures.gif(), "image/gif", "gif"),
                 Arguments.of("WEBP", ImageFixtures.webp(), "image/webp", "webp"),
-                Arguments.of("AVIF", ImageFixtures.avif(), "image/avif", "avif"));
+                Arguments.of("AVIF", ImageFixtures.avif(), "image/avif", "avif"),
+                Arguments.of("AVIF whose major brand is mif1 and which lists avif as compatible",
+                        ImageFixtures.ftyp("mif1", "avif", "miaf"), "image/avif", "avif"));
+    }
+
+    @Test
+    void should_refuse_an_avif_whose_brand_lies_past_the_bytes_it_reads() throws IOException {
+        Path dataDir = dataDirectory();
+        // A lying ftyp box, then the brand far into what would be the image data — the archive reads a
+        // bounded header and never looks there, so this is not a file it can recognise.
+        byte[] brandBeyondTheHeader = ImageFixtures.padded(
+                ImageFixtures.ftypDeclaringSize(4096L, "mif1", "miaf"), 256);
+        System.arraycopy("avif".getBytes(StandardCharsets.US_ASCII), 0, brandBeyondTheHeader,
+                ImageFormat.HEADER_LENGTH + 8, 4);
+
+        assertThatExceptionOfType(UnsupportedImageTypeException.class)
+                .isThrownBy(() -> service(dataDir)
+                        .store(upload("holiday.avif", "image/avif", brandBeyondTheHeader)))
+                .withMessageContaining("not a recognised image");
+
+        assertThat(imagesOf(dataDir)).isEmpty();
+        assertThat(stagingOf(dataDir)).isEmpty();
     }
 
     @ParameterizedTest(name = "ignores the client name {0}")
@@ -106,6 +128,46 @@ class StorageServiceTest {
 
         assertThat(imagesOf(dataDir)).isEmpty();
         assertThat(stagingOf(dataDir)).isEmpty();
+    }
+
+    @Test
+    void should_not_echo_control_characters_from_the_declared_media_type() throws IOException {
+        Path dataDir = dataDirectory();
+        // A client can put anything in the label, newlines included: the refusal repeats it on one line.
+        String forged = "text/plain\r\nX-Injected: yes";
+
+        assertThatExceptionOfType(UnsupportedImageTypeException.class)
+                .isThrownBy(() -> service(dataDir).store(upload("holiday.jpg", forged, ImageFixtures.jpeg())))
+                .withMessageContaining("'text/plainX-Injected: yes' is not an image media type")
+                .satisfies(failure -> assertThat(failure.getMessage())
+                        .doesNotContain("\r")
+                        .doesNotContain("\n"));
+    }
+
+    @Test
+    void should_not_echo_an_unbounded_declared_media_type() throws IOException {
+        Path dataDir = dataDirectory();
+        String flood = "text/" + "a".repeat(4096);
+
+        assertThatExceptionOfType(UnsupportedImageTypeException.class)
+                .isThrownBy(() -> service(dataDir).store(upload("holiday.jpg", flood, ImageFixtures.jpeg())))
+                // The first hundred characters, then an ellipsis: enough to recognise the mistake.
+                .withMessageContaining("'" + flood.substring(0, 100) + "...'")
+                .satisfies(failure -> assertThat(failure.getMessage()).doesNotContain("a".repeat(200)));
+    }
+
+    @Test
+    void should_sanitise_the_media_type_in_the_contradiction_refusal_too() throws IOException {
+        Path dataDir = dataDirectory();
+        // Still resolves to JPEG — the trailing newline is trimmed before the lookup — but it is the raw
+        // value that reaches the refusal, so it has to be sanitised there as well.
+        String declared = "image/jpeg\n";
+
+        assertThatExceptionOfType(UnsupportedImageTypeException.class)
+                .isThrownBy(() -> service(dataDir)
+                        .store(upload("holiday.png", declared, ImageFixtures.png())))
+                .withMessageContaining("the upload declares 'image/jpeg' but its bytes are PNG")
+                .satisfies(failure -> assertThat(failure.getMessage()).doesNotContain("\n"));
     }
 
     @ParameterizedTest(name = "refuses the declared media type {0}")
@@ -187,8 +249,11 @@ class StorageServiceTest {
                 ImageFixtures.jpeg()) {
             @Override
             public InputStream getInputStream() {
-                // The signature arrives, then the stream breaks: the staging file already exists.
-                return new FailingInputStream(ImageFixtures.jpeg());
+                // The signature and the whole header arrive, then the stream breaks while the bytes are
+                // being copied: the staging file already exists. The same failure in the header read,
+                // before anything is staged, has its own test below.
+                return new FailingInputStream(
+                        ImageFixtures.padded(ImageFixtures.jpeg(), ImageFormat.HEADER_LENGTH));
             }
         };
 
@@ -216,6 +281,45 @@ class StorageServiceTest {
 
         assertThat(stagingOf(dataDir)).isEmpty();
         assertThat(imagesOf(dataDir)).isEmpty();
+    }
+
+    @Test
+    void should_refuse_an_upload_whose_header_cannot_be_read() throws IOException {
+        Path dataDir = dataDirectory();
+        MockMultipartFile unreadableUpload = new MockMultipartFile("file", "holiday.jpg", "image/jpeg",
+                ImageFixtures.jpeg()) {
+            @Override
+            public InputStream getInputStream() {
+                // The very first read fails, before anything is staged: the store has nothing to undo.
+                return new FailingInputStream(new byte[0]);
+            }
+        };
+
+        assertThatExceptionOfType(StorageException.class)
+                .isThrownBy(() -> service(dataDir).store(unreadableUpload))
+                .withMessageContaining("could not be read");
+
+        assertThat(stagingOf(dataDir)).isEmpty();
+        assertThat(imagesOf(dataDir)).isEmpty();
+    }
+
+    @Test
+    void should_store_into_a_data_directory_that_is_a_symbolic_link() throws IOException {
+        // ~/AetherArchive_Data -> /mnt/archive is a legitimate layout (ADR-012): the data directory
+        // itself may be a link, and the files still land in the directory it points at.
+        Path realData = Files.createDirectories(tempDir.resolve("real-data"));
+        Files.createDirectories(realData.resolve(StorageInitializer.IMAGES_DIR));
+        Files.createDirectories(realData.resolve(StorageInitializer.TMP_DIR));
+        Path linkedData = tempDir.resolve("aether-data");
+        createSymbolicLinkOrSkip(linkedData, realData);
+
+        StoredFile stored = service(linkedData)
+                .store(upload("holiday.png", "image/png", ImageFixtures.png()));
+
+        assertThat(stored.relativePath()).isEqualTo("images/" + stored.id() + ".png");
+        assertThat(Files.readAllBytes(realData.resolve(stored.relativePath())))
+                .isEqualTo(ImageFixtures.png());
+        assertThat(stagingOf(realData)).isEmpty();
     }
 
     @Test
@@ -327,8 +431,9 @@ class StorageServiceTest {
     }
 
     /**
-     * Yields the upload's signature and then breaks, so the store fails after the staging file has been
-     * created — the failure the cleanup path exists for.
+     * Yields the given prefix of the upload and then breaks. With a full header as the prefix the store
+     * fails after the staging file has been created — the failure the cleanup path exists for; with an
+     * empty one it fails in the header read, before anything is staged.
      */
     private static final class FailingInputStream extends InputStream {
 
