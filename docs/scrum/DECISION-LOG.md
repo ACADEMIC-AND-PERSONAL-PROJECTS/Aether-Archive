@@ -20,6 +20,7 @@ Statuses: `Proposed` · `Accepted` · `Superseded by ADR-NNN` · `Rejected`.
 | [ADR-008](#adr-008--no-spring-security-for-v1) | 2026-10-15 | No Spring Security for v1 | Accepted |
 | [ADR-009](#adr-009--postgresql-as-the-database) | 2026-10-15 | PostgreSQL as the database | Accepted |
 | [ADR-010](#adr-010--containerized-delivery-for-v10) | 2026-10-15 | Containerized delivery for v1.0 | Accepted |
+| [ADR-011](#adr-011--api-contract-clarifications-for-sprint-1) | 2026-10-15 | API contract clarifications for Sprint 1 | Accepted |
 
 ---
 
@@ -215,6 +216,44 @@ a clean clone in E6-S12.
 **Consequences.** The v1.0 runbook becomes `docker compose up`; `./mvnw`/`npm` remain the development
 path. Registry publishing, remote deployment, TLS and auth stay out of scope (ADR-008) and would need
 new ADRs.
+
+---
+
+## ADR-011 — API contract clarifications for Sprint 1
+
+**Date**: 2026-10-15 · **Status**: Accepted
+
+**Context.** Two canonical documents describe the HTTP contract and they do not agree. `_docs/openapi.yml`
+defines `/photos` (GET, POST), `/photos/random` (GET) and `/dumps` (GET, POST); the narrative
+`_docs/aether_archive_specs.md` §4.2 still lists `/api/v1/archives/random`, `/archives/river`,
+`/archives/dump` and `/archives/single`. Separately, `DumpCreate.title` is listed as `required` in
+`openapi.yml`, while the domain model (`_docs/aether_archive_specs.md` §4.1: "title … nullable"), the
+backlog (E1-S7 `title?`, E4-S5 "title (optional)") and the workshop flow all treat it as optional. The
+`Photo` schema also exposes `uploadedAt` and `category`, which are not among the entity fields listed in
+`.claude/rules/backend.md`. `_docs/` is read-only, so the divergence is resolved here instead of by
+editing the specs.
+
+**Decision.**
+
+1. **`_docs/openapi.yml` is the API contract of record.** Sprint 1 implements `/api/v1/photos` (GET, POST),
+   `/api/v1/photos/random` (GET) and `/api/v1/dumps` (GET, POST). The `/api/v1/archives/*` table in the
+   specs §4.2 is superseded and is not implemented.
+2. **`title` is optional on `DumpCreate`** (null when absent, ≤ 80 characters when present). Accepting a
+   request *without* a title is a strict superset of the OpenAPI schema: any client that sends the fields
+   OpenAPI marks `required` still works unchanged, so no client is broken by this reading.
+3. **An upload creates an *unassigned* photo**: `archiveItem` and `displayOrder` are null until the curator
+   publishes a dump, which is when the `ArchiveItem` (`MONTHLY_DUMP`) is created and the six photos are
+   attached in order. This matches the `Photo` schema of `openapi.yml` and the workshop flow (E4-S1/S5).
+4. **`Photo` carries `createdAt` (Instant, UTC) and `category`** (enum `PICS | ANIME | DUMP |
+   UNCATEGORIZED`, default `UNCATEGORIZED`) in addition to the fields listed in `.claude/rules/backend.md`,
+   because the contract exposes `uploadedAt` and `category` on every photo response.
+
+**Consequences.** Sprint 1 has one unambiguous contract to implement and test against, and reviewers have a
+written reason for the two readings that could otherwise look like improvisation. `ArchiveItem.type` keeps
+all three values (`SINGLE_PIC | ANIME | MONTHLY_DUMP`) even though only `MONTHLY_DUMP` is created in
+Sprint 1 — single-photo items arrive with the river feed (E5-S1). Any future change to the paths, to the
+`title` requirement, or to the on-upload assignment model re-opens this ADR; the stale specs §4.2 text stays
+as it is until the owner approves a spec revision.
 
 ---
 
