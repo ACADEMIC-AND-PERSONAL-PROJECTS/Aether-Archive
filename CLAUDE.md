@@ -17,6 +17,7 @@ Images are the product; the UI must be almost invisible.
 | Definition of Done / Ready | `docs/scrum/DEFINITION-OF-DONE.md`, `docs/scrum/DEFINITION-OF-READY.md` |
 | Architecture | `docs/engineering/ARCHITECTURE.md` |
 | Design system (color, glass, type) | `docs/engineering/DESIGN-SYSTEM.md` |
+| Design references (soft & modern brief, inspiration) | `docs/engineering/DESIGN-REFERENCES.md` |
 | Decision log (ADRs) | `docs/scrum/DECISION-LOG.md` |
 | Sprint plans / retrospectives | `docs/scrum/sprints/`, `retrospectives/` |
 

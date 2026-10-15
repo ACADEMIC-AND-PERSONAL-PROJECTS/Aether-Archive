@@ -59,6 +59,9 @@ styles/      global.css (tokens + base), theme.css, glass.css
 
 ## Styling
 
+- Before building any screen, read `docs/engineering/DESIGN-REFERENCES.md` (**soft & modern** brief +
+  curated references): fetch 2–3 references, extract principles, cite them in the PR. Development-time
+  only — nothing from them is loaded, copied, or requested at runtime.
 - Tailwind utilities first; extract a component/`@apply` only after the third repetition.
 - Theme values come from CSS custom properties generated from the active palette
   (`--aura-*`, `--font-*`) — see `.claude/rules/design-language.md` and

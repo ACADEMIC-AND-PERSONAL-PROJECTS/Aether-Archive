@@ -18,6 +18,23 @@ The mandate (user requirement, do not substitute):
 Read `docs/engineering/DESIGN-SYSTEM.md` (tokens, scales, targets) and `.claude/rules/design-language.md`
 (hard rules) before starting. The full-mandate paragraphs above are the acceptance criteria, not suggestions.
 
+## Part 0 — Inspiration (do this first, every UI story)
+
+1. Read `docs/engineering/DESIGN-REFERENCES.md` — the target feeling ("soft & modern"), the curated
+   references, the anti-patterns and the review questions.
+2. Fetch **2–3 references** matching the story with WebFetch:
+   - structure/pattern → Mobbin or Refero (search the exact screen type: empty state, menu overlay, photo viewer),
+   - feel/motion → Hoverstat.es, Dark.design, Animations.dev, Web Interface Guidelines,
+   - technique → the official docs (Motion, Tailwind, Fontsource, MDN).
+3. Write **3–5 extracted principles** into the PR description (e.g. "glass only over imagery",
+   "menu drifts up 16 px, never slides in from the side", "the only serif on the feed is the markers"),
+   and cite the references that informed the work. Taste must be traceable, not vibes.
+4. These sites are **development-time only** — the shipped app makes zero external requests; nothing is
+   copied (no snippet, no asset, no dependency).
+
+The result must feel **soft and modern** as defined in §1 of the references doc: low-contrast elegance,
+muted colour, generous space, rounded geometry, calm motion, one focal point per view.
+
 ## Part A — Colour extraction (story E2-S4)
 
 Deliverables in `frontend/src/lib/color/` (pure TypeScript, no React):

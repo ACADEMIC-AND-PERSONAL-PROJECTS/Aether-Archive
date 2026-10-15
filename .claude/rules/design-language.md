@@ -8,8 +8,25 @@ paths:
 
 # Design language — Dark Glassmorphism (loaded for UI files)
 
-Full specification: `docs/engineering/DESIGN-SYSTEM.md`. The procedure to implement or extend it:
-`.claude/skills/design-system/SKILL.md`. Hard rules:
+Full specification: `docs/engineering/DESIGN-SYSTEM.md`. Procedure to implement or extend it:
+`.claude/skills/design-system/SKILL.md`. **Inspiration to consult at the start of every UI story:
+`docs/engineering/DESIGN-REFERENCES.md`** (fetch 2–3 references, extract principles, cite them in the PR).
+Hard rules:
+
+## The brief: soft & modern
+
+- **Soft** — low-contrast elegance: never pure black or pure white (base `#0B0B0D`–`#121215`, text
+  `#E8E6E3`); muted, desaturated accents; generous negative space; rounded organic geometry
+  (panels 20–24 px, controls 10–14 px); at most one wide low-opacity shadow; calm 300–600 ms motion;
+  one focal element per view.
+- **Modern** — fluid `clamp()` typography, one consistent glass material over imagery only, ambient
+  colour derived from the content in view, tactile micro-interactions without overshoot, mobile-native
+  feel (safe areas, `100dvh`, thumb-reachable controls).
+- **Reject on sight**: neon or saturated accents, stacked shadows, borders on everything, cards in cards,
+  bento clichés, gradient blobs, emoji as icons, badges/counters/upsells, text over a busy photo without
+  a scrim, animation the user did not trigger.
+- Before a PR, answer §1.4 of `DESIGN-REFERENCES.md` (calm in a dim room? one focal point? holds with a
+  pale/dark/busy photo? emptier and better with one element removed?).
 
 ## Aesthetic contract
 
