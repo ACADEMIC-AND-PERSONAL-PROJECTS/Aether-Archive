@@ -11,9 +11,11 @@
 | Metric | Value |
 | --- | --- |
 | Stories committed / delivered | 0 / 0 (infrastructure sprint) |
-| PRs merged | 1 (bootstrap) |
+| PRs merged | 3 (#1 bootstrap, #2 backlog seeder, #9 label fix — both follow-ups caught by running the script for real) |
 | Backlog produced | 6 epics · 40 stories · 170 points |
 | Sprints planned | 6 (≈ 25–34 points each) |
+| GitHub mirror | issues #3–#49 (6 epics + 40 stories), 16 labels, 6 milestones |
+| Protected branches | `main`, `develop` (PR required, admins enforced, no force-push, no deletion) |
 
 ## What was delivered
 
@@ -34,6 +36,9 @@
   without guessing.
 - The git policy (merge commits only, protected branches, hook-enforced) matches the owner's
   "lossless history" requirement exactly.
+- The process was validated by using it during the bootstrap itself: three PRs, each with evidence,
+  merged with merge commits; the backlog seeder's label bug was found by running the tool and fixed
+  through a normal `fix/*` branch.
 
 ## What did not
 
