@@ -326,8 +326,8 @@ depends on: whether each problem gets a `type` URI of its own, and whether `titl
 **Decision.** The codes are part of the contract, listed in `backend/README.md`: the archive's own
 situations have one each — `unsupported-image-type`, `upload-too-large`, `storage-failure`,
 `validation-failure`, `invalid-parameter`, `malformed-request`, `missing-request-part`, `not-found`,
-`internal-failure`. A refusal Spring MVC raises before a controller runs (405, 406, 415, a missing required
-parameter) borrows its code from the status instead: the status name in kebab-case —
+`empty-archive`, `internal-failure`. A refusal Spring MVC raises before a controller runs (405, 406, 415, a
+missing required parameter) borrows its code from the status instead: the status name in kebab-case —
 `method-not-allowed`, `bad-request`, `unsupported-media-type` — or `request-rejected` when no `HttpStatus`
 name describes the status. A refusal the archive raises itself keeps its own `detail` and, when its problem
 detail set one, its own `code`.
@@ -347,6 +347,13 @@ refactor. A new situation adds its code to the README table in the same change; 
 revision until `_docs/openapi.yml` grows an error schema, which is itself a contract change needing the
 owner's approval (`_docs/` is read-only, ADR-011). Clients switch on `code`, never on `title` or `detail`,
 which the archive may reword.
+
+**Amendment — 2026-10-16 (E1-S6).** `empty-archive` joins the vocabulary as the first code an endpoint
+raises for a *legitimate* request that has no answer: `GET /photos/random` on an archive with no photos. It
+is deliberately distinct from `not-found`, which means the client asked for something that does not exist —
+the splash screen has an empty state for one and a bug for the other. It is carried by
+`EmptyArchiveException`, which extends `ErrorResponseException` so the archive's own sentence survives the
+refusal path unchanged.
 
 ---
 

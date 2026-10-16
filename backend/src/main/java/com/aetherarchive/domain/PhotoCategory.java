@@ -1,5 +1,11 @@
 package com.aetherarchive.domain;
 
+import java.util.Arrays;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
 /**
  * The bucket a photo belongs to, as the contract defines it ({@code category} on the {@code Photo}
  * schema).
@@ -17,6 +23,14 @@ public enum PhotoCategory {
     DUMP("dump"),
     UNCATEGORIZED("uncategorized");
 
+    /**
+     * The wire values indexed by themselves, so a request's {@code category} is looked up as the
+     * contract spells it rather than through {@link #name()} — the two coincide today, and nothing
+     * but this table makes them keep doing so.
+     */
+    private static final Map<String, PhotoCategory> BY_WIRE_VALUE = Arrays.stream(values())
+            .collect(Collectors.toUnmodifiableMap(PhotoCategory::wireValue, Function.identity()));
+
     private final String wireValue;
 
     PhotoCategory(String wireValue) {
@@ -30,5 +44,22 @@ public enum PhotoCategory {
      */
     public String wireValue() {
         return wireValue;
+    }
+
+    /**
+     * The category a request named, as the contract writes it — how an upload's {@code category} field
+     * becomes an enum constant.
+     *
+     * <p>Explicit on purpose: Spring's own converter would resolve the constant through
+     * {@link #name()}, which is the <em>persistence</em> spelling, and would answer a client's typo
+     * with a closed list nobody can extend without a code change. A caller that has already validated
+     * the value — as the photo upload does with {@code ValidationConstraints.CATEGORY_PATTERN} — gets
+     * the constant here; a caller that has not can answer the empty result itself.
+     *
+     * @param wireValue the value as it arrived, for example {@code pics}; may be null
+     * @return the matching constant, or empty when the value is not one of the contract's
+     */
+    public static Optional<PhotoCategory> fromWireValue(String wireValue) {
+        return wireValue == null ? Optional.empty() : Optional.ofNullable(BY_WIRE_VALUE.get(wireValue));
     }
 }

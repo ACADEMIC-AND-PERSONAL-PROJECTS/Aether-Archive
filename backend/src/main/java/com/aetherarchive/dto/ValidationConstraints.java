@@ -22,6 +22,17 @@ public final class ValidationConstraints {
     /** The only colour format the archive stores, {@code #RRGGBB}, as the specs write it. */
     public static final String BACKGROUND_COLOR_PATTERN = "^#[0-9a-fA-F]{6}$";
 
+    /**
+     * The four values the contract accepts for a photo's {@code category}, lowercase, as an upload must
+     * send them (ADR-011).
+     *
+     * <p>An upload's {@code category} is a multipart field, not a DTO member, so the pattern is the only
+     * place its accepted values are stated to the client: {@link com.aetherarchive.domain.PhotoCategory}
+     * holds the values themselves, and {@code PhotoCategoryTest} proves this pattern accepts exactly the
+     * wire values of that enum and nothing else, which is what keeps the two from drifting apart.
+     */
+    public static final String CATEGORY_PATTERN = "^(pics|anime|dump|uncategorized)$";
+
     /** Number of photos a monthly dump holds; the order of the ids is the display order. */
     public static final int DUMP_PHOTO_COUNT = 6;
 

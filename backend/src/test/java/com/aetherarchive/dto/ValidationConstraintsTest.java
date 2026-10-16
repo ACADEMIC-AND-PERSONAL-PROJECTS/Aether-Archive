@@ -25,4 +25,9 @@ class ValidationConstraintsTest {
     void should_fix_the_dump_at_six_photos() {
         assertThat(ValidationConstraints.DUMP_PHOTO_COUNT).isEqualTo(6);
     }
+
+    @Test
+    void should_fix_the_category_pattern_at_the_contracts_four_values() {
+        assertThat(ValidationConstraints.CATEGORY_PATTERN).isEqualTo("^(pics|anime|dump|uncategorized)$");
+    }
 }

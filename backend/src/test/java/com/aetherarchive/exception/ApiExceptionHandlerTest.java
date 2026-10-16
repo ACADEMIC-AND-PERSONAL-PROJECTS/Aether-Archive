@@ -19,6 +19,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 
@@ -47,7 +48,7 @@ import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
-import org.springframework.http.ProblemDetail;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultMatcher;
@@ -55,7 +56,6 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.validation.method.MethodValidationException;
 import org.springframework.validation.method.MethodValidationResult;
 import org.springframework.validation.method.ParameterValidationResult;
-import org.springframework.web.ErrorResponseException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -71,6 +71,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.aetherarchive.config.CorsProperties;
 import com.aetherarchive.config.StorageProperties;
 import com.aetherarchive.dto.ValidationConstraints;
+import com.aetherarchive.support.ImageFixtures;
 
 /**
  * The error contract of the API, one mapped case at a time: the status, the {@code code}, the title, the
@@ -326,6 +327,30 @@ class ApiExceptionHandlerTest {
     }
 
     @Test
+    void should_answer_400_when_a_multipart_field_arrives_as_a_file() throws Exception {
+        // `curl -F "category=@values.txt"` posts a field of the request as a file. Spring MVC resolves the
+        // part and then has no converter from a file to the string the handler declares — a refusal that
+        // reaches no handler at all, and that the advice has to own: answered by the catch-all it was a 500,
+        // which reports the client's mistake as an archive bug.
+        mockMvc.perform(multipart("/test/errors/upload")
+                .file(new MockMultipartFile("file", "holiday.png", MediaType.IMAGE_PNG_VALUE,
+                        ImageFixtures.png()))
+                .file(new MockMultipartFile("category", "category.txt", MediaType.TEXT_PLAIN_VALUE,
+                        "pics".getBytes(StandardCharsets.UTF_8))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.code").value("invalid-parameter"))
+                .andExpect(jsonPath("$.title").value("Invalid parameter"))
+                // The conversion refusal's own sentence, not the one a value of the wrong format gets: the
+                // parameter is named, the shape it should have arrived in is given, and the file's content —
+                // the value the client sent — is not repeated.
+                .andExpect(jsonPath("$.detail").value(containsString("'category'")))
+                .andExpect(jsonPath("$.detail").value(containsString("cannot be read from the request")))
+                .andExpect(noEchoedValue("pics"))
+                .andExpect(noInternalDetail());
+    }
+
+    @Test
     void should_answer_400_when_a_multipart_request_cannot_be_read_as_one() throws Exception {
         // A request that declares itself multipart and is not one — a broken envelope, a part header the
         // container refuses. That is the client's mistake: Spring answers 400 for it, and the advice must
@@ -365,15 +390,18 @@ class ApiExceptionHandlerTest {
 
     @Test
     void should_keep_the_code_a_refusing_body_set_of_its_own() throws Exception {
-        // A story that needs its own code for a state of the archive — an empty one, for instance — sets
-        // it on the problem detail it refuses with. Replacing it with the status-derived code would take
-        // that distinction away from the client.
+        // A state of the archive that needs its own code — an empty one, as E1-S6's random photo finds it
+        // — sets it on the problem detail it refuses with, and keeps the sentence it wrote there.
+        // Replacing either with the status-derived code and the fixed sentence would take that distinction
+        // away from the client: "no photo yet" and "no such path" are the same status and a different
+        // screen.
         mockMvc.perform(get("/test/errors/empty-archive"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.code").value("empty-archive"))
                 .andExpect(jsonPath("$.title").value("Not Found"))
-                .andExpect(jsonPath("$.detail").value("No photo has been archived yet."))
+                .andExpect(jsonPath("$.detail").value(containsString("No photo has been archived yet")))
+                .andExpect(jsonPath("$.detail").value(not(containsString("The request was refused"))))
                 .andExpect(noInternalDetail());
     }
 
@@ -543,8 +571,12 @@ class ApiExceptionHandlerTest {
         }
 
         @PostMapping(path = "/test/errors/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-        void upload(@RequestPart("file") MultipartFile file) {
-            // Same: reaching the method means the multipart request carried the part.
+        void upload(@RequestPart("file") MultipartFile file,
+                @RequestParam(name = "category", required = false)
+                @NotBlank @Pattern(regexp = ValidationConstraints.CATEGORY_PATTERN) String category) {
+            // Same: reaching the method means the multipart request carried the part and the field passed
+            // its constraints. The second parameter is the shape the photo upload declares, so the refusal
+            // of a field that arrived as a file is exercised through the same resolver.
         }
 
         @PostMapping(path = "/test/errors/wide", consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -590,10 +622,10 @@ class ApiExceptionHandlerTest {
 
         @GetMapping("/test/errors/empty-archive")
         void emptyArchive() {
-            ProblemDetail body = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND,
-                    "No photo has been archived yet.");
-            body.setProperty("code", "empty-archive");
-            throw new ErrorResponseException(HttpStatus.NOT_FOUND, body, null);
+            // The archive's own refusal, as E1-S6's GET /photos/random raises it: the exception carries the
+            // problem detail it refuses with — its sentence and its own code — and the advice answers it as
+            // written instead of flattening it into the status-derived refusal.
+            throw new EmptyArchiveException();
         }
 
         @PostMapping(path = "/test/errors/distinct-dump", consumes = MediaType.APPLICATION_JSON_VALUE)

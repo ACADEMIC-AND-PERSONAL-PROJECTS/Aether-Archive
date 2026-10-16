@@ -3,6 +3,7 @@ package com.aetherarchive.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -183,6 +184,56 @@ class PhotoRepositoryTest {
         // ADR-011: the column holds the Java name, the JSON value is lowercase.
         assertThat(storedCategory).isEqualTo("UNCATEGORIZED");
         assertThat(storedCategory).isNotEqualTo(PhotoCategory.UNCATEGORIZED.wireValue());
+    }
+
+    @Test
+    void should_return_the_feed_newest_first_when_two_photos_share_an_instant() {
+        // The feed is the whole collection, newest first, and the id tiebreaker is what keeps it stable:
+        // two uploads stamped in the same instant must still come back in one order, not in whichever
+        // order the database happened to read them.
+        Instant later = ArchiveFixtures.CREATED_AT.plusSeconds(60);
+        photos.saveAllAndFlush(List.of(
+                ArchiveFixtures.photo(ArchiveFixtures.id(70), null, null, PhotoCategory.PICS,
+                        ArchiveFixtures.CREATED_AT),
+                ArchiveFixtures.photo(ArchiveFixtures.id(72), null, null, PhotoCategory.PICS, later),
+                ArchiveFixtures.photo(ArchiveFixtures.id(71), null, null, PhotoCategory.PICS,
+                        ArchiveFixtures.CREATED_AT)));
+        entityManager.clear();
+
+        List<Photo> feed = photos.findAllByOrderByCreatedAtDescIdDesc();
+
+        assertThat(feed).extracting(Photo::getId).containsExactly(
+                ArchiveFixtures.id(72), ArchiveFixtures.id(71), ArchiveFixtures.id(70));
+        assertThat(feed).extracting(Photo::getCreatedAt).containsExactly(
+                later, ArchiveFixtures.CREATED_AT, ArchiveFixtures.CREATED_AT);
+    }
+
+    @Test
+    void should_pick_nothing_when_the_archive_is_empty() {
+        // GET /photos/random answers 404 with the empty-archive code for this; the frontend shows its
+        // empty state.
+        assertThat(photos.findRandom()).isEmpty();
+    }
+
+    @Test
+    void should_pick_the_only_photo_when_the_archive_holds_one() {
+        Photo only = ArchiveFixtures.unassignedPhoto(ArchiveFixtures.id(80));
+        photos.saveAndFlush(only);
+        entityManager.clear();
+
+        assertThat(photos.findRandom()).get().extracting(Photo::getId).isEqualTo(only.getId());
+    }
+
+    @Test
+    void should_pick_one_of_the_photos_when_the_archive_holds_several() {
+        photos.saveAllAndFlush(List.of(
+                ArchiveFixtures.unassignedPhoto(ArchiveFixtures.id(81)),
+                ArchiveFixtures.unassignedPhoto(ArchiveFixtures.id(82))));
+
+        // Which row `order by random()` returns is the database's business, so the test does not pin it:
+        // it pins that one photo of the archive comes back, always.
+        assertThat(photos.findRandom()).get().extracting(Photo::getId)
+                .isIn(ArchiveFixtures.id(81), ArchiveFixtures.id(82));
     }
 
     /** The fixture instant as {@code timestamptz}, for the raw inserts that bypass the entities. */

@@ -118,9 +118,9 @@ class MultipartUploadCeilingTest {
     }
 
     /**
-     * Posts the same shape the upload endpoint of E1-S6 will take: a {@code file} part with a real
-     * filename — without one the container treats the part as a form field — and the {@code category}
-     * field whose headers, with the boundaries, make up the envelope in question.
+     * Posts the same shape {@code POST /api/v1/photos} takes: a {@code file} part with a real filename —
+     * without one the container treats the part as a form field — and the {@code category} field whose
+     * headers, with the boundaries, make up the envelope in question.
      */
     private ResponseEntity<Map<String, Object>> upload(byte[] payload) {
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
@@ -162,8 +162,9 @@ class MultipartUploadCeilingTest {
     }
 
     /**
-     * Test-only: the archive has no upload endpoint until E1-S6, and this probe is not one — it exists to
-     * carry a real multipart request through Tomcat into the real {@link StorageService}.
+     * Test-only: not an endpoint of the API. It carries a real multipart request through Tomcat into the
+     * real {@link StorageService} and answers the stored path, which the photo endpoint does not publish —
+     * the container's ceilings are what this class measures, not the endpoint.
      */
     @RestController
     static class UploadProbeController {
