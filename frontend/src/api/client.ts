@@ -221,9 +221,18 @@ function describeFailure(response: Response, problem: ProblemDetail | undefined)
  * Reads a successful body. An empty body is not a failure — a `204 No Content` is a legitimate answer
  * to a request whose result the caller does not need — but a body that is neither empty nor JSON is:
  * the endpoint broke its own contract, and `SyntaxError` reaching a component would be a stack trace.
+ * A read that dies mid-stream (a connection cut after the headers) is the same promise to the caller:
+ * every failure leaves as an {@link ApiError}, never as the runtime's own `TypeError` (E2-S2 review).
  */
 async function readJson<T>(response: Response, url: string): Promise<T> {
-  const text = await response.text();
+  let text: string;
+  try {
+    text = await response.text();
+  } catch {
+    throw new ApiError("parse", `The archive's answer ended before it could be read (${url}).`, {
+      url,
+    });
+  }
   if (text.trim() === "") {
     // `undefined` rather than a cast that pretends otherwise: the only callers that see this are the
     // ones that asked for `void`. Read as "the archive answered, and had nothing to say".

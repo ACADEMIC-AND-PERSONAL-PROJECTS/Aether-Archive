@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { PROBLEM_400, PROBLEM_500 } from "./__fixtures__/problems";
 import { ApiError, apiRequest, resolveApiUrl } from "./client";
 
 /**
@@ -8,28 +9,9 @@ import { ApiError, apiRequest, resolveApiUrl } from "./client";
  * `fetch` is spied on rather than mocked by a library: the client's whole job is to read what `fetch`
  * gives back, so the tests hand it the exact shapes the runtime produces — a `Response` for anything the
  * server answered, a rejected promise for anything it did not. Those shapes were measured against a real
- * HTTP server first (`frontend/README.md`, "How a failure arrives"); nothing here is guessed.
+ * HTTP server first (`frontend/README.md`, "How a failure arrives"); nothing here is guessed. The
+ * problem bodies live with the other payload fixtures (`__fixtures__/problems.ts`).
  */
-
-const PROBLEM_400 = {
-  type: "about:blank",
-  title: "Validation failed",
-  status: 400,
-  detail:
-    "The request failed validation; the 'errors' collection lists the fields that were rejected.",
-  instance: "/api/v1/dumps",
-  code: "validation-failure",
-  errors: [{ field: "photoIds", message: "must name exactly 6 photos" }],
-} as const;
-
-const PROBLEM_500 = {
-  type: "about:blank",
-  title: "Internal error",
-  status: 500,
-  detail: "The archive could not process the request.",
-  instance: "/api/v1/photos",
-  code: "internal-failure",
-} as const;
 
 /** A response carrying a problem body, as `ApiExceptionHandler` writes one. */
 function problemResponse(problem: unknown, status: number): Response {
@@ -151,6 +133,18 @@ describe("apiRequest — the successful path", () => {
     const { init } = callTo(fetchSpy);
     expect(init?.signal).toBeDefined();
     expect(init?.signal?.aborted).toBe(false);
+  });
+
+  it("should not arm a deadline when the caller disables it with timeoutMs 0", async () => {
+    const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
+    const fetchSpy = spyOnFetch().mockResolvedValue(jsonResponse([]));
+
+    await apiRequest("/photos", { timeoutMs: 0 });
+
+    // `0` means "no deadline" (`client.ts`: the signal is only composed when the timeout is > 0) —
+    // pinned because the branch was reachable but untested (E2-S2 review).
+    expect(timeoutSpy).not.toHaveBeenCalled();
+    expect(callTo(fetchSpy).init?.signal).toBeUndefined();
   });
 
   it("should return the parsed body typed by the caller", async () => {
@@ -319,6 +313,22 @@ describe("apiRequest — a broken success", () => {
     spyOnFetch().mockResolvedValue(
       new Response("<html>proxy</html>", { status: 200, headers: { "content-type": "text/html" } }),
     );
+
+    const error = await rejectionOf(apiRequest("/photos"));
+
+    expect(error.kind).toBe("parse");
+    expect(error.status).toBeUndefined();
+  });
+
+  it("should classify a body whose read dies mid-stream as a parse failure", async () => {
+    // Headers arrived, the body did not (a connection cut after the status line): the runtime rejects
+    // `response.text()` with its own `TypeError: terminated`, and the client's promise is that such a
+    // failure still leaves as an `ApiError` (E2-S2 review, measured with exactly this stub).
+    spyOnFetch().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: () => Promise.reject(new TypeError("terminated")),
+    } as unknown as Response);
 
     const error = await rejectionOf(apiRequest("/photos"));
 
