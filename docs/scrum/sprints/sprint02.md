@@ -3,10 +3,12 @@
 - **Dates**: 2026-10-16 → 2026-10-30 (UTC)
 - **Goal**: The React shell runs and the design system — colour extraction from the user's own images,
   Fontsource typography, the Dark Glassmorphism layer — is defined.
-- **Capacity**: **33 points** committed — 8 stories, inside the 25–34 band, leaving nothing spare for
-  defects. If something appears, the story that gives way is named here rather than decided silently at the
-  end: **E1-S10** (2 pts, a developer convenience) moves to Sprint 3, and then **E1-S5** if a second overrun
-  lands. The design system itself does not slip.
+- **Capacity**: **33 points** committed — 8 stories, inside the 25–34 band, one point below the ceiling.
+  That is not enough room for another story, and not enough for a story that overruns. The order of sacrifice
+  is named here so it is not improvised at the end: **E1-S10** (2 pts, a developer convenience) is the first
+  candidate for Sprint 3; **E1-S5** would be second, and — because moving a `p0` story out of a sprint is a
+  scope change the playbook reserves for the owner — that one is confirmed with them rather than decided here.
+  The design system itself does not slip.
 - **Branch base**: `develop`
 - **Milestone**: `Sprint 02 — Design System` (already holds exactly these eight issues: #20–#25, #14, #19)
 - **Retrospective of record for the previous sprint**: `retrospectives/sprint01.md`
@@ -15,7 +17,7 @@
 
 | # | ID | Story | Points | Priority | Status | PR |
 | --- | --- | --- | --- | --- | --- | --- |
-| 0 | — | *chore*: land retro-change #3 (working agreements in `.claude/`) | — | — | Todo | — |
+| 0 | S02-C1 | *chore*: land retro-change #3 (working agreements in `.claude/`) | — | — | Done | #77 |
 | 1 | E2-S1 | Scaffold the frontend toolchain | 5 | p0 | Todo | — |
 | 2 | E1-S5 | Serve images at `/images/**` | 2 | p0 | Todo | — |
 | 3 | E2-S2 | App shell, routing & typed API client | 5 | p0 | Todo | — |
@@ -25,20 +27,24 @@
 | 7 | E2-S6 | Dark Glassmorphism theme layer & GlassPanel | 5 | p0 | Todo | — |
 | 8 | E1-S10 | Dev seed script & curl smoke collection | 2 | p2 | Todo | — |
 
-**Total: 8 stories · 33 points.** The order is the dependency chain, not the epic numbering:
+**Total: 8 stories · 33 points** (the row above the eight is a chore, not a story). The order is mostly
+the dependency chain, with two deliberate placements — E2-S4 early for risk, E1-S10 last to close:
 
 - **E2-S1 first** — every other frontend story needs the toolchain, and guessing at its shape would cost more
   than doing it once.
-- **E1-S5 second** — a 2-point backend story with no frontend dependency, delivered early so the shell has a
-  real image to point at instead of a fixture URL. It also closes the last gap in the Sprint 1 API surface
-  (`Photo.url` exists; nothing serves it yet — see `reports/verify-e1-s6-20261016.md` §6).
-- **E2-S2 and E2-S3 next, in that order** — the shell gives later stories a place to render, the CSS foundation
-  defines the tokens the typography and theme layers extend. Both are prerequisites of E2-S5/S6.
+- **E1-S5 second** — a 2-point backend story with no frontend dependency, so it costs nothing to clear early.
+  It closes the last gap in the Sprint 1 API surface (`Photo.url` exists; nothing serves it yet —
+  `reports/verify-e1-s6-20261016.md`, "Not covered / SKIPPED"), and it is what E1-S10's "every endpoint" smoke
+  collection needs to cover. No Sprint 2 story renders a served image: the views are Sprint 3+.
+- **E2-S2 and E2-S3 next, in that order** — the shell is a deliverable in its own right (a routed, typed
+  application that talks to the API), and it is where E2-S6's token check page renders; the CSS foundation is
+  the harder dependency, since `global.css` is what E2-S5 and E2-S6 extend.
 - **E2-S4 mid-sprint, deliberately not last** — it is the 8-point story and the one with real algorithmic risk
   (clustering, determinism, a 50 ms budget, and a test environment that may not have a canvas). Putting the
   risky work in the middle leaves room to react; putting it last would turn any surprise into a missed sprint.
-- **E2-S5 before E2-S6** — the theme layer reads the typographic variables; fonts are the smaller, better
-  understood piece.
+- **E2-S5 before E2-S6** — the link is the check page: E2-S6 renders type styles alongside the colour tokens
+  (`docs/engineering/DESIGN-SYSTEM.md` §10), and the font payload is measured in the same build. Fonts are also
+  the smaller, better understood piece.
 - **E2-S6 last of the frontend six** — it needs the tokens (S3), the palette (S4) and the fonts (S5).
 - **E1-S10 closes the sprint** — it demos the *finished* stack (seed data + a smoke collection over every
   endpoint), which is exactly what a sprint review wants to run.
@@ -58,9 +64,13 @@ reader can check it afterwards:
 1. **Probe, do not reason.** Every brief requires executed evidence for any framework or browser assumption
    (a command, a version, a supported API), pasted into the story's report. A review finding that traces back
    to an assumption nobody executed is recorded in the retrospective as a *process* failure, not as bad luck.
-2. **Measured change budgets.** Every story PR records **both** numbers: total changed lines and hand-written
-   changed lines (generated files, lockfiles and `npm`-produced artefacts excluded and named). The
-   retrospective reports both averages and compares them with Sprint 1's 1,300.
+2. **Measured change budgets, and a rule that uses them.** Every story PR records **both** numbers: total
+   changed lines and hand-written changed lines (generated files, lockfiles and `npm`-produced artefacts
+   excluded and named). The rule the retrospective settled — the ~400/500-line guidance applies to the
+   *hand-written* number, and a large atomic story is split into production/tests/docs commits rather than
+   into artificial stories — is stated in `.claude/rules/git-workflow.md`. Sprint 1's 1,300 was a **total**
+   average, so this sprint recomputes its hand-written baseline from the nine Sprint 1 PRs and compares like
+   with like.
 3. **Working agreements live in the repository.** Staged commits, the probe rule and the concurrent-agent
    staging rule go into `.claude/agents/*.md` and `.claude/rules/git-workflow.md` in the first (chore) PR of
    the sprint, so a fresh session can follow them by grep alone — no dependence on a session that has ended.
@@ -88,6 +98,12 @@ reader can check it afterwards:
 - **Browser assumptions are the frontend's equivalent of Sprint 1's framework beliefs** — `backdrop-filter`
   support, `100dvh`, `env(safe-area-inset-*)`, `OffscreenCanvas`. Each is probed in the story that depends on
   it, and the fallback is built rather than hoped for.
+- **Nobody has said how the required screenshots get taken.** E2-S3's acceptance criteria demand captures at
+  320/390/430 px and E2-S6's PR needs one, and the DoD asks for a mobile viewport — but no story names the
+  mechanism. The environment has browsers and Playwright/Puppeteer caches present, so this is feasible rather
+  than hypothetical; **E2-S1 must probe it and E2-S3 must use it**, and if a test-only dependency is needed it
+  is justified in that PR like any other. Discovering this mid-story is exactly what the sprint's first
+  commitment exists to prevent.
 
 ## Out of scope (explicitly)
 
@@ -107,3 +123,6 @@ reader can check it afterwards:
 
 - 2026-10-16 — Sprint opened. The milestone already held exactly these eight issues, so no issue churn was
   needed; the plan, the playbook row and the process-commitments section are new.
+- 2026-10-16 — The sprint runs 2026-10-16 → 2026-10-30, which leaves a gap before Sprint 3's planned start
+  (2026-11-16). Later rows of the playbook schedule are indicative and are re-planned at their own planning;
+  the gap is deliberate slack after a sprint that closed in two days, not an oversight.
