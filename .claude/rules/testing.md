@@ -5,6 +5,14 @@
 Every acceptance criterion of a story is either covered by an automated test or explicitly listed as
 manually verified in the PR (with the command or the device used). Untested behaviour is unfinished work.
 
+## Path guards
+
+- Code that compares filesystem paths (traversal checks, sandboxing, static serving) is tested with the
+  adversarial matrix: trailing and doubled slashes, `/.` and `..` segments, symlinks — including a
+  **directory** symlink — and environment variants (the data dir with and without a trailing separator).
+  E1-S10's first-cut guard was a string comparison that `//`, `/.`, `..` and symlinks walked straight
+  through (Sprint 2's retrospective, change 2).
+
 ## Backend (Java / Spring Boot)
 
 - Frameworks: JUnit 5, Spring Boot Test, MockMvc, AssertJ. No network, no remote service dependencies —

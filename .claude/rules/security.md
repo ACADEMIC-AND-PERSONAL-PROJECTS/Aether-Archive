@@ -19,9 +19,13 @@ by accident, and supply-chain creep from unnecessary dependencies. Design for th
   3. enforce a size limit (`AETHER_MAX_UPLOAD_MB`),
   4. **regenerate the filename** as a UUID — never reuse the client filename or path,
   5. write inside the configured data directory only, after canonical-path verification.
-- **Path traversal guards**: any path built from data or input must be resolved and checked with
-  `Path.normalize()/toRealPath()` to stay under the data root before read or write. Serve `/images/**`
-  from an explicit resource handler; never build file paths from request parameters.
+- **Path traversal guards**: any path built from data or input must be resolved and checked to stay
+  under the data root before read or write. Serve `/images/**` from an explicit resource handler; never
+  build file paths from request parameters.
+- **Canonicalise before comparing — both sides** (`Path.toRealPath()`, `os.path.realpath`); a string or
+  prefix comparison is not a guard. E1-S10's first cut was one, and `//`, `/.`, `..` and symlinks walked
+  straight through it (Sprint 2's retrospective, change 2). A path guard ships with its adversarial
+  matrix (`.claude/rules/testing.md`).
 - **No SQL string concatenation.** JPA/derived queries only; native queries with bound parameters.
 - **No `eval`, no `innerHTML`, no `dangerouslySetInnerHTML`** with server or user content.
 - **Dependency discipline**: every new dependency needs a one-line justification in the PR.
