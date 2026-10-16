@@ -64,7 +64,7 @@ serves images and exposes the `/api/v1` contract from `_docs/openapi.yml` — fu
 | E1-S2 | Configuration & local data directory | p0 | 2 | 1 | Done |
 | E1-S3 | PostgreSQL persistence + Flyway baseline | p0 | 5 | 1 | Done |
 | E1-S4 | StorageService — safe local file storage | p0 | 5 | 1 | Done |
-| E1-S5 | Serve images at `/images/**` | p0 | 2 | 2 | Todo |
+| E1-S5 | Serve images at `/images/**` | p0 | 2 | 2 | Done |
 | E1-S6 | Photo API — upload, list, random | p0 | 5 | 1 | Done |
 | E1-S7 | Dump API — create and list 6-photo dumps | p0 | 5 | 1 | Done |
 | E1-S8 | Error handling (RFC 9457) & validation | p0 | 2 | 1 | Done |
@@ -192,8 +192,8 @@ user's own images, Dark Glassmorphism tokens, local Fontsource typography — is
 
 | ID | Story | P | Pts | Sprint | Status |
 | --- | --- | --- | --- | --- | --- |
-| E2-S1 | Scaffold the frontend toolchain | p0 | 5 | 2 | Todo |
-| E2-S2 | App shell, routing & typed API client | p0 | 5 | 2 | Todo |
+| E2-S1 | Scaffold the frontend toolchain | p0 | 5 | 2 | Done |
+| E2-S2 | App shell, routing & typed API client | p0 | 5 | 2 | Done |
 | E2-S3 | Global CSS foundation | p0 | 3 | 2 | Todo |
 | E2-S4 | Dominant-colour extraction algorithm | p0 | 8 | 2 | Todo |
 | E2-S5 | Fontsource typography system | p0 | 3 | 2 | Todo |
