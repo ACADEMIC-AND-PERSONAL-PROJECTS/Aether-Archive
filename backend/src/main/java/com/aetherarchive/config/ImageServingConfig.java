@@ -29,11 +29,15 @@ import com.aetherarchive.service.StorageInitializer;
  * boot creates it in {@link StorageInitializer}), so the slash is appended here rather than left to
  * {@link Path#toUri()}.
  *
- * <p><strong>Nothing outside that directory can be named.</strong> The path a request contributes is
- * resolved against the location and the result is kept only when it stays under it, so a {@code ../} that
- * survives to this layer resolves to nothing rather than to a file of the archive. Directory listings are
- * not an answer this handler gives: a request that ends at a directory is a resource that is not served
- * (see {@code ImageServingFlowTest}, which pins both).
+ * <p><strong>Nothing outside that directory can be named.</strong> A path that still contains a {@code ..}
+ * after the framework's own cleaning is refused <em>before</em> any location is consulted — measured:
+ * {@code ResourceHandlerUtils} logs {@code Path contains "../" after call to StringUtils#cleanPath} and the
+ * request is answered 404 even when the file it names is stored — and a path that survives that is resolved
+ * against the location and kept only when the result stays under it. That last check reads the URL, so a
+ * filesystem link inside {@code images/} that resolves elsewhere passes it; measured, and routed to E6-S17
+ * rather than papered over here. Directory listings are not an answer this handler gives: a request that
+ * ends at a directory is a resource that is not served. {@code ImageServingFlowTest} pins all three: the
+ * refusals, the directories, and the one request that asks what the location list actually contains.
  *
  * <p><strong>The content type comes from the stored extension, never from the client.</strong> The
  * signature says which format the bytes are ({@link com.aetherarchive.service.ImageFormat}) and the name
@@ -103,8 +107,10 @@ public class ImageServingConfig implements WebMvcConfigurer {
      *
      * <p>{@link Path#toUri()} appends the slash only when the path is a directory at the moment it is
      * asked, and this configuration may be built before {@link StorageInitializer} has created the
-     * directory (or in a test, against one that never exists). The slash therefore has to be added rather
-     * than assumed.
+     * directory (or in a test, against one that never exists). The framework appends a missing one itself
+     * — it warns and does so, measured — so this is not the only thing keeping the mapping correct; it
+     * keeps the location used identical to the location logged, and the startup log free of a warning
+     * about a condition this code already knows.
      */
     private String imagesLocation() {
         String location = properties.dataDir().resolve(StorageInitializer.IMAGES_DIR).toUri().toString();
