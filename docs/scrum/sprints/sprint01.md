@@ -23,10 +23,10 @@
 | E1-S2 | Configuration & local data directory | 2 | p0 | Done | #62 |
 | E1-S3 | PostgreSQL persistence + Flyway baseline | 5 | p0 | Done | #63 |
 | E1-S4 | StorageService — safe local file storage | 5 | p0 | Done | #64 |
-| E1-S8 | Error handling (RFC 9457) & validation | 2 | p0 | Todo | — |
-| E1-S6 | Photo API — upload, list, random | 5 | p0 | Todo | — |
-| E1-S7 | Dump API — create and list 6-photo dumps | 5 | p0 | Todo | — |
-| E1-S9 | Backend test suite | 5 | p0 | Todo | — |
+| E1-S8 | Error handling (RFC 9457) & validation | 2 | p0 | Done | #66 |
+| E1-S6 | Photo API — upload, list, random | 5 | p0 | Done | #67 |
+| E1-S7 | Dump API — create and list 6-photo dumps | 5 | p0 | Done | #68 |
+| E1-S9 | Backend test suite | 5 | p0 | Done | #69 |
 
 **Total: 9 stories · 34 points.** Order above is the delivery order: it follows the dependency chain
 (scaffold → database → configuration → persistence → storage → errors → photos → dumps → suite), so every
@@ -79,8 +79,7 @@ consolidation story and is treated as a technical enabler.
   branch → implement → `verify` with raw evidence → PR → independent `code-reviewer` → findings fixed by new
   commits → merge commit → issue closed with the merge sha. Statuses and PR links are in the table above.
   Two stories closed with one acceptance criterion deferred, each recorded in its PR and completed rather
-  than forgotten: E1-S4's "oversized files rejected with a `ProblemDetail`" belongs to E1-S8 (still open, and
-  its own AC names the size limit), and E1-S11's "`./mvnw spring-boot:run` connects to the dev database" was
+  than forgotten: E1-S4's "oversized files rejected with a `ProblemDetail`" belongs to E1-S8 (delivered in #66, whose own AC names the size limit), and E1-S11's "`./mvnw spring-boot:run` connects to the dev database" was
   closed by E1-S3's dev-database run (`reports/verify-e1-s3-20261015.md` §2).
 - 2026-10-15 — **Findings that would otherwise have shipped** — caught by the independent review, unless
   noted: a **symlinked `tmp/` made the boot delete the link target's contents** (E1-S2, proven by execution
@@ -103,3 +102,19 @@ consolidation story and is treated as a technical enabler.
   an `@Version` (the backend rules require optimistic locking when a story mutates existing rows) — `Photo`
   has no setter today by design. Soft delete has moved to the backlog's **Icebox**: the architecture mandates
   it, but the contract defines no delete endpoint, so it needs a spec decision first.
+- 2026-10-16 — **All nine stories delivered (34 of 34 points), each merged into `develop` through the full gate.**
+  Milestone "Sprint 01 — Foundation & Backend": 9 closed, 0 open. Backend suite: 280 tests, 0 failures, 45 s.
+- 2026-10-16 — **Security audit (release gate)**: `reports/security-audit-sprint01.md` — no Critical or High
+  findings, release not blocked. Every resolved dependency was checked against OSV at its exact version; one
+  **reachable** DoS (`jackson-core` 2.21.4, `POST /api/v1/dumps`) was fixed before the release (#70). The three
+  Mediums and seven Lows are tracked as issues #71 (cross-site state-changing requests — the CSRF stand-in
+  ADR-008 defers), #72 (the Spring Boot 3.5.x OSS line is past EOL: a mandated-stack decision for the owner)
+  and #73 (the Low-severity hardening pass). SEC-03 was fixed before the release (#70, backlog E6-S15), so
+  **two** Mediums remain open, not three.
+- 2026-10-16 — Two reviews of the last story found the suite was **order-dependent** — it passed only because
+  surefire ordered classes favourably, so the story's own determinism claim was wrong. Fixed and proven under
+  two class orders (`alphabetical`, `reversealphabetical`). A claim of reliability that a re-run cannot
+  reproduce is not evidence, and the sprint's own report was corrected rather than left to stand.
+- 2026-10-16 — Added after the sprint: `reports/security-audit-sprint01.md` (the release gate) and
+  `retrospectives/sprint01.md`.
+
