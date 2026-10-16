@@ -68,7 +68,9 @@ reader can check it afterwards:
    changed lines and hand-written changed lines (generated files, lockfiles and `npm`-produced artefacts
    excluded and named). The rule the retrospective settled — the ~400/500-line guidance applies to the
    *hand-written* number, and a large atomic story is split into production/tests/docs commits rather than
-   into artificial stories — is stated in `.claude/rules/git-workflow.md`. Sprint 1's 1,300 was a **total**
+   into artificial stories — is stated in `.claude/rules/git-workflow.md` — including the atomic-story
+   exception, written into that file during this sprint (see the notes) after E2-S2's review found this
+   section cited it before it existed. Sprint 1's 1,300 was a **total**
    average, so the baseline is recomputed here from the nine Sprint 1 story PRs (`gh pr view <n> --json
    files`), and this sprint compares like with like:
 
@@ -147,3 +149,8 @@ reader can check it afterwards:
   described the tree one commit early (5,715 total / 691 hand-written, not 5,595 / 571); the tip measures 5,862 / 838. Fixed in the
   PR body and the report. The lesson is smaller than the mistake: a size is a measurement of the final commit,
   and taking it before the last commit lands is the same class of error as an unexecuted assumption.
+- 2026-10-16 — **E2-S2's review found the size commitment one step ahead of the repository**: the citation
+  above named `.claude/rules/git-workflow.md` for the atomic-story exception before that file contained it —
+  Sprint 1's retrospective had settled the practice, the rule did not yet carry it. The clause is now written
+  there (condition: production/tests/docs split, claimed by name in the PR, judged in review), and E2-S1 and
+  E2-S2 claim it under that clause rather than under an unwritten understanding.
