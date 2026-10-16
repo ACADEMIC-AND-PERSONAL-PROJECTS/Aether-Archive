@@ -1,0 +1,353 @@
+import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { SplashView } from "./SplashView";
+import { createQueryClient } from "../../app/queryClient";
+import { oklchToHex } from "../../lib/color/oklch";
+import { FALLBACK_THEME, paletteToTheme, type AuraTheme } from "../../lib/color/theme";
+import {
+  PULL_SURFACE_TOUCH_ACTION,
+  PULL_THRESHOLD_PX,
+  TAP_SLOP_PX,
+} from "../../lib/gesture/pullToRefresh";
+
+import type { Palette } from "../../lib/color/types";
+import type * as HeroModule from "../../lib/image/hero";
+import type { Photo } from "../../types/api";
+
+/**
+ * The splash's behaviour, asserted where the user can observe it.
+ *
+ * ## Why the hero environment is mocked, and what stays real
+ *
+ * jsdom has no image pipeline at all — measured in the test process, not assumed: `typeof
+ * HTMLImageElement.prototype.decode` is `undefined`, `createImageBitmap`, `OffscreenCanvas` and
+ * `ImageData` are `undefined`, and an `<img>` pointed at a data URL fires neither `load` nor `error`
+ * (probe output in the PR). The three browser edges are therefore faked
+ * ({@link heroEnvironment}) while everything between them is the shipped code: the real `prepareHero`
+ * ordering and error policy, the real `useHeroImage` state machine, the real `SplashView`. The same
+ * split E2-S4 chose for the colour pipeline (ADR-018).
+ *
+ * The consequences for what these tests can and cannot say are named where they bite: the *browser*
+ * guarantee ("the pixels really are decoded before the reveal") is proven by the offline Chromium
+ * probe, not here, because there is no decoder here to prove anything with.
+ */
+
+const heroEnvironment = vi.hoisted(() => ({
+  fetchBytes: vi.fn(),
+  decode: vi.fn(),
+  tone: vi.fn(),
+}));
+
+vi.mock("../../lib/image/hero", async (importOriginal) => {
+  const actual = await importOriginal<typeof HeroModule>();
+  return { ...actual, browserHeroEnvironment: heroEnvironment };
+});
+
+/** What the archive answers for the splash hero (`Photo`, `_docs/openapi.yml`). */
+const PHOTO: Photo = {
+  id: "42b6608a-5e82-4a5d-b95c-2d077b7f5199",
+  url: "/images/42b6608a-5e82-4a5d-b95c-2d077b7f5199.png",
+  category: "pics",
+  uploadedAt: "2026-10-16T03:29:32.289807Z",
+};
+
+/** A photo's palette — deep blue, warm sand, pale — and the theme it generates. */
+const PHOTO_THEME: AuraTheme = paletteToTheme({
+  colors: [
+    {
+      hex: oklchToHex({ l: 0.22, c: 0.05, h: 250 }),
+      oklch: { l: 0.22, c: 0.05, h: 250 },
+      weight: 0.5,
+    },
+    { hex: oklchToHex({ l: 0.7, c: 0.09, h: 60 }), oklch: { l: 0.7, c: 0.09, h: 60 }, weight: 0.3 },
+    { hex: oklchToHex({ l: 0.9, c: 0.01, h: 80 }), oklch: { l: 0.9, c: 0.01, h: 80 }, weight: 0.2 },
+  ],
+} satisfies Palette);
+
+const DECODED_SRC = "blob:decoded-photo";
+
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+}
+
+/** A body the archive writes for a failure, as `ApiExceptionHandler` writes one. */
+function problemResponse(code: string, status: number): Response {
+  return new Response(
+    JSON.stringify({
+      type: "about:blank",
+      title: code === "empty-archive" ? "The archive is empty" : "Not found",
+      status,
+      detail: "Nothing to show.",
+      code,
+    }),
+    { status, headers: { "content-type": "application/problem+json" } },
+  );
+}
+
+/**
+ * Stubs `fetch` with a **new** `Response` per call: a body can be read once, and the re-roll tests read
+ * two of them. `restoreMocks` in `vite.config.ts` undoes the spy after every test.
+ */
+function stubApi(respond: () => Response) {
+  return vi.spyOn(globalThis, "fetch").mockImplementation(() => Promise.resolve(respond()));
+}
+
+function renderSplash(client: QueryClient = createQueryClient()) {
+  return render(
+    <QueryClientProvider client={client}>
+      <SplashView />
+    </QueryClientProvider>,
+  );
+}
+
+const tapTarget = () => screen.getByRole("button", { name: "Open the menu" });
+
+beforeEach(() => {
+  heroEnvironment.fetchBytes.mockResolvedValue(new Blob(["photo bytes"]));
+  heroEnvironment.decode.mockResolvedValue({ src: DECODED_SRC, release: vi.fn() });
+  heroEnvironment.tone.mockResolvedValue(PHOTO_THEME);
+});
+
+describe("SplashView — the photo", () => {
+  it("should fill the viewport with the archive's photo and show no other text", async () => {
+    stubApi(() => jsonResponse(PHOTO));
+    renderSplash();
+
+    const photo = await screen.findByRole("img", { name: "A photo from your archive" });
+    expect(photo).toHaveAttribute("src", DECODED_SRC);
+    expect(photo).toHaveClass("object-cover");
+    expect(photo).toHaveClass("absolute", "inset-0", "h-full", "w-full");
+    expect(screen.getByRole("main")).toHaveAttribute("data-state", "ready");
+
+    // "Headerless, zero visible UI": the only text in the view is the one visually hidden heading.
+    // Asserted as text rather than as markup, so a caption, a label or a stray sentence in the wrong
+    // place fails here.
+    expect(screen.getByRole("main").textContent).toBe("Aether Archive");
+    expect(screen.getByRole("heading", { level: 1, name: "Aether Archive" })).toHaveClass(
+      "sr-only",
+    );
+  });
+
+  it("should ask the archive for a photo on every visit, never for one it already has", async () => {
+    const fetchSpy = stubApi(() => jsonResponse(PHOTO));
+    // One client for both visits: leaving the splash and coming back inside one app session is what
+    // the criterion is about, and a fresh cache per render would prove nothing (measured probe: with
+    // the app's default 30 s `staleTime`, the second visit issued **no request at all**).
+    const client = createQueryClient();
+
+    const firstVisit = renderSplash(client);
+    await screen.findByRole("img", { name: "A photo from your archive" });
+    firstVisit.unmount();
+
+    renderSplash(client);
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
+    expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([
+      "/api/v1/photos/random",
+      "/api/v1/photos/random",
+    ]);
+  });
+
+  it("should release the decoded photo and hand the page back to the stylesheet on leaving", async () => {
+    const release = vi.fn();
+    heroEnvironment.decode.mockResolvedValue({ src: DECODED_SRC, release });
+    stubApi(() => jsonResponse(PHOTO));
+
+    const { unmount } = renderSplash();
+    await screen.findByRole("img", { name: "A photo from your archive" });
+    unmount();
+
+    // The blob URL is freed once nothing paints it — the splash does not leak one per visit…
+    expect(release).toHaveBeenCalledTimes(1);
+    // …and the neutral set the stylesheet declares is what the next view inherits.
+    expect(document.documentElement.style.getPropertyValue("--aura-bg")).toBe("");
+  });
+});
+
+describe("SplashView — the dominant tone (no flash of empty screen)", () => {
+  it("should paint the photo's own tone while the photo is still decoding", async () => {
+    // Guards the assertion below from passing vacuously: if the generated tone were the stylesheet's
+    // neutral value, "the tone was applied" and "nothing was applied" would look identical.
+    expect(PHOTO_THEME.bg).not.toBe(FALLBACK_THEME.bg);
+
+    stubApi(() => jsonResponse(PHOTO));
+    // A decode that never finishes: the state the placeholder exists for.
+    heroEnvironment.decode.mockImplementation(() => new Promise(() => {}));
+    renderSplash();
+
+    await waitFor(() =>
+      expect(document.documentElement.style.getPropertyValue("--aura-bg")).toBe(PHOTO_THEME.bg),
+    );
+    expect(screen.getByRole("main")).toHaveAttribute("data-state", "loading");
+    // The reveal has not happened: no image, because the pixels are not decoded yet.
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    // The tone is the theme layer's, not a colour this view invented (§2.2 hex-literal rule).
+    expect(heroEnvironment.tone).toHaveBeenCalledWith(expect.any(Blob));
+  });
+
+  it("should reveal the photo with the neutral set when no tone could be derived", async () => {
+    stubApi(() => jsonResponse(PHOTO));
+    heroEnvironment.tone.mockRejectedValue(new Error("unsupported"));
+    renderSplash();
+
+    await screen.findByRole("img", { name: "A photo from your archive" });
+    expect(document.documentElement.style.getPropertyValue("--aura-bg")).toBe("");
+  });
+});
+
+describe("SplashView — the tap target", () => {
+  it("should open the menu on a tap anywhere, and close it on the next one", async () => {
+    stubApi(() => jsonResponse(PHOTO));
+    renderSplash();
+    await screen.findByRole("img", { name: "A photo from your archive" });
+
+    expect(tapTarget()).toHaveAttribute("aria-expanded", "false");
+    expect(tapTarget()).toHaveAttribute("aria-haspopup", "dialog");
+
+    fireEvent.click(tapTarget());
+    expect(tapTarget()).toHaveAttribute("aria-expanded", "true");
+
+    fireEvent.click(tapTarget());
+    expect(tapTarget()).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("should close the menu on Escape", async () => {
+    stubApi(() => jsonResponse(PHOTO));
+    renderSplash();
+    await screen.findByRole("img", { name: "A photo from your archive" });
+
+    fireEvent.click(tapTarget());
+    expect(tapTarget()).toHaveAttribute("aria-expanded", "true");
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(tapTarget()).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("should still open the menu for a tap that wobbled up to the slop", async () => {
+    stubApi(() => jsonResponse(PHOTO));
+    renderSplash();
+    await screen.findByRole("img", { name: "A photo from your archive" });
+
+    drag(TAP_SLOP_PX);
+    fireEvent.click(tapTarget());
+
+    expect(tapTarget()).toHaveAttribute("aria-expanded", "true");
+  });
+});
+
+describe("SplashView — pull to refresh", () => {
+  it("should re-roll the photo on a pull past the threshold without opening the menu", async () => {
+    const fetchSpy = stubApi(() => jsonResponse(PHOTO));
+    renderSplash();
+    await screen.findByRole("img", { name: "A photo from your archive" });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    drag(PULL_THRESHOLD_PX);
+    // The browser fires a click after the release whatever the finger did; this one must be swallowed,
+    // or the menu would open over the photo the pull just replaced.
+    fireEvent.click(tapTarget());
+
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
+    expect(tapTarget()).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("should leave the photo alone when the drag stopped short of the threshold", async () => {
+    const fetchSpy = stubApi(() => jsonResponse(PHOTO));
+    renderSplash();
+    await screen.findByRole("img", { name: "A photo from your archive" });
+
+    drag(PULL_THRESHOLD_PX - 1);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("should leave the photo alone when the gesture was cancelled", async () => {
+    const fetchSpy = stubApi(() => jsonResponse(PHOTO));
+    renderSplash();
+    await screen.findByRole("img", { name: "A photo from your archive" });
+
+    const main = screen.getByRole("main");
+    fireEvent.pointerDown(main, { clientY: 100 });
+    fireEvent.pointerMove(main, { clientY: 100 + PULL_THRESHOLD_PX + 20 });
+    fireEvent.pointerCancel(main);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("should claim the pull from the browser's own scroll gesture", async () => {
+    /*
+     * The one CSS fact this story needs, and the one jsdom cannot evaluate: it has no gesture
+     * recognition, so nothing here can assert the *effect*. What is pinned is that the surface still
+     * declares it. Measured in Chromium on the built bundle, with a synthesised touch drag: with the
+     * default `touch-action: auto` the stream is `pointerdown → pointermove → pointercancel` and no
+     * re-roll happens (the browser took the drag for a scroll); with `pan-x pinch-zoom` the whole stream
+     * arrives and the photo re-rolls. Probe output in the PR.
+     */
+    stubApi(() => jsonResponse(PHOTO));
+    renderSplash();
+    await screen.findByRole("img", { name: "A photo from your archive" });
+
+    expect(screen.getByRole("main")).toHaveClass(PULL_SURFACE_TOUCH_ACTION);
+  });
+
+  it("should not let a drag swallow the tap that follows it", async () => {
+    stubApi(() => jsonResponse(PHOTO));
+    renderSplash();
+    await screen.findByRole("img", { name: "A photo from your archive" });
+
+    drag(PULL_THRESHOLD_PX);
+    fireEvent.click(tapTarget());
+    // The suppressed click answered for the drag; the next gesture starts clean.
+    drag(TAP_SLOP_PX);
+    fireEvent.click(tapTarget());
+
+    expect(tapTarget()).toHaveAttribute("aria-expanded", "true");
+  });
+});
+
+describe("SplashView — quiet states (E3-S4 renders their words)", () => {
+  it("should show the empty state, never a crash, when the archive holds no photo", async () => {
+    stubApi(() => problemResponse("empty-archive", 404));
+    renderSplash();
+
+    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "empty"));
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    // The screen is still the app: the view is named and the tap target is still there.
+    expect(screen.getByRole("heading", { level: 1, name: "Aether Archive" })).toBeInTheDocument();
+    expect(tapTarget()).toBeInTheDocument();
+  });
+
+  it("should show the error state, never a crash, when the archive refuses the request", async () => {
+    // A 4xx that is not the empty archive. A 5xx or an unreachable archive reaches the same branch
+    // after the app's retry policy (two attempts, 500 ms and 1 s) — not exercised here to keep the
+    // suite free of real waits; `api/retryPolicy.test.ts` owns that policy.
+    stubApi(() => problemResponse("not-found", 404));
+    renderSplash();
+
+    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "error"));
+    expect(tapTarget()).toBeInTheDocument();
+  });
+
+  it("should keep the shell when a photo arrives but cannot be decoded", async () => {
+    stubApi(() => jsonResponse(PHOTO));
+    heroEnvironment.decode.mockRejectedValue(new Error("The photo could not be decoded."));
+    renderSplash();
+
+    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "error"));
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Aether Archive" })).toBeInTheDocument();
+    expect(tapTarget()).toBeInTheDocument();
+  });
+});
+
+/** A complete downward drag and release of `distance` px, starting from the top of the screen. */
+function drag(distance: number): void {
+  const main = screen.getByRole("main");
+  fireEvent.pointerDown(main, { clientY: 100, pointerType: "touch" });
+  fireEvent.pointerMove(main, { clientY: 100 + distance, pointerType: "touch" });
+  fireEvent.pointerUp(main, { clientY: 100 + distance, pointerType: "touch" });
+}
