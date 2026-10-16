@@ -21,6 +21,11 @@ describe("filterClusters", () => {
     expect(kept).toHaveLength(1);
     expect(kept[0]?.centroid).toEqual(input[1]?.centroid);
   });
+
+  it("keeps a tone just inside the near-black edge", () => {
+    expect(rgbToOklab(8, 8, 10).l).toBeCloseTo(0.1354, 3);
+    expect(filterClusters([cluster([8, 8, 10], 10)])).toHaveLength(1);
+  });
 });
 
 describe("mergeClusters", () => {
