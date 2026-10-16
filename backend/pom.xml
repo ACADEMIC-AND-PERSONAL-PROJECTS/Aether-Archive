@@ -21,6 +21,12 @@
         <java.version>21</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <!-- Sprint-1 security audit (SEC-03): jackson-core 2.21.4, which Spring Boot 3.5.16 manages,
+             carries two DoS advisories reachable from POST /api/v1/dumps (GHSA-p6pp-m3f8-5c89,
+             GHSA-7hhh-6rmp-j9qf — quadratic number parsing and an unbounded error token). Both are
+             fixed in 2.21.7; this override is patch-level and in the same family. Remove it when the
+             Boot line manages 2.21.7 or later. -->
+        <jackson-bom.version>2.21.7</jackson-bom.version>
     </properties>
 
     <dependencies>
