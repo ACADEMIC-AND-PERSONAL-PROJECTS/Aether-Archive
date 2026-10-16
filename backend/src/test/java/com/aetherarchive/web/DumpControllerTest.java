@@ -3,6 +3,7 @@ package com.aetherarchive.web;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
@@ -250,7 +251,12 @@ class DumpControllerTest {
                 // Not a complaint about the request: no field was rejected, and the version that lost the
                 // race — a row identifier — is the operator's, not the client's.
                 .andExpect(jsonPath("$.errors").doesNotExist())
-                .andExpect(jsonPath("$.detail").value(containsString("retry")));
+                .andExpect(jsonPath("$.detail").value(containsString("retry")))
+                // The advice's sentence, not the framework's: the message of the failure behind it names
+                // the entity class and the row that lost the race, and neither belongs in a response body.
+                .andExpect(jsonPath("$.detail").value(not(containsString("ArchiveItem"))))
+                .andExpect(jsonPath("$.detail")
+                        .value(not(containsString(ArchiveFixtures.id(11).toString()))));
     }
 
     @Test
