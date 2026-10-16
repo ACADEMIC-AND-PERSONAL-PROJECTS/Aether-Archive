@@ -18,9 +18,9 @@
 | # | ID | Story | Points | Priority | Status | PR |
 | --- | --- | --- | --- | --- | --- | --- |
 | 0 | S02-C1 | *chore*: land retro-change #3 (working agreements in `.claude/`) | — | — | Done | #77 |
-| 1 | E2-S1 | Scaffold the frontend toolchain | 5 | p0 | Todo | — |
-| 2 | E1-S5 | Serve images at `/images/**` | 2 | p0 | Todo | — |
-| 3 | E2-S2 | App shell, routing & typed API client | 5 | p0 | Todo | — |
+| 1 | E2-S1 | Scaffold the frontend toolchain | 5 | p0 | Done | #78 |
+| 2 | E1-S5 | Serve images at `/images/**` | 2 | p0 | Done | #80 |
+| 3 | E2-S2 | App shell, routing & typed API client | 5 | p0 | Done | #81 |
 | 4 | E2-S3 | Global CSS foundation | 3 | p0 | Todo | — |
 | 5 | E2-S4 | Dominant-colour extraction algorithm | 8 | p0 | Todo | — |
 | 6 | E2-S5 | Fontsource typography system | 3 | p0 | Todo | — |
