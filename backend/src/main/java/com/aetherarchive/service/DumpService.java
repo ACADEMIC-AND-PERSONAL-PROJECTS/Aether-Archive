@@ -17,12 +17,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import com.aetherarchive.domain.ArchiveItem;
 import com.aetherarchive.domain.ItemType;
 import com.aetherarchive.domain.Photo;
 import com.aetherarchive.dto.DumpCreateRequest;
 import com.aetherarchive.dto.DumpResponse;
+import com.aetherarchive.dto.ValidationConstraints;
 import com.aetherarchive.exception.DumpValidationException;
 import com.aetherarchive.exception.FieldViolation;
 import com.aetherarchive.repository.ArchiveItemRepository;
@@ -96,7 +99,11 @@ public class DumpService {
         items.saveAndFlush(dump);
 
         List<Photo> ordered = attach(dump, photoIds, curatable);
-        log.info("Published dump {} with {} photos", dump.getId(), ordered.size());
+        // The log waits for the commit: everything this method has written so far — the item and the six
+        // positions — is still uncommitted, and a publish that loses a race rolls all of it back. Logging
+        // here would leave "Published dump …" in the log for a dump that does not exist, which is exactly
+        // the entry an operator would search for after a client reports a failed publish.
+        afterCommit(() -> log.info("Published dump {} with {} photos", dump.getId(), ordered.size()));
         return DumpResponse.from(dump, ordered);
     }
 
@@ -118,9 +125,55 @@ public class DumpService {
         }
         Map<UUID, List<Photo>> byItem = groupByItem(
                 photos.findAllOfItemsOrderByDisplayOrder(identifierOfEach(dumps)));
-        return dumps.stream()
-                .map(dump -> DumpResponse.from(dump, byItem.getOrDefault(dump.getId(), List.of())))
-                .toList();
+        return dumps.stream().map(dump -> DumpResponse.from(dump, sixPhotosOf(dump, byItem))).toList();
+    }
+
+    /**
+     * The six photos of one dump — or a failure that names the invariant a database can hold but not
+     * enforce.
+     *
+     * <p>"Exactly six" is the service's rule; the schema only bounds it (V2's {@code display_order} range
+     * and its per-item unique index allow six, and a delete leaves five). So a dump that lost a photo is a
+     * state the read path can meet, and answering it with whatever came back would publish a short — or
+     * empty — {@code photos} array as if it were a monthly compilation, hiding a broken row behind a
+     * response that looks fine. A failure is the honest answer: the item goes to the operator's log with
+     * the identifier and the count, and the client gets an {@code internal-failure}, which says the archive
+     * is in a state it must not be in — never a dump with no pictures.
+     */
+    private static List<Photo> sixPhotosOf(ArchiveItem dump, Map<UUID, List<Photo>> byItem) {
+        List<Photo> itsPhotos = byItem.getOrDefault(dump.getId(), List.of());
+        if (itsPhotos.size() != ValidationConstraints.DUMP_PHOTO_COUNT) {
+            throw new IllegalStateException("dump " + dump.getId() + " holds " + itsPhotos.size()
+                    + " photos; a monthly dump must hold exactly " + ValidationConstraints.DUMP_PHOTO_COUNT);
+        }
+        return itsPhotos;
+    }
+
+    /**
+     * Runs the action once the surrounding transaction has committed, and never when it rolls back.
+     *
+     * <p>{@code create} is transactional, so through the API the synchronization the registration needs is
+     * always active: Spring calls {@link TransactionSynchronization#afterCommit()} after a successful
+     * commit and discards the registration when the transaction rolls back, which is the whole of the
+     * guarantee the publish log needs.
+     *
+     * <p>A call with no transaction around it has no commit to wait for — the controller slice drives this
+     * service without one, so its responses can be asserted without a database — and there the action runs
+     * at once rather than failing. Logging is not allowed to be the thing that breaks a publish that did
+     * nothing wrong; note that such a call does not write a dump either, because the updates it makes are
+     * only ever flushed by a transaction.
+     */
+    private static void afterCommit(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            action.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
     }
 
     /**

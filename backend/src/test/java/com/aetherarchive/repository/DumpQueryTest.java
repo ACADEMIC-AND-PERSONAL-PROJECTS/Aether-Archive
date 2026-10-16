@@ -45,7 +45,10 @@ import com.aetherarchive.support.PostgresTestConfiguration;
  * <p>The service is built by hand instead of imported: a {@code @DataJpaTest} does not scan
  * {@code @Service} beans, and importing one would change this class's context configuration — every
  * {@code @DataJpaTest} of the suite shares a single throwaway PostgreSQL container, and only because
- * their annotations are identical.
+ * their annotations are identical. Hand-built, the service is also unproxied: no transaction wraps these
+ * two queries, so what this class measures is the statements they issue and nothing more. The endpoint's
+ * real transaction boundary is exercised by {@code DumpApiFlowTest}, and what a rollback of it leaves
+ * behind by {@code DumpPublishAtomicityTest}.
  */
 @DataJpaTest
 @ActiveProfiles("test")
@@ -100,9 +103,12 @@ class DumpQueryTest {
         assertThat(dumps.get(0).photos()).extracting(PhotoResponse::id).containsExactlyElementsOf(photoIds(20));
         assertThat(dumps.get(1).photos()).extracting(PhotoResponse::id).containsExactlyElementsOf(photoIds(10));
 
-        // One statement for the items and one for the photos of both of them. A per-dump query would make
-        // this three; reading each photo's item through a lazy association while grouping would make it
-        // five. Both are what the batch and its fetch join exist to prevent.
+        // One statement for the items and one for the photos of both of them — a per-dump query in place of
+        // the batch would push this to three, which is what the batch is here to prevent. The fetch join of
+        // the photo query is not what holds this number today: the grouping asks a photo for its item's
+        // identifier alone, which the proxy answers from the foreign key it already carries, without a
+        // statement. It is insurance for a grouping that reads anything more of the item, which would
+        // otherwise cost one query per photo.
         assertThat(statistics.getPrepareStatementCount()).isEqualTo(2);
         assertThat(statistics.getQueryExecutionCount()).isEqualTo(2);
     }

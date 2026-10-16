@@ -20,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.IntStream;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,6 +60,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  *
  * <p>The clock is fixed, because the instant of a dump is part of the body this class asserts character
  * for character.
+ *
+ * <p>No transaction is involved: this slice brings no transaction manager, so the service runs unproxied
+ * and the positions a publish sets are never flushed anywhere. What is asserted here is the HTTP layer —
+ * status, body, problem detail — and the publish that really writes a row is covered by
+ * {@code DumpApiFlowTest} (it commits) and {@code DumpPublishAtomicityTest} (it rolls back whole).
  */
 @WebMvcTest(controllers = DumpController.class)
 @Import({ DumpService.class, DumpControllerTest.FixedClockConfiguration.class })
@@ -225,16 +231,20 @@ class DumpControllerTest {
     @Test
     void should_publish_the_dumps_in_the_order_the_service_returns_them() throws Exception {
         // "Newest first" is the query's rule and is pinned against PostgreSQL in DumpQueryTest; the
-        // endpoint publishes the dumps in the order it is handed them, each with its photos.
+        // endpoint publishes the dumps in the order it is handed them, each with its photos. Six each:
+        // the read refuses a dump that does not hold six (DumpService.sixPhotosOf), so a fixture with
+        // fewer would answer 500 and this class would be asserting a state the archive cannot publish.
         ArchiveItem newest = ArchiveFixtures.item(ArchiveFixtures.id(11),
                 Instant.parse("2026-10-16T10:00:00Z"));
         ArchiveItem oldest = ArchiveFixtures.item(ArchiveFixtures.id(12),
                 Instant.parse("2026-09-16T10:00:00Z"));
-        Photo firstOfNewest = ArchiveFixtures.photo(ArchiveFixtures.id(21), newest, 0);
-        Photo firstOfOldest = ArchiveFixtures.photo(ArchiveFixtures.id(22), oldest, 0);
+        List<Photo> photosOfNewest = curatedPhotos(newest, 21);
+        List<Photo> photosOfOldest = curatedPhotos(oldest, 31);
+        List<Photo> both = new ArrayList<>(photosOfNewest);
+        both.addAll(photosOfOldest);
         given(items.findAllByTypeOrderByTimestampDescIdDesc(ItemType.MONTHLY_DUMP))
                 .willReturn(List.of(newest, oldest));
-        given(photos.findAllOfItemsOrderByDisplayOrder(any())).willReturn(List.of(firstOfNewest, firstOfOldest));
+        given(photos.findAllOfItemsOrderByDisplayOrder(any())).willReturn(both);
 
         mockMvc.perform(get(DUMPS))
                 .andExpect(status().isOk())
@@ -244,10 +254,32 @@ class DumpControllerTest {
                 .andExpect(jsonPath("$[0].title").value("Late Summer"))
                 .andExpect(jsonPath("$[0].backgroundColor").value(ArchiveFixtures.BACKGROUND_COLOR))
                 .andExpect(jsonPath("$[0].createdAt").value(newest.getTimestamp().toString()))
-                .andExpect(jsonPath("$[0].photos", hasSize(1)))
-                .andExpect(jsonPath("$[0].photos[0].id").value(firstOfNewest.getId().toString()))
+                .andExpect(jsonPath("$[0].photos", hasSize(ValidationConstraints.DUMP_PHOTO_COUNT)))
+                .andExpect(jsonPath("$[0].photos[0].id").value(photosOfNewest.getFirst().getId().toString()))
                 .andExpect(jsonPath("$[0].photos[0].uploadedAt").value(ArchiveFixtures.CREATED_AT.toString()))
-                .andExpect(jsonPath("$[1].id").value(oldest.getId().toString()));
+                .andExpect(jsonPath("$[1].id").value(oldest.getId().toString()))
+                .andExpect(jsonPath("$[1].photos", hasSize(ValidationConstraints.DUMP_PHOTO_COUNT)));
+    }
+
+    @Test
+    void should_answer_500_with_an_internal_failure_when_a_dump_no_longer_holds_six_photos() throws Exception {
+        ArchiveItem broken = ArchiveFixtures.item(ArchiveFixtures.id(11));
+        given(items.findAllByTypeOrderByTimestampDescIdDesc(ItemType.MONTHLY_DUMP))
+                .willReturn(List.of(broken));
+        // Five of the six: a state the schema allows — V2 bounds display_order and makes it unique per item,
+        // and a delete leaves five — and the read refuses. What must never come back is a 200 with five
+        // photos, or with none: such a body looks like a healthy dump to every client that reads it.
+        given(photos.findAllOfItemsOrderByDisplayOrder(any()))
+                .willReturn(curatedPhotos(broken, 21).subList(0, ValidationConstraints.DUMP_PHOTO_COUNT - 1));
+
+        mockMvc.perform(get(DUMPS))
+                .andExpect(status().isInternalServerError())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.code").value("internal-failure"))
+                // The archive's one sentence for a failure of its own, and no more: the identifier of the
+                // broken dump and the count it holds go to the log, where the operator needs them.
+                .andExpect(jsonPath("$.detail").value("The archive could not process the request."));
     }
 
     /** The count is the one rule both a short and a long list break: same field, same message. */
@@ -269,6 +301,14 @@ class DumpControllerTest {
     private static List<UUID> shuffledCurationOrder() {
         List<UUID> ids = ArchiveFixtures.dumpPhotoIds();
         return List.of(ids.get(4), ids.get(0), ids.get(5), ids.get(2), ids.get(1), ids.get(3));
+    }
+
+    /** The six photos of one dump, positions 0..5, named {@code firstPhotoId} … {@code firstPhotoId+5}. */
+    private static List<Photo> curatedPhotos(ArchiveItem dump, long firstPhotoId) {
+        return IntStream.range(0, ValidationConstraints.DUMP_PHOTO_COUNT)
+                .mapToObj(position -> ArchiveFixtures.photo(ArchiveFixtures.id(firstPhotoId + position), dump,
+                        position))
+                .toList();
     }
 
     private String body(String title, String backgroundColor, List<UUID> photoIds)

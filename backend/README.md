@@ -271,6 +271,7 @@ What a publish can answer besides the `201`:
 | --- | --- | --- |
 | `400` | `validation-failure` | the body breaks a constraint: five or seven ids, a colour that is not `#RRGGBB`, a title over 80 characters |
 | `400` | `validation-failure` | the six identifiers are not six *different* photos of the archive that are still uncurated |
+| `409` | `concurrent-modification` | another write changed a row this publish was writing first; nothing was published |
 
 The second row is the rule no annotation can state, and the service checks it before it writes anything: a
 duplicate, an identifier no photo holds, and a photo that already belongs to another item are all refused
@@ -381,12 +382,19 @@ message; `detail` is one sentence, taken from the domain exception when it has o
 | `missing-request-part` | 400 | a multipart request arrived without a part the endpoint requires |
 | `not-found` | 404 | neither a controller nor a static resource serves the path |
 | `empty-archive` | 404 | `/photos/random` found no photo: the archive holds none yet, which the frontend shows as an empty state |
+| `concurrent-modification` | 409 | another write changed the row this one was changing: read it again and retry |
 | `internal-failure` | 500 | a bug: no handler above claimed the exception |
 
 The table is the archive's own vocabulary (ADR-013). A refusal Spring raises before a controller runs
 borrows its code from the status instead: the status name in kebab-case — `bad-request` for a required
 parameter that is missing, `unsupported-media-type` for a `Content-Type` the endpoint does not take,
 `method-not-allowed`, `not-acceptable` — and `request-rejected` when no status name describes it.
+
+`concurrent-modification` is the table's first conflict code. The request was well formed and the archive
+is intact — the write that lost the race rolled back whole, which is why the answer is not a `500` — but
+another write changed the same row first, so the client reads it again and retries. A `400` would blame a
+request that was perfectly valid, and a `500` would report an archive that nothing has broken: both send
+the client looking for the wrong problem.
 
 A validation failure lists the rejected fields in `errors`, so a client can mark them all at once instead
 of resubmitting to discover the next one. Where the violation was found makes no difference to the client:
