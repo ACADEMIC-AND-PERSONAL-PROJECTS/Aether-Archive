@@ -27,6 +27,7 @@ Statuses: `Proposed` · `Accepted` · `Superseded by ADR-NNN` · `Rejected`.
 | [ADR-015](#adr-015--typescript-603-while-the-lint-stack-cannot-parse-7) | 2026-10-16 | TypeScript 6.0.3 while the lint stack cannot parse 7 | Accepted |
 | [ADR-016](#adr-016--the-frontend-reaches-the-api-on-its-own-origin) | 2026-10-16 | The frontend reaches the API on its own origin | Accepted |
 | [ADR-017](#adr-017--the-css-foundation-declared-inputs-runtime-only-colour-one-definition-per-scale) | 2026-10-16 | The CSS foundation: declared inputs, runtime-only colour, one definition per scale | Accepted |
+| [ADR-018](#adr-018--the-clustering-algorithm-and-the-pipelines-open-readings) | 2026-10-16 | The clustering algorithm and the pipeline's open readings | Accepted |
 
 ---
 
@@ -540,6 +541,64 @@ story asks for the dependency, and the pin policy needs one (ADR-014's left-open
 **Evidence.** `reports/verify-e2-s3-20261016.md` — scan sentinels (README/TS/HTML), palette-wipe and
 emission probes, the reduced-motion probe under `--force-prefers-reduced-motion`, and the 9-cell
 overflow measurement with screenshots at 320/390/430.
+
+---
+
+## ADR-018 — The clustering algorithm and the pipeline's open readings
+
+**Date**: 2026-10-16 · **Status**: Accepted
+
+**Context.** `DESIGN-SYSTEM.md` §2.1 fixes the extraction pipeline's shape — decode → downscale ≤ 64 px
+→ OKLab/OKLCH → weighted clustering → score & filter → 5–8 colours — and leaves three readings open:
+which clustering algorithm ships as the default ("decided with measured numbers in an ADR during
+E2-S4"), the exact curve of `midLightnessBonus(L)`, and the edge between "near-black/near-white" and
+kept tones. The environment constrains the tests: jsdom implements no canvas at all (`OffscreenCanvas`,
+`ImageData`, `createImageBitmap` undefined; `getContext("2d")` null — probe in the E2-S4 report), and
+vitest 5.0.5 exports no `bench` API. So the pure pipeline is unit-tested in jsdom, `decode.ts` sits
+behind an injectable dependency interface, the real decode path is proven by an offline Chromium probe,
+and the measurements come from a probe test over the shipped modules.
+
+**Decision.** All three readings, implemented in `frontend/src/lib/color/`:
+
+1. **k-means++ is the default** (`DEFAULT_ALGORITHM = "kmeans"`); median cut ships beside it,
+   selectable via `extractPalette(image, { algorithm: "median-cut" })` and held to the same suite.
+   On the measured runs (synthetic jittered photo, 45% rust / 30% teal / 15% sand / 10% near-black;
+   Node 22.23.3; full JSON in the report):
+   - **time** — everything inside §2.1's 50 ms budget with room: clustering of 4,096 px in 7.6 ms
+     (median cut 6.6 ms), full pipeline 8.2 ms for 64 px / 10.7 ms for a 512 px input downscaled
+     (median cut 10.5 ms / 15.6 ms — k-means++ ahead on the pipeline, where it matters);
+   - **region fidelity** — k-means++ centroids are means of real pixel subsets, so every returned hex
+     exists in its source region; median cut can blend a mixed box into a colour absent from the image
+     (measured: `#cf855c`, between rust and sand). A theme built on invented blends misrepresents the
+     photo's masses;
+   - **dominant mass survives splitting** — k-means++ describes the textured rust region as three real
+     tones whose weights sum to its true 0.45 (pinned by a unit test at ≥ 0.40). Median cut's better
+     top-1 metric on the same probe (ΔE 0.003 vs 0.24 to the rust centre) is the flip side of that
+     blending: it folds a heterogeneous region into one centroid. If a later story judges top-1
+     dominance the more valuable property, the switch is one line plus the suite.
+2. **`midLightnessBonus(L) = 1 − |L − 0.5|`** — 1.0 at mid lightness, 0.62 at the darkest permitted
+   tone (L = 0.12), 0.55 at the brightest (L = 0.95). §2.1 names the bonus without its curve; this
+   curve stays within [0.55, 1] and so never outvotes a difference in mass.
+3. **Near-black/near-white are §2.1's lightness bounds, exactly**: `L < 0.12` and `L > 0.95` in
+   OKLab. A tone inside a bound is kept by design — a test pins `#08080a` (L ≈ 0.134) as kept.
+4. **Adaptivity.** Without an explicit `k`, the pipeline starts at k = 8 and retries twice (k = 10,
+   then 12, never above the pixel count) when filters and merges leave fewer than five colours.
+   Degenerate inputs — a solid bitmap, one hue, a fully transparent image — return their few real
+   colours rather than invented ones; the palette is honest, not padded to five.
+5. **Decode.** `decodeToPixels` uses `createImageBitmap` + `OffscreenCanvas`, pre-sizes in one
+   aspect-preserving draw (never upscales) and funnels every failure into `PaletteExtractionError`:
+   `"decode-failed"` for bytes no browser decoder accepts, `"unsupported"` for an environment without
+   the APIs. No image library, no network, and no dependency added (`package.json` and lock are
+   untouched from `bf12bb0`).
+
+**Consequences.** The suite runs pure in jsdom with no browser-runner dependency; the browser edge is
+proven by the offline Chromium probe with real canvas-rendered PNGs (dominant hue, grayscale,
+transparent, corrupted, 512² pre-size). Roles and contrast stay with `theme.ts` in E2-S6 — E2-S4 ships
+the scored palette only, as recorded on issue #23. Changing the default algorithm or the bonus curve
+later is a new ADR, not a silent edit.
+
+**Evidence.** `reports/verify-e2-s4-20261016.md` — environment probe, the 44-test colour suite
+(99 repo-wide), the timing/quality JSON, and the Chromium probe JSON.
 
 ---
 
