@@ -1,0 +1,27 @@
+/*
+ * The single glass material (DESIGN-SYSTEM §3). One primitive component composes this class
+ * (`components/GlassPanel.tsx`); nothing else writes `backdrop-filter`.
+ *
+ * Tokens only — no colour literal lives here (§2.2: a hex literal outside the theme layer is a
+ * review blocker). One build subtlety, measured in E2-S6: the bundler deduplicates a
+ * prefixed/standard pair keeping the *last* declaration, so the `-webkit-` line sits first and
+ * the standard `backdrop-filter` last — the built CSS carries both.
+ *
+ * The `@supports` block is the §3 fallback for engines without backdrop
+ * filters: the tint moves to its raised-opacity twin (`--aura-glass-solid`, ≥ 0.72) so text
+ * stays readable — the same move Apple's "increase contrast" makes over glass (NN/g, §7 of the
+ * references: translucent text containers must hold contrast on any backdrop).
+ */
+.glass {
+  background: var(--aura-glass);
+  -webkit-backdrop-filter: blur(15px) saturate(1.2);
+  backdrop-filter: blur(15px) saturate(1.2);
+  border: var(--aura-hairline);
+  border-radius: 20px;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass {
+    background: var(--aura-glass-solid);
+  }
+}

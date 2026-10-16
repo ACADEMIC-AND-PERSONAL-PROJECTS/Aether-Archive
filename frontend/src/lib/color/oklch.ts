@@ -49,6 +49,12 @@ export function oklabToOklch(lab: Oklab): Oklch {
   return { l: lab.l, c, h: h < 0 ? h + 360 : h };
 }
 
+/** The inverse of `oklabToOklch`: cartesian form, for the transforms that need it (theme maths). */
+export function oklchToOklab({ l, c, h }: Oklch): Oklab {
+  const radians = (h * Math.PI) / 180;
+  return { l, a: c * Math.cos(radians), b: c * Math.sin(radians) };
+}
+
 export function rgbToOklch(r: number, g: number, b: number): Oklch {
   return oklabToOklch(rgbToOklab(r, g, b));
 }
@@ -65,6 +71,11 @@ export function rgbToHex(r: number, g: number, b: number): string {
 export function oklabToHex(lab: Oklab): string {
   const { r, g, b } = oklabToRgb(lab);
   return rgbToHex(r, g, b);
+}
+
+/** Convenience for the theme layer: an OKLCh triplet straight to its clamped hex. */
+export function oklchToHex(color: Oklch): string {
+  return oklabToHex(oklchToOklab(color));
 }
 
 /**

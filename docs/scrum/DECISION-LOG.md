@@ -662,6 +662,67 @@ probe JSON, the gate log, and the probe-technique findings.
 
 ---
 
+## ADR-020 — The theme layer: role mapping in OKLCh, contrast by construction, one glass fallback
+
+**Date**: 2026-10-16 · **Status**: Accepted
+
+**Context.** DESIGN-SYSTEM §2.1/§2.2 fix the role vocabulary (`background`, `surface`, `glass`,
+`hairline`, `text`, `muted`, `accent`, `accentContrast`) and the hard rule: text ≥ 4.5:1 on the
+background *and* on glass-over-background, neutral fallback on extraction failure, no colour literal
+outside the theme layer. E2-S4 ships scored palettes (hex + OKLCh + weight); E2-S3 shipped the
+neutral stylesheet with five measured contrast pairs. What was open: the exact palette→token
+mapping, how contrast is *guaranteed* rather than spot-checked, how a theme reaches the DOM, and
+what "the theme layer" means for the hex-literal rule. §2.3 (per-view application) is deferred to
+E3+ by the backlog, so E2-S6 ships the layer, its fallback, the material and the visual check page —
+one slice each.
+
+**Decision.**
+
+1. **Roles from OKLCh with a fixed adjustment policy.** Background: the darkest colour, l clamped
+   to [0.10, 0.18], C ≤ 0.05, hue kept (never pure black, never a washed grey). Surface: background
+   l + 0.032 capped at 0.24, C ≤ 0.06. Text: the lightest colour, C ≤ 0.02, l starts in
+   [0.86, 0.93] and rises in 0.01 steps (ceiling 0.97) until it clears **4.5:1 against the
+   background, the surface and the glass composite**. Muted: text at alpha 0.62, +0.02 steps until
+   4.5:1 on the background. Accent: max `weight × C`, ties broken lexicographically on hex.
+2. **Accent contrast is derived, not assumed.** `fitAccent` measures the accent against a neutral
+   dark base (`#0b0b0d`) and a neutral light base (`#e8e6e3`); the stronger pair wins, and when
+   neither passes the accent's lightness is stepped ±0.02 (band 0.05–0.97) toward the stronger base
+   until it does. Every accent ships as a passing pair, and `--aura-accent-contrast` is a token the
+   generator derived.
+3. **Contrast arithmetic is float sRGB, WebAIM's formulas.** `contrast.ts` composites alpha over the
+   background without byte-rounding: the math reproduces E2-S3's measured pairs exactly (text on
+   glass **16.20:1**; rounding first gives 16.17:1). All five pairs are asserted in tests.
+4. **Runtime application is nine inline custom properties on `documentElement`.** `applyTheme` /
+   `applyFallbackTheme` / `clearTheme`; `FALLBACK_THEME` mirrors the stylesheet's `:root` set value
+   for value, and a drift-guard test reads `global.css` and fails on divergence. Extraction failure
+   calls `applyFallbackTheme` (the measured E2-S3 neutral set) — an invented theme is never applied;
+   `paletteToTheme` throws on an empty palette.
+5. **The glass material gets a token fallback, not a second material.** `.glass` (`glass.css`) keeps
+   §3's recipe; `--aura-glass-solid` (`rgba(0, 0, 0, 0.72)`) is its no-`backdrop-filter` twin, swapped
+   by `@supports`. Build finding: Lightning CSS deduplicates the `-webkit-`/standard pair keeping the
+   **last** declaration — the file lists the prefix first so both survive into `dist/`.
+6. **"The theme layer" is `theme.ts` + the stylesheet's `:root` block.** That is where colour
+   literals may live; everywhere else reads `--aura-*` tokens or `text-aura-*` utilities. The audit
+   command and its empty result are recorded in DESIGN-SYSTEM §13.
+7. **A Storybook-free check page is the sitting evidence.** `/check` renders the nine tokens with
+   live values, the type styles, the glass over a palette stand-in and over the page background, and
+   the five contrast rows; `?theme=demo` applies a derived theme so the headless probe screenshots it
+   without a click (the demo palette is built through `oklchToHex` — the page itself contains no hex
+   literal).
+
+**Consequences.** §2.3 still governs where a theme is applied per view (E3+); today the layer exists,
+the fallback path works, and the check page proves both. The `:root` block and `FALLBACK_THEME` are
+two copies of one set, bridged by an automated drift guard rather than by discipline. Adding a role
+means touching `THEME_PROPERTIES`, `global.css`, the §2.2 table and the check page — the drift guard
+only covers the tokens it enumerates. The vitest runner is configured `css: true` so `?raw` imports
+return source text (the drift guard's read); that is a test-harness setting, not a build change.
+
+**Evidence.** `reports/verify-e2-s6-20261016.md` — contrast numbers, both Chromium probe JSONs
+(fallback + derived), the built-CSS inspection (`@supports` branch, both `backdrop-filter` forms),
+screenshots, and the hex-literal audit.
+
+---
+
 ## Template for new ADRs
 
 ```markdown
