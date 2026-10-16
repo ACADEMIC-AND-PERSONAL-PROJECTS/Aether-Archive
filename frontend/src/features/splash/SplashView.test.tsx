@@ -1,16 +1,12 @@
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SplashView } from "./SplashView";
+import { queryKeys } from "../../api/queryKeys";
 import { createQueryClient } from "../../app/queryClient";
 import { oklchToHex } from "../../lib/color/oklch";
 import { FALLBACK_THEME, paletteToTheme, type AuraTheme } from "../../lib/color/theme";
-import {
-  PULL_SURFACE_TOUCH_ACTION,
-  PULL_THRESHOLD_PX,
-  TAP_SLOP_PX,
-} from "../../lib/gesture/pullToRefresh";
 
 import type { Palette } from "../../lib/color/types";
 import type * as HeroModule from "../../lib/image/hero";
@@ -31,7 +27,8 @@ import type { Photo } from "../../types/api";
  *
  * The consequences for what these tests can and cannot say are named where they bite: the *browser*
  * guarantee ("the pixels really are decoded before the reveal") is proven by the offline Chromium
- * probe, not here, because there is no decoder here to prove anything with.
+ * probe, not here, because the decoder is the one leaf that is faked — and the un-mocked edge itself
+ * has its own test in `app/App.test.tsx`.
  */
 
 const heroEnvironment = vi.hoisted(() => ({
@@ -51,6 +48,14 @@ const PHOTO: Photo = {
   url: "/images/42b6608a-5e82-4a5d-b95c-2d077b7f5199.png",
   category: "pics",
   uploadedAt: "2026-10-16T03:29:32.289807Z",
+};
+
+/** A second photo, so "a new photo arrived and this one is different" is a real change of url. */
+const LATER_PHOTO: Photo = {
+  id: "0f0c9a1e-5c1f-4d1a-9b1e-2f2c6f1a7b31",
+  url: "/images/0f0c9a1e-5c1f-4d1a-9b1e-2f2c6f1a7b31.png",
+  category: "anime",
+  uploadedAt: "2026-10-16T04:02:11.000000Z",
 };
 
 /** A photo's palette — deep blue, warm sand, pale — and the theme it generates. */
@@ -90,8 +95,9 @@ function problemResponse(code: string, status: number): Response {
 }
 
 /**
- * Stubs `fetch` with a **new** `Response` per call: a body can be read once, and the re-roll tests read
- * two of them. `restoreMocks` in `vite.config.ts` undoes the spy after every test.
+ * Stubs `fetch` with a **new** `Response` per call: a body can be read once, and a test that lets the
+ * query answer twice would read two of them. `restoreMocks` in `vite.config.ts` undoes the spy after
+ * every test.
  */
 function stubApi(respond: () => Response) {
   return vi.spyOn(globalThis, "fetch").mockImplementation(() => Promise.resolve(respond()));
@@ -105,7 +111,7 @@ function renderSplash(client: QueryClient = createQueryClient()) {
   );
 }
 
-const tapTarget = () => screen.getByRole("button", { name: "Open the menu" });
+const hero = () => screen.queryByRole("img", { name: "A photo from your archive" });
 
 beforeEach(() => {
   heroEnvironment.fetchBytes.mockResolvedValue(new Blob(["photo bytes"]));
@@ -131,25 +137,6 @@ describe("SplashView — the photo", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Aether Archive" })).toHaveClass(
       "sr-only",
     );
-  });
-
-  it("should ask the archive for a photo on every visit, never for one it already has", async () => {
-    const fetchSpy = stubApi(() => jsonResponse(PHOTO));
-    // One client for both visits: leaving the splash and coming back inside one app session is what
-    // the criterion is about, and a fresh cache per render would prove nothing (measured probe: with
-    // the app's default 30 s `staleTime`, the second visit issued **no request at all**).
-    const client = createQueryClient();
-
-    const firstVisit = renderSplash(client);
-    await screen.findByRole("img", { name: "A photo from your archive" });
-    firstVisit.unmount();
-
-    renderSplash(client);
-    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
-    expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([
-      "/api/v1/photos/random",
-      "/api/v1/photos/random",
-    ]);
   });
 
   it("should release the decoded photo and hand the page back to the stylesheet on leaving", async () => {
@@ -184,7 +171,7 @@ describe("SplashView — the dominant tone (no flash of empty screen)", () => {
     );
     expect(screen.getByRole("main")).toHaveAttribute("data-state", "loading");
     // The reveal has not happened: no image, because the pixels are not decoded yet.
-    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(hero()).not.toBeInTheDocument();
     // The tone is the theme layer's, not a colour this view invented (§2.2 hex-literal rule).
     expect(heroEnvironment.tone).toHaveBeenCalledWith(expect.any(Blob));
   });
@@ -199,113 +186,29 @@ describe("SplashView — the dominant tone (no flash of empty screen)", () => {
   });
 });
 
-describe("SplashView — the tap target", () => {
-  it("should open the menu on a tap anywhere, and close it on the next one", async () => {
+describe("SplashView — a later photo that will not decode", () => {
+  it("should report the failure over the photo it could not replace", async () => {
+    const client = createQueryClient();
+    heroEnvironment.decode
+      .mockResolvedValueOnce({ src: DECODED_SRC, release: vi.fn() })
+      .mockRejectedValueOnce(new Error("The photo could not be decoded."));
     stubApi(() => jsonResponse(PHOTO));
-    renderSplash();
+
+    renderSplash(client);
     await screen.findByRole("img", { name: "A photo from your archive" });
 
-    expect(tapTarget()).toHaveAttribute("aria-expanded", "false");
-    expect(tapTarget()).toHaveAttribute("aria-haspopup", "dialog");
+    // A second photo arrives for the same query — how the app reaches this state is E3-S1B's re-roll;
+    // what matters here is the state the view reports once a later hero fails.
+    act(() => {
+      client.setQueryData(queryKeys.randomPhoto, LATER_PHOTO);
+    });
 
-    fireEvent.click(tapTarget());
-    expect(tapTarget()).toHaveAttribute("aria-expanded", "true");
-
-    fireEvent.click(tapTarget());
-    expect(tapTarget()).toHaveAttribute("aria-expanded", "false");
-  });
-
-  it("should close the menu on Escape", async () => {
-    stubApi(() => jsonResponse(PHOTO));
-    renderSplash();
-    await screen.findByRole("img", { name: "A photo from your archive" });
-
-    fireEvent.click(tapTarget());
-    expect(tapTarget()).toHaveAttribute("aria-expanded", "true");
-
-    fireEvent.keyDown(window, { key: "Escape" });
-    expect(tapTarget()).toHaveAttribute("aria-expanded", "false");
-  });
-
-  it("should still open the menu for a tap that wobbled up to the slop", async () => {
-    stubApi(() => jsonResponse(PHOTO));
-    renderSplash();
-    await screen.findByRole("img", { name: "A photo from your archive" });
-
-    drag(TAP_SLOP_PX);
-    fireEvent.click(tapTarget());
-
-    expect(tapTarget()).toHaveAttribute("aria-expanded", "true");
-  });
-});
-
-describe("SplashView — pull to refresh", () => {
-  it("should re-roll the photo on a pull past the threshold without opening the menu", async () => {
-    const fetchSpy = stubApi(() => jsonResponse(PHOTO));
-    renderSplash();
-    await screen.findByRole("img", { name: "A photo from your archive" });
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-
-    drag(PULL_THRESHOLD_PX);
-    // The browser fires a click after the release whatever the finger did; this one must be swallowed,
-    // or the menu would open over the photo the pull just replaced.
-    fireEvent.click(tapTarget());
-
-    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
-    expect(tapTarget()).toHaveAttribute("aria-expanded", "false");
-  });
-
-  it("should leave the photo alone when the drag stopped short of the threshold", async () => {
-    const fetchSpy = stubApi(() => jsonResponse(PHOTO));
-    renderSplash();
-    await screen.findByRole("img", { name: "A photo from your archive" });
-
-    drag(PULL_THRESHOLD_PX - 1);
-
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-  });
-
-  it("should leave the photo alone when the gesture was cancelled", async () => {
-    const fetchSpy = stubApi(() => jsonResponse(PHOTO));
-    renderSplash();
-    await screen.findByRole("img", { name: "A photo from your archive" });
-
-    const main = screen.getByRole("main");
-    fireEvent.pointerDown(main, { clientY: 100 });
-    fireEvent.pointerMove(main, { clientY: 100 + PULL_THRESHOLD_PX + 20 });
-    fireEvent.pointerCancel(main);
-
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-  });
-
-  it("should claim the pull from the browser's own scroll gesture", async () => {
-    /*
-     * The one CSS fact this story needs, and the one jsdom cannot evaluate: it has no gesture
-     * recognition, so nothing here can assert the *effect*. What is pinned is that the surface still
-     * declares it. Measured in Chromium on the built bundle, with a synthesised touch drag: with the
-     * default `touch-action: auto` the stream is `pointerdown → pointermove → pointercancel` and no
-     * re-roll happens (the browser took the drag for a scroll); with `pan-x pinch-zoom` the whole stream
-     * arrives and the photo re-rolls. Probe output in the PR.
-     */
-    stubApi(() => jsonResponse(PHOTO));
-    renderSplash();
-    await screen.findByRole("img", { name: "A photo from your archive" });
-
-    expect(screen.getByRole("main")).toHaveClass(PULL_SURFACE_TOUCH_ACTION);
-  });
-
-  it("should not let a drag swallow the tap that follows it", async () => {
-    stubApi(() => jsonResponse(PHOTO));
-    renderSplash();
-    await screen.findByRole("img", { name: "A photo from your archive" });
-
-    drag(PULL_THRESHOLD_PX);
-    fireEvent.click(tapTarget());
-    // The suppressed click answered for the drag; the next gesture starts clean.
-    drag(TAP_SLOP_PX);
-    fireEvent.click(tapTarget());
-
-    expect(tapTarget()).toHaveAttribute("aria-expanded", "true");
+    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "error"));
+    // The previous photo is still what is painted: unmounting it would flash the placeholder over a
+    // picture that is still perfectly good. The state, not the markup, carries the news — and if `src`
+    // outranked `failed` (as it did before this was pinned) the view would report `ready` and E3-S4
+    // would have nothing to render its notice for.
+    expect(hero()).toHaveAttribute("src", DECODED_SRC);
   });
 });
 
@@ -315,10 +218,9 @@ describe("SplashView — quiet states (E3-S4 renders their words)", () => {
     renderSplash();
 
     await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "empty"));
-    expect(screen.queryByRole("img")).not.toBeInTheDocument();
-    // The screen is still the app: the view is named and the tap target is still there.
+    expect(hero()).not.toBeInTheDocument();
+    // The screen is still the app: the shell is named and nothing threw.
     expect(screen.getByRole("heading", { level: 1, name: "Aether Archive" })).toBeInTheDocument();
-    expect(tapTarget()).toBeInTheDocument();
   });
 
   it("should show the error state, never a crash, when the archive refuses the request", async () => {
@@ -329,7 +231,7 @@ describe("SplashView — quiet states (E3-S4 renders their words)", () => {
     renderSplash();
 
     await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "error"));
-    expect(tapTarget()).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Aether Archive" })).toBeInTheDocument();
   });
 
   it("should keep the shell when a photo arrives but cannot be decoded", async () => {
@@ -338,16 +240,7 @@ describe("SplashView — quiet states (E3-S4 renders their words)", () => {
     renderSplash();
 
     await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "error"));
-    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(hero()).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1, name: "Aether Archive" })).toBeInTheDocument();
-    expect(tapTarget()).toBeInTheDocument();
   });
 });
-
-/** A complete downward drag and release of `distance` px, starting from the top of the screen. */
-function drag(distance: number): void {
-  const main = screen.getByRole("main");
-  fireEvent.pointerDown(main, { clientY: 100, pointerType: "touch" });
-  fireEvent.pointerMove(main, { clientY: 100 + distance, pointerType: "touch" });
-  fireEvent.pointerUp(main, { clientY: 100 + distance, pointerType: "touch" });
-}
