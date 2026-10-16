@@ -30,6 +30,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -226,6 +227,30 @@ class DumpControllerTest {
                 .andExpect(jsonPath("$.errors[0].field").value("title"))
                 .andExpect(jsonPath("$.errors[0].message")
                         .value("size must be between 0 and " + ValidationConstraints.TITLE_MAX_LENGTH));
+    }
+
+    @Test
+    void should_answer_409_with_the_concurrent_modification_code_when_the_publish_loses_a_race()
+            throws Exception {
+        given(photos.findAllById(any())).willReturn(ArchiveFixtures.unassignedDumpPhotos());
+        // The version check of a stale write: another writer curated one of the six photos between the read
+        // and the update, so the flush that writes the item fails. The archive is intact — nothing was
+        // committed — and the client's repair is to read the six photos again, not to change its body.
+        given(items.saveAndFlush(any(ArchiveItem.class)))
+                .willThrow(new ObjectOptimisticLockingFailureException(ArchiveItem.class, ArchiveFixtures.id(11)));
+
+        mockMvc.perform(post(DUMPS).contentType(MediaType.APPLICATION_JSON)
+                .content(body(TITLE, BACKGROUND_COLOR, shuffledCurationOrder())))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.code").value("concurrent-modification"))
+                .andExpect(jsonPath("$.title").value("Concurrent modification"))
+                .andExpect(jsonPath("$.instance").value(DUMPS))
+                // Not a complaint about the request: no field was rejected, and the version that lost the
+                // race — a row identifier — is the operator's, not the client's.
+                .andExpect(jsonPath("$.errors").doesNotExist())
+                .andExpect(jsonPath("$.detail").value(containsString("retry")));
     }
 
     @Test
