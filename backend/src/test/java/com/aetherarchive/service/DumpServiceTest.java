@@ -52,6 +52,10 @@ import com.aetherarchive.support.ArchiveFixtures;
  * it: {@link DumpService#create} registers its publish log for after the commit, and Spring runs the
  * registration only when a transaction is in progress. The tests that care about the moment the log
  * appears drive the callbacks themselves, with the service's log captured in a list appender.
+ *
+ * <p>That capture pins the service logger's level itself, for the length of each test: the test profile
+ * asks for a WARN root and Logback's loggers are JVM-wide, so which class ran first must not decide
+ * whether a line the service writes at INFO can be seen here.
  */
 class DumpServiceTest {
 
@@ -71,20 +75,35 @@ class DumpServiceTest {
     /** The service's own log, captured so a test can say when the publish line is written. */
     private ListAppender<ILoggingEvent> serviceLog;
 
+    private Logger serviceLogger;
+
+    /** The level this logger carried before the test pinned it; {@code null} means it inherited one. */
+    private Level previousLevel;
+
     @BeforeEach
     void setUp() {
         items = mock(ArchiveItemRepository.class);
         photos = mock(PhotoRepository.class);
         service = new DumpService(items, photos, Clock.fixed(PUBLISHED_AT, ZoneOffset.UTC));
+        serviceLogger = (Logger) LoggerFactory.getLogger(DumpService.class);
+        // Pinned, because this logger's level is not this class's to assume: the test profile asks for
+        // `logging.level.root: WARN`, a Logback logger is a JVM-wide singleton, and Spring never restores
+        // the level a context applied. A Spring class that ran before this one leaves WARN behind, and the
+        // INFO lines the tests below wait for would be filtered before they reach the appender. Pinned
+        // here, the capture answers to this class and to nothing else; `previousLevel` is put back after
+        // every test, so a neighbour is left exactly as it was found.
+        previousLevel = serviceLogger.getLevel();
+        serviceLogger.setLevel(Level.INFO);
         serviceLog = new ListAppender<>();
         serviceLog.start();
-        ((Logger) LoggerFactory.getLogger(DumpService.class)).addAppender(serviceLog);
+        serviceLogger.addAppender(serviceLog);
         TransactionSynchronizationManager.initSynchronization();
     }
 
     @AfterEach
     void tearDown() {
-        ((Logger) LoggerFactory.getLogger(DumpService.class)).detachAppender(serviceLog);
+        serviceLogger.detachAppender(serviceLog);
+        serviceLogger.setLevel(previousLevel);
         // A test that simulated a rollback has already cleared it: Spring would have done the same when
         // the transaction ended.
         if (TransactionSynchronizationManager.isSynchronizationActive()) {

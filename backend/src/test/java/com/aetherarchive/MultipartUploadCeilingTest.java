@@ -26,6 +26,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -50,9 +51,15 @@ import com.aetherarchive.support.PostgresTestConfiguration;
  * file at the limit over the request ceiling, and the container answered 413 before
  * {@link StorageService} saw the bytes. It is an integration test on purpose — {@code MockMvc} does not
  * parse multipart at all, so only a real Tomcat can catch it.
+ *
+ * <p>It stores no row — the upload probe goes through the storage service and never reaches the photo
+ * repository — and names its own database all the same: a context that boots one has to say which it
+ * takes, so that two of them sharing a schema is always something a reader can see
+ * ({@code PostgresTestConfiguration}).
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
+@TestPropertySource(properties = "aether.test.database=upload_ceiling")
 @Import({ PostgresTestConfiguration.class, MultipartUploadCeilingTest.UploadProbeConfiguration.class })
 class MultipartUploadCeilingTest {
 

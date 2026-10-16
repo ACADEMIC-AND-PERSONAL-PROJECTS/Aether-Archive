@@ -6,10 +6,10 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.regex.Pattern;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.jdbc.JdbcConnectionDetails;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.env.Environment;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
@@ -31,14 +31,15 @@ import org.testcontainers.utility.DockerImageName;
  * every photo, {@code DumpQueryTest} asserts that the archive holds exactly the dumps it published, and
  * the two classes that add a test-only Flyway folder would leave their {@code V999} in a database their
  * neighbours also connect to. So each context is given a {@link JdbcConnectionDetails} of its own,
- * naming the database {@code aether.test.database} selects (default {@link #DEFAULT_DATABASE}), created
- * on the shared container the first time it is asked for. The isolation the separate containers used to
- * provide is kept, without the start.
+ * naming the database it declares in {@link #DATABASE_PROPERTY} — a property every context that boots a
+ * database has to set, see {@link #requireNamedDatabase} — created on the shared container the first time
+ * it is asked for. The isolation the separate containers used to provide is kept, without the start.
  *
  * <p>The container is never stopped by Spring: it is not a bean, so the lifecycle that closes
- * Testcontainers beans on context close does not apply to it, and Testcontainers' own reaper removes it
- * when the JVM exits. Nothing is left behind and no test waits for a database someone started by hand —
- * the datasource settings in {@code application.yml} stay unused in tests.
+ * Testcontainers beans on context close does not apply to it, and Testcontainers' own reaper — Ryuk, on
+ * by default — removes it when the JVM exits. Nothing is left behind and no test waits for a database
+ * someone started by hand: the datasource settings in {@code application.yml} stay unused in tests. The
+ * reaper is a precondition rather than a detail, and the README says what a run leaves behind without it.
  *
  * <p>Import it in every test that boots a context: {@code @Import(PostgresTestConfiguration.class)}.
  */
@@ -48,12 +49,8 @@ public class PostgresTestConfiguration {
     /** Keep in step with the {@code db} service of {@code docker-compose.dev.yml}. */
     public static final String POSTGRES_IMAGE = "postgres:17-alpine";
 
-    /**
-     * The database of a context that names none: the one the container itself creates. Its contents are
-     * therefore shared with every other such context — a class belongs here only if it reads no row it
-     * did not write in the same test.
-     */
-    public static final String DEFAULT_DATABASE = "test";
+    /** The property a test class names its database in; see {@link #requireNamedDatabase}. */
+    public static final String DATABASE_PROPERTY = "aether.test.database";
 
     /** PostgreSQL's {@code duplicate_database}: a database another context already created is fine. */
     private static final String DUPLICATE_DATABASE = "42P04";
@@ -66,13 +63,34 @@ public class PostgresTestConfiguration {
     /**
      * The connection details of one test context's database, created if it does not exist yet.
      *
-     * @param database the name {@code aether.test.database} gives this context, or {@code test}
+     * @param environment the environment the context named its database in
      */
     @Bean
-    JdbcConnectionDetails postgresConnectionDetails(
-            @Value("${aether.test.database:" + DEFAULT_DATABASE + "}") String database) {
+    JdbcConnectionDetails postgresConnectionDetails(Environment environment) {
+        String database = requireNamedDatabase(environment);
         createDatabase(database);
         return new PostgresConnectionDetails(database);
+    }
+
+    /**
+     * The database this context named, or a failure that says it named none.
+     *
+     * <p>There is no default on purpose. Two contexts sharing one database has to be a decision a reader
+     * can see in both classes — the four repository slices name {@code repository} in so many words — and
+     * never the residue of whichever class happened to run first: {@code test} used to be handed to every
+     * context that asked for nothing, which made the isolation of the whole suite rest on a rule nobody
+     * had written down. A context that names nothing stops the build here, where the message can still say
+     * what to add.
+     */
+    private static String requireNamedDatabase(Environment environment) {
+        String database = environment.getProperty(DATABASE_PROPERTY);
+        if (database == null) {
+            throw new IllegalStateException("This test context boots a database but names none: add "
+                    + "@TestPropertySource(properties = \"" + DATABASE_PROPERTY + "=<name>\") to the test "
+                    + "class. Two classes may name the same database only when they agree to share it — "
+                    + "neither reads a row the other wrote.");
+        }
+        return database;
     }
 
     private static PostgreSQLContainer<?> startContainer() {
