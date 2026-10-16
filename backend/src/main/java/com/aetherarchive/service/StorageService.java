@@ -120,6 +120,41 @@ public class StorageService {
         return writeAtomically(file, detected);
     }
 
+    /**
+     * Removes a file this service stored, for a flow that could not complete — the bytes are in the data
+     * directory but the row that would have described them is not, and an image no API can reach is a
+     * file the owner would have to find and delete by hand.
+     *
+     * <p>The name is rebuilt here from the identifier and the <em>validated</em> extension of
+     * {@link StoredFile}, never from the relative path: the two agree — {@link #store} writes them from
+     * the same values — and rebuilding leaves nothing of a caller's string in the path. The destination
+     * is then resolved and proved to stay inside {@code images/} before anything is deleted, the same
+     * containment check the write path makes, because deletion follows a symlink just as a write does.
+     *
+     * <p>Idempotent: removing a file that is already gone is not a failure, so a retry after a partial
+     * compensation cannot fail on the work it already did.
+     *
+     * @param stored the file {@link #store} returned
+     * @throws StorageException when the data directory is not usable, or the file is there and cannot be
+     *     removed
+     */
+    public void delete(StoredFile stored) {
+        Path dataRoot = realDirectory(properties.dataDir(), "data directory");
+        Path imagesDir = realDirectory(dataRoot.resolve(StorageInitializer.IMAGES_DIR), "'images' directory");
+        requireInside(dataRoot, imagesDir, "the 'images' directory");
+        Path target = imagesDir.resolve(stored.id() + "." + stored.extension());
+        requireInside(imagesDir, target, "the stored upload");
+
+        try {
+            Files.deleteIfExists(target);
+        }
+        catch (IOException ex) {
+            throw new StorageException("the stored upload could not be removed from the data directory; "
+                    + "check that this process may write to AETHER_DATA_DIR", ex);
+        }
+        log.info("Removed stored upload {}", stored.id());
+    }
+
     /** Stages the bytes in {@code tmp/} and moves them into {@code images/} in one filesystem step. */
     private StoredFile writeAtomically(MultipartFile file, ImageFormat format) {
         Path dataRoot = realDirectory(properties.dataDir(), "data directory");

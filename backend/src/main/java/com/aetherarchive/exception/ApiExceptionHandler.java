@@ -31,6 +31,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentConversionNotSupportedException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartException;
@@ -175,6 +176,25 @@ public class ApiExceptionHandler {
         return problemResponse(problemBody(HttpStatus.BAD_REQUEST, CODE_INVALID_PARAMETER, "Invalid parameter",
                 "The parameter '" + ex.getName() + "' does not have the format this endpoint expects.",
                 request));
+    }
+
+    /**
+     * A handler parameter that arrived as something the resolver cannot convert at all — as opposed to a
+     * value of the right kind in the wrong format, just above. The shape this endpoint meets is a
+     * multipart request that carries a field of the request as a <em>file</em>: {@code curl -F
+     * "category=@values.txt"} posts the category as a file part, Spring MVC finds the part and then has no
+     * way to read it as the string the handler declares. It is the client's mistake, and the mapping is
+     * what keeps it from being reported as an archive bug: without it the catch-all below answers 500.
+     *
+     * <p>The parameter is named, the value is not — it arrived as a file, which is exactly the kind of
+     * client input a response body does not repeat.
+     */
+    @ExceptionHandler(MethodArgumentConversionNotSupportedException.class)
+    ResponseEntity<ProblemDetail> handleArgumentConversionNotSupported(
+            MethodArgumentConversionNotSupportedException ex, HttpServletRequest request) {
+        return problemResponse(problemBody(HttpStatus.BAD_REQUEST, CODE_INVALID_PARAMETER, "Invalid parameter",
+                "The parameter '" + ex.getName() + "' cannot be read from the request as it was sent; send "
+                        + "its value as a form field rather than as a file.", request));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
