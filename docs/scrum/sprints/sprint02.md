@@ -22,7 +22,7 @@
 | 2 | E1-S5 | Serve images at `/images/**` | 2 | p0 | Done | #80 |
 | 3 | E2-S2 | App shell, routing & typed API client | 5 | p0 | Done | #81 |
 | 4 | E2-S3 | Global CSS foundation | 3 | p0 | Done | #84 |
-| 5 | E2-S4 | Dominant-colour extraction algorithm | 8 | p0 | Todo | — |
+| 5 | E2-S4 | Dominant-colour extraction algorithm | 8 | p0 | Done | #86 |
 | 6 | E2-S5 | Fontsource typography system | 3 | p0 | Todo | — |
 | 7 | E2-S6 | Dark Glassmorphism theme layer & GlassPanel | 5 | p0 | Todo | — |
 | 8 | E1-S10 | Dev seed script & curl smoke collection | 2 | p2 | Todo | — |
@@ -165,3 +165,11 @@ reader can check it afterwards:
   contrast values — and sustained `index-DYfMmtpW.css` / `424+ 18- 442`. The 442 hand-written is ~10% over
   the DoD's soft guideline and under the branch-split trigger, so the claim clause is not triggered; both
   numbers are stated in the PR and `reports/verify-e2-s3-20261016.md` §8.
+- 2026-10-16 — **E2-S4's review: one procedural blocking finding — the missing size numbers and the
+  atomic-story claim — resolved in the PR description, plus three accuracy findings fixed in
+  `1c45a9c`/`fafdc1f`.** The reviewer rebuilt both trees, proved the lint refactor behaviour-neutral
+  (old implementation × new tests, new implementation × old tests, green both ways; built assets
+  `cmp`-identical before and after), reproduced the timing matrix from the shipped modules, and made the
+  cited boundary test real (`#08080a`, L ≈ 0.1354). The atomic-story claim — **1,828 total / 1,828
+  hand-written**, nothing generated — was re-checked against the diff and sustained; final gates on the
+  merge tip: 100/100 tests. The merge is `2ad0c17`.
