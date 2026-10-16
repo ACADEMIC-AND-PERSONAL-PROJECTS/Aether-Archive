@@ -1,11 +1,12 @@
 /*
- * Aether Archive — global CSS foundation (E2-S3).
+ * Aether Archive — global CSS foundation (E2-S3; the faces landed in E2-S5).
  *
- * Four blocks, in order:
+ * Five blocks, in order:
  *   1. Scan scope     — Tailwind's build inputs, declared, never discovered (ADR-017).
- *   2. Theme          — what Tailwind knows: the colour namespace and the fluid type scale.
- *   3. Runtime tokens — what CSS and JS read: the fallback palette, safe areas, spacing.
- *   4. Base           — dark page, full height, scrollbars, overscroll, reduced motion.
+ *   2. Faces          — the two families, self-hosted, never a CDN (ADR-005, ADR-019).
+ *   3. Theme          — what Tailwind knows: colour namespace, type scale, the two families.
+ *   4. Runtime tokens — what CSS and JS read: the fallback palette, safe areas, spacing.
+ *   5. Base           — dark page, full height, scrollbars, overscroll, reduced motion.
  */
 
 /* ---------------------------------------------------------------- 1. Scan scope --- */
@@ -25,14 +26,38 @@
 @source "../**/*.tsx";
 @source "../../index.html";
 
-/* ------------------------------------------------------------------- 2. Theme --- */
+/* -------------------------------------------------------------------- 2. Faces --- */
 
 /*
- * The raw palette does not exist: with the namespace emptied, `bg-red-500` cannot compile,
- * so colour in components can only come from the runtime palette below (ADR-017).
+ * The two faces, both from Fontsource packages, both self-hosted by Vite: no `<link>`, no
+ * CDN, no request to anyone but the app itself (ADR-005).
+ *
+ * Playfair Display arrives as its packaged latin subsets, imported from `main.tsx` (§4.2):
+ * `latin-400.css` + `latin-500.css` — the only display weights the rules allow (§4.4) — and
+ * the latin subset is the only one the app can render. Inter Variable has no per-subset
+ * entrypoint (every `wght*.css` ships all seven subsets: 218.5 kB of woff2, measured in
+ * E2-S5), so its latin woff2 is declared here instead — one 48.3 kB file carrying the whole
+ * 100–900 weight axis. Added payload, measured: 148.2 kB in total, inside the < 200 KB
+ * budget; the all-static alternative weighed 209.8 kB (ADR-019).
+ */
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("@fontsource-variable/inter/files/inter-latin-wght-normal.woff2") format("woff2");
+}
+
+/* ------------------------------------------------------------------- 3. Theme --- */
+
+/*
+ * The raw palette and the default families do not exist: with the namespaces emptied,
+ * `bg-red-500` and `font-sans` cannot compile, so colour and type in components can only
+ * come from the layers declared below (ADR-017, ADR-019).
  */
 @theme {
   --color-*: initial;
+  --font-*: initial;
 }
 
 /*
@@ -53,6 +78,17 @@
 
 /* `--aura-hairline` is a border shorthand, not a colour, so no colour utility maps to it;
  * components read it as `var(--aura-hairline)` (DESIGN-SYSTEM §2.2). */
+
+/*
+ * The two faces (ADR-019). Static values — nothing rewrites them at runtime — and `static`
+ * so both variables are always emitted: the `body` rule in block 5 reads `var(--font-ui)` as
+ * raw CSS, which would not register as a use. `font-display` / `font-ui` are the utilities
+ * components write; both resolve to these variables (DESIGN-SYSTEM §4.3).
+ */
+@theme static {
+  --font-display: "Playfair Display", Georgia, "Times New Roman", serif;
+  --font-ui: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
 
 /*
  * The fluid type scale (DESIGN-SYSTEM §4.3), defined once: `text-xl` and `var(--text-xl)`
@@ -79,7 +115,7 @@
   --tracking-ui: 0.01em;
 }
 
-/* ----------------------------------------------------------- 3. Runtime tokens --- */
+/* ----------------------------------------------------------- 4. Runtime tokens --- */
 
 :root {
   color-scheme: dark;
@@ -120,7 +156,7 @@
   --space-16: 4rem;
 }
 
-/* -------------------------------------------------------------------- 4. Base --- */
+/* -------------------------------------------------------------------- 5. Base --- */
 
 /*
  * `html` carries the page colour, so the region revealed by overscroll is the app's own
@@ -138,6 +174,9 @@ html {
  * The safe areas pad the page once, here — a view never has to know about the notch.
  * `border-box` (preflight) keeps the padding inside the 100dvh, and the flex column lets
  * the mount point take exactly the height the insets leave.
+ *
+ * The UI face and its slight positive tracking are the page default (§4.4): every screen is
+ * UI text until a title overrides both with `font-display tracking-display`.
  */
 body {
   display: flex;
@@ -146,6 +185,8 @@ body {
   min-height: 100dvh;
   padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
   overflow-wrap: break-word;
+  font-family: var(--font-ui);
+  letter-spacing: var(--tracking-ui);
 }
 
 /* The mount point: fills what the insets leave, so a view fills the page without a

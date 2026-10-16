@@ -8,7 +8,9 @@ export function RiverView() {
   return (
     <main className="grid flex-1 place-items-center p-8 text-center">
       <div className="space-y-2">
-        <h1 className="text-2xl font-normal tracking-display text-aura-text">The River</h1>
+        <h1 className="font-display text-2xl font-normal tracking-display text-aura-text">
+          The River
+        </h1>
         <p className="text-sm text-aura-muted">The feed arrives in E5-S1.</p>
       </div>
     </main>

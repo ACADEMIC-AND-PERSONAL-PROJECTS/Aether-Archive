@@ -10,7 +10,7 @@ export function WorkshopView() {
   return (
     <main className="grid flex-1 place-items-center p-8 text-center">
       <div className="space-y-2">
-        <h1 className="text-2xl font-normal tracking-display text-aura-text">
+        <h1 className="font-display text-2xl font-normal tracking-display text-aura-text">
           Curator&rsquo;s Workshop
         </h1>
         <p className="text-sm text-aura-muted">The workshop arrives in E4.</p>
