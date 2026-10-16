@@ -6,6 +6,7 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.aetherarchive.domain.ArchiveItem;
+import com.aetherarchive.domain.ItemType;
 
 /**
  * Archive items: dumps and single pictures, newest first.
@@ -20,4 +21,19 @@ public interface ArchiveItemRepository extends JpaRepository<ArchiveItem, UUID> 
      * @return the items, newest first
      */
     List<ArchiveItem> findAllByOrderByTimestampDescIdDesc();
+
+    /**
+     * The items of one kind, newest first — the list {@code GET /api/v1/dumps} is built from
+     * ({@code MONTHLY_DUMP} is the only type it asks for).
+     *
+     * <p>The type filter is what keeps that collection what it says it is: the table also holds the
+     * single pictures and anime stills of the river (E5-S1), which are not dumps and have no six photos
+     * to publish. The ordering is the river's, tiebreaker included and for the same reason — two dumps
+     * published in the same microsecond must still come back in one order, or a client that re-reads the
+     * list could see it reordered under its own scroll.
+     *
+     * @param type the kind of item to list
+     * @return the items of that type, newest first
+     */
+    List<ArchiveItem> findAllByTypeOrderByTimestampDescIdDesc(ItemType type);
 }

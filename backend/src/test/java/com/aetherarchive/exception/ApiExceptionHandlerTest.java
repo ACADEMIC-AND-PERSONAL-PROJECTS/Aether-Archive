@@ -45,10 +45,12 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.support.DefaultMessageSourceResolvable;
 import org.springframework.core.MethodParameter;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultMatcher;
@@ -70,6 +72,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.aetherarchive.config.CorsProperties;
 import com.aetherarchive.config.StorageProperties;
+import com.aetherarchive.domain.Photo;
 import com.aetherarchive.dto.ValidationConstraints;
 import com.aetherarchive.support.ImageFixtures;
 
@@ -465,6 +468,34 @@ class ApiExceptionHandlerTest {
     }
 
     @Test
+    void should_answer_409_with_the_concurrent_modification_code_when_a_write_loses_a_race() throws Exception {
+        // The version check of a stale write: the photo a publish named was curated by another writer
+        // between the read and the update (@Version, V3__photo_optimistic_locking.sql). The archive is
+        // intact — the transaction rolled back — so the client is told to retry, not that the archive
+        // broke, which is what `internal-failure` would have said about a double tap.
+        mockMvc.perform(get("/test/errors/lost-race"))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("about:blank"))
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.code").value("concurrent-modification"))
+                .andExpect(jsonPath("$.title").value("Concurrent modification"))
+                .andExpect(jsonPath("$.detail").value(containsString("read it again and retry")))
+                .andExpect(jsonPath("$.instance").value("/test/errors/lost-race"))
+                .andExpect(noInternalDetail());
+
+        // A row this transaction could not lock: the pessimistic side of the same situation. One status and
+        // one code for "another writer got there first", whichever of the two mechanisms noticed.
+        mockMvc.perform(get("/test/errors/locked-row"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.code").value("concurrent-modification"))
+                .andExpect(jsonPath("$.title").value("Concurrent modification"))
+                .andExpect(jsonPath("$.detail").value(containsString("retry")))
+                .andExpect(noInternalDetail());
+    }
+
+    @Test
     void should_log_the_exception_behind_a_500() throws Exception {
         Logger handlerLogger = (Logger) LoggerFactory.getLogger(ApiExceptionHandler.class);
         ListAppender<ILoggingEvent> appender = new ListAppender<>();
@@ -563,6 +594,20 @@ class ApiExceptionHandlerTest {
         @GetMapping("/test/errors/nameless-status")
         void namelessStatus() {
             throw new ResponseStatusException(HttpStatusCode.valueOf(599));
+        }
+
+        @GetMapping("/test/errors/lost-race")
+        void lostRace() {
+            // What a stale @Version write is translated into, as the repository really raises it when
+            // another writer curated the same photo first (V3, PhotoRepositoryTest). Its message names the
+            // entity class and the row, which is the material the advice must not answer with.
+            throw new ObjectOptimisticLockingFailureException(Photo.class,
+                    UUID.fromString("00000000-0000-0000-0000-0000000000ff"));
+        }
+
+        @GetMapping("/test/errors/locked-row")
+        void lockedRow() {
+            throw new PessimisticLockingFailureException("could not obtain a lock on the photo row");
         }
 
         @PostMapping(path = "/test/errors/dump", consumes = MediaType.APPLICATION_JSON_VALUE)

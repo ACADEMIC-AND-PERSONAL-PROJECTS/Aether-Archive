@@ -97,6 +97,24 @@ class ArchiveItemRepositoryTest {
         assertThat(ids(items.findAllByOrderByTimestampDescIdDesc())).containsExactlyElementsOf(firstRead);
     }
 
+    @Test
+    void should_list_only_the_dumps_newest_first_when_the_dump_list_is_asked() {
+        Instant sameInstant = Instant.parse("2026-10-01T10:00:00Z");
+        items.saveAllAndFlush(List.of(
+                ArchiveFixtures.item(ArchiveFixtures.id(1), Instant.parse("2026-09-01T10:00:00Z")),
+                ArchiveFixtures.itemWithoutTitle(ArchiveFixtures.id(2)),
+                new ArchiveItem(ArchiveFixtures.id(3), ItemType.ANIME, "Still",
+                        Instant.parse("2026-10-20T10:00:00Z"), ArchiveFixtures.BACKGROUND_COLOR),
+                ArchiveFixtures.item(ArchiveFixtures.id(4), sameInstant),
+                ArchiveFixtures.item(ArchiveFixtures.id(5), sameInstant)));
+
+        // GET /api/v1/dumps is a list of dumps, not of archive items: a single picture and an anime still
+        // are items too, and neither is a six-photo compilation. Newest first, with the id tiebreaker the
+        // river uses for the rows that share an instant.
+        assertThat(ids(items.findAllByTypeOrderByTimestampDescIdDesc(ItemType.MONTHLY_DUMP)))
+                .containsExactly(ArchiveFixtures.id(5), ArchiveFixtures.id(4), ArchiveFixtures.id(1));
+    }
+
     @ParameterizedTest
     @EnumSource(ItemType.class)
     void should_round_trip_every_type_when_persisting(ItemType type) {

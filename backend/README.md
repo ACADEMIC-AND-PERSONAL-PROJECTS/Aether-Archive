@@ -207,6 +207,84 @@ because two uploads can share one. `GET /photos/random` picks with `order by ran
 table — a single owner curates one archive, so the cost of that scan is not worth the machinery of a
 better method.
 
+The dump endpoints (E1-S7):
+
+| Method | Path | Answers |
+| --- | --- | --- |
+| `POST` | `/api/v1/dumps` | `201` with the created dump; the body is JSON |
+| `GET` | `/api/v1/dumps` | every dump, newest first, each with its six photos in order |
+
+A publish names six photos that are already in the archive — uploads, still uncurated — in the order the
+dump displays them:
+
+```json
+{
+  "title": "Octobre",
+  "backgroundColor": "#2E4A62",
+  "photoIds": [
+    "0b40e720-3a1f-4ce0-a21c-d163454cfd94",
+    "2f9a1c04-5b7e-4d38-9a11-0e6c7b2d4a58",
+    "6c1d8ab3-90e2-4f77-8c31-5b0a2d9e7f14",
+    "a3f5c207-1d64-4b8a-9e02-77c4d1b65a39",
+    "cd8b4410-6e29-4a55-93f7-2b6e0c8d1a70",
+    "f27e6d95-3c48-4e11-b8a6-4d9f5c2b7e83"
+  ]
+}
+```
+
+`title` is optional (ADR-011: the schema lists it required, the API accepts its absence and answers
+`null`); `backgroundColor` is a `#RRGGBB` value; `photoIds` holds exactly six identifiers. A publish
+creates one archive item of type `MONTHLY_DUMP` and attaches the six photos to it with display orders
+`0..5`, in the order the array names them. The answer is the contract's `Dump`:
+
+```json
+{
+  "id": "9d1c2a02-8f14-4d0f-bb52-1f2a3c4d5e6f",
+  "title": "Octobre",
+  "backgroundColor": "#2E4A62",
+  "photos": [
+    { "id": "0b40e720-3a1f-4ce0-a21c-d163454cfd94",
+      "url": "/images/0b40e720-3a1f-4ce0-a21c-d163454cfd94.png",
+      "category": "dump", "uploadedAt": "2026-10-16T00:03:15.578182Z" },
+    { "id": "2f9a1c04-5b7e-4d38-9a11-0e6c7b2d4a58",
+      "url": "/images/2f9a1c04-5b7e-4d38-9a11-0e6c7b2d4a58.jpg",
+      "category": "dump", "uploadedAt": "2026-10-16T00:03:16.204917Z" },
+    …four more photos, all in the shape above…
+  ],
+  "createdAt": "2026-10-16T09:30:45.123456Z"
+}
+```
+
+(The response really carries all six, in the requested order; the array above is abbreviated to two
+entries so the shape stays readable.)
+
+**A dump's order is the position in `photos`, not a field.** The contract's `Photo` schema has four
+properties, so no `displayOrder` is published: `photos[0]` is the first photo of the compilation, and the
+position lives in the database (`photo.display_order`) and nowhere else (ADR-011 §3). `POST` echoes the
+order it was asked for; `GET` reads the stored positions back, so the two agree by construction. The
+listing is ordered `timestamp DESC, id DESC` like the photo feed, and `createdAt` is the row's `timestamp`
+truncated to microseconds — the instant the `201` names is the instant every later read shows.
+
+What a publish can answer besides the `201`:
+
+| Status | `code` | When |
+| --- | --- | --- |
+| `400` | `validation-failure` | the body breaks a constraint: five or seven ids, a colour that is not `#RRGGBB`, a title over 80 characters |
+| `400` | `validation-failure` | the six identifiers are not six *different* photos of the archive that are still uncurated |
+| `409` | `concurrent-modification` | another write changed a row this publish was writing first; nothing was published |
+
+The second row is the rule no annotation can state, and the service checks it before it writes anything: a
+duplicate, an identifier no photo holds, and a photo that already belongs to another item are all refused
+with the same 400 the body's own constraints produce, because the client's repair is the same — send a
+different `photoIds`. Each violation names `photoIds` and the identifier at fault: an unknown id is a `400`
+rather than a `404` because the path exists, it is the body that has to change, and a client that sent six
+ids has no other way to learn which of them the archive could not match (see *Errors*). A photo already
+curated is refused, never moved — moving it would empty the dump it came from.
+
+`GET /api/v1/dumps` reads everything in two statements whatever the number of dumps: the items first,
+then all of their photos in one batch, grouped in memory. No per-dump query and no lazy loading while
+grouping; `DumpQueryTest` counts the statements against a real PostgreSQL so the constant stays true.
+
 ## Uploads
 
 `StorageService.store(MultipartFile)` is the only way bytes reach the disk, and it trusts nothing about
@@ -304,6 +382,7 @@ message; `detail` is one sentence, taken from the domain exception when it has o
 | `missing-request-part` | 400 | a multipart request arrived without a part the endpoint requires |
 | `not-found` | 404 | neither a controller nor a static resource serves the path |
 | `empty-archive` | 404 | `/photos/random` found no photo: the archive holds none yet, which the frontend shows as an empty state |
+| `concurrent-modification` | 409 | another write changed the row this one was changing: read it again and retry |
 | `internal-failure` | 500 | a bug: no handler above claimed the exception |
 
 The table is the archive's own vocabulary (ADR-013). A refusal Spring raises before a controller runs
@@ -311,14 +390,23 @@ borrows its code from the status instead: the status name in kebab-case — `bad
 parameter that is missing, `unsupported-media-type` for a `Content-Type` the endpoint does not take,
 `method-not-allowed`, `not-acceptable` — and `request-rejected` when no status name describes it.
 
+`concurrent-modification` is the table's first conflict code. The request was well formed and the archive
+is intact — the write that lost the race rolled back whole, which is why the answer is not a `500` — but
+another write changed the same row first, so the client reads it again and retries. A `400` would blame a
+request that was perfectly valid, and a `500` would report an archive that nothing has broken: both send
+the client looking for the wrong problem.
+
 A validation failure lists the rejected fields in `errors`, so a client can mark them all at once instead
 of resubmitting to discover the next one. Where the violation was found makes no difference to the client:
-a request body, a handler parameter validated by Spring MVC itself, and an argument of a `@Validated` bean
-all answer alike. The collection holds at most **10** entries — a request rejected on a hundred fields
-still answers in one screen — and a violation with no field of its own, such as a class-level rule, is
-reported against `request` rather than dropped. Each entry carries the `field` as the client wrote it and
-the validator's `message`; the **rejected value itself is never echoed back** — a response body is copied
-into logs and screenshots — with the one exception named below for an upload's declared media type.
+a request body, a handler parameter validated by Spring MVC itself, an argument of a `@Validated` bean,
+and a `POST /dumps` the service refused all answer alike — the service's refusals are raised as
+`DumpValidationException`, which this advice renders with the same status, code, detail and `errors` shape
+as a body Jakarta Validation rejected. The collection holds at most **10** entries — a request rejected on
+a hundred fields still answers in one screen — and a violation with no field of its own, such as a
+class-level rule, is reported against `request` rather than dropped. Each entry carries the `field` as the
+client wrote it and the validator's `message`; the **rejected value itself is never echoed back** — a
+response body is copied into logs and screenshots — with the two exceptions named below: an upload's
+declared media type, and the identifier of a photo a dump refused.
 
 A refusal the archive raises *itself*, after a controller saw the request — a 404 for a photo it does not
 hold — is its own statement: its `detail` is answered as written, and the `code` its problem detail set,
@@ -329,10 +417,12 @@ classes. Both stay refusals rather than becoming `500`, which would report the c
 server failure.
 
 **Nothing internal leaves the process.** No stack trace and no filesystem path, which
-`.claude/rules/security.md` forbids, and no SQL, class or exception name either. The one value an error
-response may repeat is the media type an upload declared, which the 415 refusal names back (stripped of
-control characters and cut to 100 characters in `StorageService`) because a client cannot correct a
-`Content-Type` it cannot see, and a declared label is not the picture's bytes. The 5xx
+`.claude/rules/security.md` forbids, and no SQL, class or exception name either. Two values an error
+response may repeat, each because the client cannot identify what to correct without it: the media type an
+upload declared, which the 415 refusal names back (stripped of control characters and cut to 100
+characters in `StorageService`) — a declared label is not the picture's bytes — and, in a dump refusal, the
+photo identifier that was not publishable, which is one of the six the client just sent. A rejected *value*
+is otherwise never echoed. The 5xx
 cases log the stack trace (`StorageException` and anything unclaimed), and the operator reads the cause
 there; even `StorageException`'s client-facing sentence is written without a path. The limits themselves are
 constants in `dto/ValidationConstraints` (title ≤ 80, `#RRGGBB`, exactly six photo ids), referenced from the
@@ -357,6 +447,12 @@ migration to it and `ddl-auto=validate` then runs against the real schema, so a 
 entities and `db/migration` fails the suite. Docker must be running: a missing daemon fails the build
 loudly rather than skipping the database tests. Each test context gets its own container, and
 Testcontainers removes them when the run is over — nothing to stop by hand, nothing left behind.
+
+`DumpApiFlowTest` is the flow the backend rules ask to see end to end — six uploads through the photo
+API, a dump published from them, and that dump read back — on a real Tomcat, the real data directory and
+a real PostgreSQL. `DumpQueryTest` counts the statements of the dump read path and needs Hibernate's
+statistics, which the test profile turns on (`application-test.yml`): the counters cost one increment per
+event and are off everywhere else.
 
 ### Data directory
 

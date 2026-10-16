@@ -68,6 +68,8 @@ class SchemaBaselineTest {
             String.class, "character varying",
             UUID.class, "uuid",
             Integer.class, "integer",
+            // The optimistic-locking counter of Photo, a primitive long: bigint.
+            long.class, "bigint",
             Instant.class, "timestamp with time zone",
             // A @JoinColumn adopts the type of the referenced @Id: ArchiveItem.id is a uuid.
             ArchiveItem.class, "uuid");

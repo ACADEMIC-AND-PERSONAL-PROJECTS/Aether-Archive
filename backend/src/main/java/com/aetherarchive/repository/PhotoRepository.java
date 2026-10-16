@@ -1,11 +1,13 @@
 package com.aetherarchive.repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import com.aetherarchive.domain.Photo;
 
@@ -22,6 +24,26 @@ public interface PhotoRepository extends JpaRepository<Photo, UUID> {
      * @return its photos, ordered by {@code displayOrder}, ascending
      */
     List<Photo> findAllByArchiveItemIdOrderByDisplayOrderAsc(UUID archiveItemId);
+
+    /**
+     * The photos of several items at once, each item's photos in curation order — the query that keeps
+     * {@code GET /api/v1/dumps} at two statements instead of one per dump: the items first, then all of
+     * their photos here, grouped by {@code DumpService}.
+     *
+     * <p>The item is fetched together with its photo because the caller groups the rows by it. Measured
+     * rather than assumed ({@code DumpQueryTest}): a lazy association would cost the same two statements,
+     * because Hibernate answers a proxy's identifier getter without a SELECT — this join is here so the
+     * grouping never has to depend on that, at the price of one repeated uuid per row. {@code id} makes
+     * the result one total order, so two reads of the same archive cannot disagree; it cannot disturb a
+     * dump's own order, because positions are unique within an item
+     * ({@code uk_photo_archive_item_display_order}).
+     *
+     * @param itemIds the items to read the photos of
+     * @return their photos, by item and then by position
+     */
+    @Query("select p from Photo p join fetch p.archiveItem item where item.id in :itemIds"
+            + " order by p.displayOrder asc, p.id asc")
+    List<Photo> findAllOfItemsOrderByDisplayOrder(@Param("itemIds") Collection<UUID> itemIds);
 
     /**
      * Every photo, newest first: the order of {@code GET /api/v1/photos}, the "Fleuve Temporel" the

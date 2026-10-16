@@ -1,12 +1,15 @@
 package com.aetherarchive.support;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.IntStream;
 
 import com.aetherarchive.domain.ArchiveItem;
 import com.aetherarchive.domain.ItemType;
 import com.aetherarchive.domain.Photo;
 import com.aetherarchive.domain.PhotoCategory;
+import com.aetherarchive.dto.ValidationConstraints;
 
 /**
  * Test data for the persistence tests.
@@ -55,5 +58,21 @@ public final class ArchiveFixtures {
     /** An upload before curation: no item and no position yet (ADR-011). */
     public static Photo unassignedPhoto(UUID id) {
         return new Photo(id, null, "images/" + id + ".jpg", null, PhotoCategory.PICS, CREATED_AT);
+    }
+
+    /**
+     * The identifiers of the six photos a dump is published from, in ascending order:
+     * {@code id(1)} … {@code id(DUMP_PHOTO_COUNT)}. Readable rather than random, so a test can name the
+     * photo it expects at each position.
+     */
+    public static List<UUID> dumpPhotoIds() {
+        return IntStream.rangeClosed(1, ValidationConstraints.DUMP_PHOTO_COUNT)
+                .mapToObj(ArchiveFixtures::id)
+                .toList();
+    }
+
+    /** Those six photos as uploads, none of them curated yet (ADR-011). */
+    public static List<Photo> unassignedDumpPhotos() {
+        return dumpPhotoIds().stream().map(ArchiveFixtures::unassignedPhoto).toList();
     }
 }

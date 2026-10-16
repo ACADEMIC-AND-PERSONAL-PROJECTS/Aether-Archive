@@ -355,6 +355,21 @@ the splash screen has an empty state for one and a bug for the other. It is carr
 `EmptyArchiveException`, which extends `ErrorResponseException` so the archive's own sentence survives the
 refusal path unchanged.
 
+**Amendment — 2026-10-16 (E1-S7).** `concurrent-modification` joins the vocabulary as its first *conflict*
+code, answered with **409**. `DumpService.create` attaches six photos in one transaction, and `Photo`
+carries a `@Version` (E1-S7) precisely because a publish and another write can want the same row: Spring's
+`ConcurrencyFailureException` family — `ObjectOptimisticLockingFailureException` when the row's version
+moved on, `PessimisticLockingFailureException` when a lock could not be taken — is raised while the
+transaction is still open, so the write that lost the race rolls back whole and **the archive is intact**.
+That is what decides the status: a `500` would report a server that is fine and send the owner looking for a
+bug, and a `400` would blame a request that was perfectly valid — it was merely overtaken. The client's
+repair is neither "fix the body" nor "report a bug" but "read the row again and retry", which is what 409
+means and what the `detail` says. One code covers both mechanisms, because the client cannot tell them
+apart and has nothing different to do about either; the framework's own message names the entity and the
+row, so it is logged for the operator and never answered. It is the vocabulary's first code of its status;
+should a future conflict ever demand a different answer from the client, it gets its own code and its own
+amendment rather than a widened meaning for this one.
+
 ---
 
 ## Template for new ADRs

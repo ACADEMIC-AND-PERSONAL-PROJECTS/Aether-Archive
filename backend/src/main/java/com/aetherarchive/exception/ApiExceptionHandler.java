@@ -13,6 +13,7 @@ import jakarta.validation.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.MessageSourceResolvable;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -89,6 +90,9 @@ public class ApiExceptionHandler {
     /** Wire code of a path that neither a controller nor a static resource serves. */
     private static final String CODE_NOT_FOUND = "not-found";
 
+    /** Wire code of a write that lost a race against another writer of the same row. */
+    private static final String CODE_CONCURRENT_MODIFICATION = "concurrent-modification";
+
     /** Wire code of a failure nobody mapped: a bug, told to the operator, never to the client. */
     private static final String CODE_INTERNAL_FAILURE = "internal-failure";
 
@@ -158,6 +162,32 @@ public class ApiExceptionHandler {
         log.error("Storage failure while serving {} {}", request.getMethod(), request.getRequestURI(), ex);
         return problemResponse(problemBody(HttpStatus.INTERNAL_SERVER_ERROR, ex.getCode(), "Storage failure",
                 ex.getMessage(), request));
+    }
+
+    /**
+     * A writer got to the row first, and this write lost: the archive refuses it rather than overwriting a
+     * change it never saw. The one way to lose that race today is a publish and another publish naming the
+     * same photo at the same time — a double tap, two tabs, a retry that was not needed — which
+     * {@code @Version} on {@code Photo} turns from a silent overwrite into a failed transaction (V3).
+     *
+     * <p>It is a 409 and not a 500 because the archive is intact: the transaction rolled back, nothing of
+     * the losing request survives, and the client's move is to read the dumps again and retry on photos
+     * that are still free. {@code internal-failure} would say the archive is broken and leave the client
+     * with nothing to do; a 400 would say the request was wrong, which it was not — it was overtaken. The
+     * two mechanisms Spring maps here are the optimistic and the pessimistic side of the same situation:
+     * a version check that matched no row, and a lock this transaction could not take.
+     *
+     * <p>The framework's message names the entity and the row, which is the operator's business: it is
+     * logged, never answered.
+     */
+    @ExceptionHandler(ConcurrencyFailureException.class)
+    ResponseEntity<ProblemDetail> handleConcurrencyFailure(ConcurrencyFailureException ex,
+            HttpServletRequest request) {
+        log.warn("Refused a write that lost a race while serving {} {}: {}", request.getMethod(),
+                request.getRequestURI(), ex.getMessage());
+        return problemResponse(problemBody(HttpStatus.CONFLICT, CODE_CONCURRENT_MODIFICATION,
+                "Concurrent modification", "Another write changed this row first; read it again and retry "
+                        + "the request.", request));
     }
 
     /**
@@ -237,6 +267,20 @@ public class ApiExceptionHandler {
             addViolation(violations, lastNodeOf(violation.getPropertyPath()), violation.getMessage());
         }
         return validationFailure(violations, request);
+    }
+
+    /**
+     * A dump request the service refused, with the fields it refused and why. The rules behind it are the
+     * ones no annotation can state — six <em>different</em> photos, each of them in the archive, none
+     * curated into another item yet — and the client repairs them the way it repairs a rejected body:
+     * by correcting the fields named. It therefore answers with the same 400, the same code, the same
+     * detail and the same {@code errors} shape, rather than inventing a second vocabulary for the same
+     * mistake.
+     */
+    @ExceptionHandler(DumpValidationException.class)
+    ResponseEntity<ProblemDetail> handleDumpValidation(DumpValidationException ex,
+            HttpServletRequest request) {
+        return validationFailure(ex.violations(), request);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
