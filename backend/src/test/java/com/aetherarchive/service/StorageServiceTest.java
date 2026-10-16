@@ -379,6 +379,54 @@ class StorageServiceTest {
     }
 
     @Test
+    void should_remove_the_file_when_a_stored_upload_is_deleted() throws IOException {
+        Path dataDir = dataDirectory();
+        StorageService storage = service(dataDir);
+        StoredFile stored = storage.store(upload("holiday.png", "image/png", ImageFixtures.png()));
+
+        storage.delete(stored);
+
+        // The compensation of an upload whose row could not be written: the bytes go, and nothing of the
+        // staging directory is left behind either.
+        assertThat(imagesOf(dataDir)).isEmpty();
+        assertThat(stagingOf(dataDir)).isEmpty();
+    }
+
+    @Test
+    void should_tolerate_a_second_deletion_when_the_file_is_already_gone() throws IOException {
+        Path dataDir = dataDirectory();
+        StorageService storage = service(dataDir);
+        StoredFile stored = storage.store(upload("holiday.png", "image/png", ImageFixtures.png()));
+        storage.delete(stored);
+
+        // Idempotent: a retry after a compensation that ran only halfway cannot fail on the work it has
+        // already done.
+        storage.delete(stored);
+
+        assertThat(imagesOf(dataDir)).isEmpty();
+    }
+
+    @Test
+    void should_refuse_a_deletion_that_leaves_the_images_directory_when_the_extension_is_crafted()
+            throws IOException {
+        Path dataDir = dataDirectory();
+        StorageService storage = service(dataDir);
+        StoredFile stored = storage.store(upload("holiday.png", "image/png", ImageFixtures.png()));
+        StoredFile crafted = new StoredFile(stored.id(), stored.extension() + "/../../outside.png",
+                stored.relativePath());
+
+        // `store` never returns an extension of this shape, so the guard is proved on the value itself:
+        // the name a deletion is built from is resolved and checked against the data root before anything
+        // is removed — deletion follows a link just as a write does.
+        assertThatExceptionOfType(StorageException.class)
+                .isThrownBy(() -> storage.delete(crafted))
+                .withMessageContaining("outside the data directory");
+
+        assertThat(dataDir.resolve("outside.png")).doesNotExist();
+        assertThat(imagesOf(dataDir)).containsExactly(dataDir.resolve(stored.relativePath()));
+    }
+
+    @Test
     void should_refuse_a_path_that_escapes_the_root_when_containment_is_checked() throws IOException {
         Path imagesDir = Files.createDirectories(tempDir.resolve("images"));
 
