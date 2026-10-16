@@ -6,7 +6,9 @@ the real data directory (`~/AetherArchive_Data`) unless `--force` is passed expl
 | Script | Purpose |
 | --- | --- |
 | `github/seed-backlog.py` | Mirror `docs/scrum/PRODUCT-BACKLOG.md` to GitHub (labels, milestones, issues) — idempotent |
-| `dev/seed.sh` | *(E1-S10)* Post sample photos and a dump to a running local backend |
+| `dev/sample-photos.py` | Write deterministic sample photos for the dev scripts (standard library only) |
+| `dev/seed.sh` | Post N sample photos and a dump to a running local backend |
+| `dev/smoke.sh` | Walk every endpoint of a running local backend — success and refusal paths; non-zero exit on any failure |
 | `jvm/` | *(later)* JVM-side utilities (index rebuild, migration checks) |
 | `backup.sh` / `restore.sh` | *(E6-S7)* Timestamped backup and safe restore of the database (`pg_dump`) and images |
 

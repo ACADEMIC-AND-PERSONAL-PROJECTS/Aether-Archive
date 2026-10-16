@@ -133,6 +133,41 @@ What it does not do:
   The other keys reach the tests like anywhere else — the `test` profile overrides the data directory and
   the logging level, not every value.
 
+## Sample data & smoke checks
+
+Two scripts turn a running dev backend into a demo archive, and then walk the whole API — the
+"one command away" flow of E1-S10 (from the repository root):
+
+```bash
+# Terminal 1 — the backend, on a scratch data directory (never the real archive):
+(cd backend && AETHER_DATA_DIR=/tmp/aether-dev ./mvnw spring-boot:run)
+
+# Terminal 2 — twelve sample photos and a dump, then the contract walk:
+AETHER_DATA_DIR=/tmp/aether-dev scripts/dev/seed.sh
+AETHER_DATA_DIR=/tmp/aether-dev scripts/dev/smoke.sh
+```
+
+- `scripts/dev/seed.sh` uploads N deterministic sample photos — 96×64 PNGs written locally by
+  `scripts/dev/sample-photos.py`, standard library only, no image dependency — cycling the four
+  categories, then publishes one dump whose six photos are evenly spaced over the batch.
+  `--count` (default 12, minimum 6), `--base-url` (default `http://localhost:8080`).
+- `scripts/dev/smoke.sh` covers **every endpoint including failure paths**: the reads, the six
+  upload refusals (missing file part; missing, invalid or file-part `category`; empty and
+  non-image bytes; a declared type contradicting the bytes; a JSON content type), the dump
+  refusals (malformed JSON, a colour that is not `#RRGGBB`, five ids, a repeated id, unknown
+  ids), the 404 / 405 cases, and a full write round-trip — its own six uploads, a dump of
+  them, the read-back and the stored image's bytes compared with the file that was sent. Every
+  check asserts the status, the machine-readable `code` and the problem media type; any failed
+  check exits non-zero.
+- **`AETHER_DATA_DIR` is honoured, and the real archive is guarded.** Both scripts compute the
+  effective data directory as `${AETHER_DATA_DIR:-$HOME/AetherArchive_Data}` — the same
+  semantics the backend binds — and refuse to run against `~/AetherArchive_Data` unless
+  `--force` is passed. Export the scratch value for the backend *and* for the scripts, or the
+  guard cannot know the truth.
+- Both scripts are safe to run twice: a second run adds a fresh batch (smoke adds its six
+  photos and a dump per run); nothing is overwritten, moved or deleted. They need `curl` and
+  `python3` (standard library only) and a reachable backend.
+
 ## Configuration
 
 Everything is env-driven: `SERVER_PORT`, `AETHER_DATA_DIR`, `AETHER_MAX_UPLOAD_MB`,
