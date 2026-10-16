@@ -12,6 +12,7 @@
 /* ---------------------------------------------------------------- 1. Scan scope --- */
 
 @import "tailwindcss" source(none);
+@import "./glass.css";
 
 /*
  * Automatic detection walked the whole project from this file and stopped at `.gitignore`,
@@ -132,6 +133,11 @@
   --aura-bg: #0b0b0d;
   --aura-surface: #121215;
   --aura-glass: rgba(0, 0, 0, 0.4);
+  /*
+   * The glass material's fallback (§3): the same black tint at the raised opacity that
+   * glass.css's @supports branch swaps in when backdrop-filter is missing.
+   */
+  --aura-glass-solid: rgba(0, 0, 0, 0.72);
   --aura-hairline: 1px solid rgba(255, 255, 255, 0.08);
   --aura-text: #e8e6e3;
   --aura-muted: rgba(232, 230, 227, 0.62);
