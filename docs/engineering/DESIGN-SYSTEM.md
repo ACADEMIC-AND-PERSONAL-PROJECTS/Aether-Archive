@@ -238,3 +238,24 @@ and measurements: `reports/verify-e2-s3-20261016.md`).
 
 The full visual check page (§10) arrives with the glass material in E2-S6; E2-S3's visual evidence is
 the three-width screenshot set plus the 9-cell overflow measurement, both in the report.
+
+## 12. Colour extraction (E2-S4)
+
+`frontend/src/lib/color/` implements the §2.1 pipeline (decision: ADR-018; measurements and browser
+probe: `reports/verify-e2-s4-20261016.md`).
+
+- **One pure pipeline, one browser edge.** `palette.ts` (`extractPalette`) runs downscale → cluster →
+  score/filter → 5–8 colours with normalised weights; `decode.ts` is the only environment-bound file
+  (`createImageBitmap` + `OffscreenCanvas` behind injectable dependencies), so the core is testable
+  anywhere and the real path is proven in Chromium.
+- **k-means++ is the default; median cut ships as the measured alternative**
+  (`extractPalette(image, { algorithm: "median-cut" })`). ADR-018 records both, with numbers.
+- **Weights are the honest share of returned colours** — renormalised over the 5–8 kept, not over all
+  pixels, so filtering a 40% near-black region never leaves a palette summing below 1; `oklch` fields
+  are rounded for stable output, and hex is the identity assertions use.
+- **Errors have a vocabulary of two.** `PaletteExtractionError` with `code: "decode-failed"` (bytes no
+  decoder accepts — the corrupted-file funnel) or `"unsupported"` (no canvas in the environment).
+  Nothing else throws.
+- **Roles are not here.** §2.1's role derivation (`background` / `surface` / `accent` / `text` /
+  `muted` / `accentContrast`) and contrast enforcement arrive with `theme.ts` in E2-S6; E2-S4 ships
+  the scored palette only.
