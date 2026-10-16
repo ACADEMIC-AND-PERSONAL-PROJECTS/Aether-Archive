@@ -33,6 +33,25 @@ main      ← released, protected, PR-only, tag sprint-NN at each sprint end
   `wip(<scope>): <what remains>` on the feature branch — an unpushed WIP commit may be amended or
   rewritten freely; a pushed one may not.
 - One concern per commit. Do not mix formatting, refactors and features in a single commit.
+- **Within a story, commit per logical unit — production code, tests, docs — not once at the end.** A story
+  that lands as one 1,500-line commit cannot be reviewed in parts, and its diffs cannot be explained. In
+  Sprint 1 the first story was one commit and the last was four; the four-commit shape is the target.
+- **Measure the change, not just the total.** Every story PR states two numbers: total changed lines, and
+  hand-written changed lines with the generated files named (Maven wrapper, `package-lock.json`, build
+  output). The ~500-line guidance applies to the second number — Sprint 1 averaged ~1,300 total because
+  nobody separated them.
+- **Stage explicit paths, never a directory, when an agent may be writing concurrently.** `git add <dir>`
+  cannot tell a subagent's in-flight file from yours: in Sprint 1 it swept a security report that another
+  agent was writing into an unrelated story commit, which then had to be untracked in a follow-up (history
+  is append-only, so a pushed commit cannot be amended). Run `git status --short` and check the staged list
+  against what you actually changed before committing.
+
+### Who commits
+
+- **The parent session commits. Subagents do not run writing git commands** (`add`, `commit`, `switch`,
+  `stash`, `merge`, `push`) — they are told so in their own definitions. Read-only git is fine for them.
+- A subagent reports its work in **stages**, naming which files belong to which, so the parent can turn each
+  stage into its own commit.
 
 ## Pull requests
 

@@ -32,8 +32,15 @@ Java 21, Spring Boot 3, Maven, PostgreSQL (Docker), local file storage.
 
 ## Working style
 
-- Commit often on the feature branch (Conventional Commits, story id in the header — see
-  `.claude/rules/git-workflow.md`).
+- **Never run a writing git command** — no `add`, `commit`, `switch`, `stash`, `merge`, `push`. The parent
+  session commits. Read-only git (`status`, `log`, `diff`, `show`) is fine.
+- **Work in reviewable stages and name them**: production code, tests, docs. Tell the parent which files
+  belong to which stage; each becomes one commit. A story that arrives as a single large change cannot be
+  reviewed in parts.
+- **Probe, do not reason.** Every assumption about a framework or the database — an exception hierarchy, a
+  default limit, what `saveAndFlush` returns, whether a symlink is followed, when a constraint fires — must be
+  **executed** and its output pasted into your report. Sprint 1's significant defects were all beliefs nobody
+  had run; the ones that were probed found real bugs before review.
 - Run `./mvnw verify` (or the smallest useful subset) before reporting done. Report exactly what ran
   and its output tail; never claim a check passed when it did not run.
 - If something in the specs is ambiguous, stop and surface the question instead of guessing.

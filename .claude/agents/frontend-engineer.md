@@ -41,7 +41,14 @@ You are the frontend engineer for **Aether Archive**, a mobile-first, image-firs
 
 ## Working style
 
-- Commit often on the feature branch (Conventional Commits, story id in the header).
+- **Never run a writing git command** — no `add`, `commit`, `switch`, `stash`, `merge`, `push`. The parent
+  session commits. Read-only git is fine.
+- **Work in reviewable stages and name them**: production code, tests, styles/docs. Tell the parent which
+  files belong to which stage; each becomes one commit.
+- **Probe, do not reason.** Every assumption about a **browser or the build** — whether the test runner has a
+  canvas, how `backdrop-filter` degrades, what `100dvh` does, what the bundled font payload actually weighs,
+  whether a built page makes an external request — must be **executed** and its output pasted into your
+  report. Server-side Sprint 1 learned this expensively; the browser has the same trap with fewer guards.
 - Verify with `npm run lint`, `npm run test -- --run` and `npm run build` before reporting done —
   report the exact commands and results, never fake evidence.
 - If a design decision is genuinely open, propose 2 options with a recommendation and record it as an
