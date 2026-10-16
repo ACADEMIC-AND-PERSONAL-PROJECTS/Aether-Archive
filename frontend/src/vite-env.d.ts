@@ -3,8 +3,10 @@
  *
  * Vite replaces `import.meta.env.VITE_*` in the bundle with a literal string, so the declaration is the
  * only place the name is known to the compiler. A variable that is not listed here is **not** part of
- * the app's configuration — and only `VITE_`-prefixed keys are ever exposed to the client bundle
- * (`docs/engineering/DEPLOYMENT.md`); every other key in `.env` belongs to the backend.
+ * the app's configuration — and only `VITE_`-prefixed keys are ever exposed to the client bundle.
+ * Vite reads them from the repository-root `.env` (`envDir` in `vite.config.ts`), the same file
+ * compose and the backend read (`docs/engineering/DEPLOYMENT.md`); every other key in it belongs to
+ * the backend.
  */
 
 interface ImportMetaEnv {

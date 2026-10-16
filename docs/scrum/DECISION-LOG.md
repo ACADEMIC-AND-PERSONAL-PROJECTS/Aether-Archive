@@ -477,7 +477,11 @@ and the SPA is served on the same origin as the API in every environment: the Vi
 container's nginx proxies the same prefixes to the `api` service (ADR-010). `VITE_API_BASE_URL` —
 declared in `frontend/src/vite-env.d.ts`, documented in `.env.example` — remains as an escape hatch for
 a client that must call an API elsewhere: it takes an **absolute origin, no `/api/v1` suffix**, because
-the client adds the prefix itself.
+the client adds the prefix itself. The key is read from the repository-root `.env`: Vite's `envDir`
+points there, the same file compose and the backend read. E2-S2's review probe found the escape hatch
+had been a silent no-op while Vite read only `frontend/`; the wiring was corrected, and the probe then
+measured both the client value and the dev proxy arriving from that file (review response in
+`reports/verify-e2-s2-20261016.md`).
 
 **Measured (E2-S2).** Through the dev server with a backend on `:8099`: `GET /api/v1/photos` → `200`
 and `GET /images/<uuid>.png` → `200 image/png`. With the suffixed form (`…:8099/api/v1`) the app

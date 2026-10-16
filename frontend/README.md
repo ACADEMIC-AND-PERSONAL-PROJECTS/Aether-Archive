@@ -65,7 +65,9 @@ Measured in E2-S2: with a backend on `:8099` and `VITE_API_PROXY_TARGET` pointin
 `curl http://localhost:5173/api/v1/photos` → **200** and `curl http://localhost:5173/images/<uuid>.png`
 → **200 `image/png`** — through the dev server, so the phone path is the PC path.
 
-`VITE_API_BASE_URL` (declared in `src/vite-env.d.ts`) exists for one case only: a client build that must
+`VITE_API_BASE_URL` (declared in `src/vite-env.d.ts`, set in the **repository-root `.env`** — the one
+local environment file that compose, the backend and Vite all read, via `envDir` in `vite.config.ts`)
+exists for one case only: a client build that must
 call an API on **another origin**. It takes an absolute **origin — no `/api/v1` suffix**; the client
 adds the prefix itself, so a value that already ends in `/api/v1` doubles it, and E2-S2's probe measured
 exactly that: `…/api/v1/api/v1/photos` → 404. (`.env.example` used to suggest the suffixed form; it was

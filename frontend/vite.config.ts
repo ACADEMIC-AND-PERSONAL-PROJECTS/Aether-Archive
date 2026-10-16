@@ -1,5 +1,6 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import { fileURLToPath } from "node:url";
 import { loadEnv } from "vite";
 import { defineConfig } from "vitest/config";
 
@@ -19,12 +20,19 @@ import { defineConfig } from "vitest/config";
  * The shipped bundle never makes a network request of its own — see `frontend/README.md`.
  */
 export default defineConfig(({ mode }) => {
-  // Only `VITE_`-prefixed keys are read, so the backend's own keys in the root `.env` stay out of the
-  // frontend's build and dev server (`docs/engineering/DEPLOYMENT.md`).
-  const env = loadEnv(mode, process.cwd(), "VITE_");
+  // The repository-root `.env` is the one local environment file: docker compose reads it, the backend
+  // imports it (`spring.config.import`), and `envDir` below makes Vite read it too — so a
+  // `VITE_API_BASE_URL` or `VITE_API_PROXY_TARGET` set there is *seen*. Vite read only `frontend/`
+  // before the wiring, which made the escape hatch the docs point at a silent no-op; E2-S2's review
+  // probe measured both sides of that. Only `VITE_`-prefixed keys are ever exposed to the client
+  // bundle, so the backend's own keys in the same file stay out of the frontend
+  // (`docs/engineering/DEPLOYMENT.md`).
+  const envDir = fileURLToPath(new URL("..", import.meta.url));
+  const env = loadEnv(mode, envDir, "VITE_");
   const apiProxyTarget = env.VITE_API_PROXY_TARGET || "http://localhost:8080";
 
   return {
+    envDir,
     plugins: [react(), tailwindcss()],
     server: {
       host: true,
@@ -47,6 +55,10 @@ export default defineConfig(({ mode }) => {
       globals: false,
       setupFiles: ["./src/test/setup.ts"],
       restoreMocks: true,
+      // Hermetic: now that Vite reads the repository-root `.env` (`envDir` above), a machine-set
+      // `VITE_API_BASE_URL` would otherwise change test outcomes. A test that wants a configured base
+      // stubs the value itself; `vi.unstubAllEnvs` restores this empty default.
+      env: { VITE_API_BASE_URL: "" },
     },
   };
 });
