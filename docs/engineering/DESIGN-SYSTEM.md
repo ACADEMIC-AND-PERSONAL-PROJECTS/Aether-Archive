@@ -111,7 +111,9 @@ accent **8.46:1** — every pair ≥ 4.5:1 (§8).
 | UI sans | **Inter variable** | `@fontsource-variable/inter` | Glass menu, buttons, labels, numbers |
 
 Allowed alternatives (must also exist as Fontsource packages): Cormorant Garamond, Fraunces (display);
-Work Sans, Manrope (UI). The final pair is fixed by an ADR at E2-S5 and recorded here afterwards.
+Work Sans, Manrope (UI). The pair above was **confirmed at E2-S5** — measured payload, weights and
+why each alternative stayed on the shelf are in ADR-019. Replacing the pair is a new ADR, not a
+silent edit.
 
 ### 4.2 Installation (local only — no CDN, ever)
 
@@ -120,20 +122,32 @@ npm install @fontsource/playfair-display @fontsource-variable/inter
 ```
 
 ```ts
-// frontend/src/main.tsx — imported BEFORE global.css so variables resolve
-import "@fontsource/playfair-display/400.css";
-import "@fontsource/playfair-display/500.css";
-import "@fontsource-variable/inter/wght.css";
+// frontend/src/main.tsx — imported BEFORE global.css
+import "@fontsource/playfair-display/latin-400.css";
+import "@fontsource/playfair-display/latin-500.css";
 import "./styles/global.css";
 ```
+
+- The `latin-*.css` entrypoints: the latin subset is the only one the app can render (§4.4), and the
+  import is what ships — each face brings one woff2 plus one legacy woff.
+- **Inter Variable has no per-subset entrypoint** (every packaged CSS file carries all seven
+  subsets; `wght.css` alone weighs 218.5 kB of woff2 — measured at E2-S5). Its packaged latin woff2
+  is therefore declared as a single `@font-face` in `global.css`, block 2: one 48.3 kB file for the
+  whole 100–900 axis, Vite-fingerprinted like any other asset.
+- Measured added payload (E2-S5 report): **148.2 kB** in `dist/` — inside the budget. The
+  all-subsets reading of the old snippet weighed 453.4 kB; all-static latin weighed 209.8 kB.
 
 ### 4.3 Variables in the global stylesheet
 
 ```css
-:root {
+/* The families are declared once, in the theme layer — `static` so both variables are always
+   emitted to :root, and so `font-display` / `font-ui` compile from the same declaration. */
+@theme static {
   --font-display: "Playfair Display", Georgia, "Times New Roman", serif;
   --font-ui: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
 
+@theme {
   --text-xs: clamp(0.72rem, 0.70rem + 0.10vw, 0.78rem);
   --text-sm: clamp(0.82rem, 0.79rem + 0.15vw, 0.90rem);
   --text-base: clamp(0.95rem, 0.92rem + 0.20vw, 1.05rem);
@@ -144,6 +158,11 @@ import "./styles/global.css";
   --tracking-display: -0.015em;
   --tracking-ui: 0.01em;
 }
+
+body {
+  font-family: var(--font-ui);
+  letter-spacing: var(--tracking-ui);
+}
 ```
 
 ### 4.4 Rules
@@ -152,7 +171,8 @@ import "./styles/global.css";
 - UI: weights 300/400/500, slight positive tracking on small sizes, line-height 1.4–1.6.
 - No component declares a raw `font-family`; everything uses `--font-display` / `--font-ui`
   (or a Tailwind theme alias mapped to them).
-- Added font payload budget: **< 200 KB** total; latin subsets only.
+- Added font payload budget: **< 200 KB** total; latin subsets only. (Shipped at E2-S5: 148.2 kB,
+  74% of the budget — ADR-019.)
 
 ## 5. Motion
 
