@@ -325,8 +325,11 @@ and cannot be: an upload destination does not exist yet, and `toRealPath()` on i
 `NoSuchFileException` (measured, S03-C1's review). What `StorageService.requireInside` actually does is
 normalise the candidate lexically, resolve the *existing* directory chain through
 `realDirectory`/`toRealPath()`, and refuse a candidate that normalises outside the root — which refuses `..`
-and a symlinked directory, and accepts a leaf that is itself a link. That acceptance is deliberate: the
-write replaces the link instead of following it, and a delete removes the link rather than its target. The
+and an `images/` or `tmp/` directory that is itself a link resolving outside the root, and accepts a leaf
+that is itself a link. A link anywhere *else* in the candidate path is not resolved at all, so the guard
+neither follows nor refuses it. That acceptance is deliberate: `Files.move` with `ATOMIC_MOVE` replaces the
+link rather than following it (an `open`-style write such as `Files.writeString` would follow it instead),
+and a delete removes the link rather than its target. The
 invariant in `.claude/rules/security.md` is stated as the invariant for this reason; this line records what
 the code does rather than what one description of it says.
 

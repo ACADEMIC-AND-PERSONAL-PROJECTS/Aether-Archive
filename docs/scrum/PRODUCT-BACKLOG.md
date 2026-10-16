@@ -611,6 +611,12 @@ the ADR below, not a patch inside a serving story.
 - [ ] **Tomcat's own 400 refusals are HTML and carry no `nosniff`** (the traversal strings that never reach
       Spring). An error-page mapping to `problem+json` would close the shape mismatch; decide whether it is
       worth it or whether the 400 is acceptable as-is.
+- [ ] **Pin the write site's accepted cell.** `StorageService.requireInside` accepts a leaf that *is* a link
+      (`Files.move` with `ATOMIC_MOVE` replaces it rather than following it; a delete removes the link, not
+      its target — both measured by S03-C1's review), and no test plants one: every `createSymbolicLink` in
+      the suite is directory-level. The rule that names the acceptance is honest about this, so the cell gets
+      its test and its written reason here. The same pass should cover a link used as a *path component*
+      inside the candidate, which the guard does not resolve at all.
 - [ ] Re-run E1-S5's path battery afterwards and record the statuses that changed.
 
 ---

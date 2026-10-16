@@ -16,7 +16,10 @@ manually verified in the PR (with the command or the device used). Untested beha
   must refuse, and the ones a call site accepts deliberately. A write site accepts a leaf that is a link —
   its write replaces the link rather than following it — but the same cell at a *serving* site is a
   traversal. So the cells a guard refuses and the cells it accepts are both pinned by tests, with the reason
-  for each accepted cell written beside it (`.claude/rules/security.md`).
+  for each accepted cell written beside it (`.claude/rules/security.md`). **This is the target, not the
+  current state**: a shipped guard whose accepted cell has no test (the write site's leaf link is one today,
+  tracked in E6-S17) gets that test with the next change to that guard, and until then the gap is named here
+  rather than assumed closed.
 
 ## Backend (Java / Spring Boot)
 

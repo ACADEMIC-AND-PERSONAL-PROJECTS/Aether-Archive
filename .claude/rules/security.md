@@ -30,8 +30,10 @@ by accident, and supply-chain creep from unnecessary dependencies. Design for th
   upload target — has no canonical form by definition, so it is checked through its canonical parent plus
   the generated leaf rather than by resolving the destination (measured: `toRealPath()` on a not-yet-existing
   target throws `NoSuchFileException`). A leaf that *is* a link is **accepted** at the write site on purpose:
-  the write replaces the link instead of following it, and a delete removes the link rather than its target
-  (measured: `ATOMIC_MOVE` onto a planted link leaves the target's bytes untouched). A path guard ships with
+  `Files.move` with `ATOMIC_MOVE` replaces the link rather than following it, and a delete removes the link
+  rather than its target (measured: `ATOMIC_MOVE` onto a planted link leaves the target's bytes untouched).
+  Do not generalise that to "writing replaces a link" — an `open`-style write (`Files.writeString`,
+  `Files.newOutputStream`) follows it and would land the bytes outside the root. A path guard ships with
   its adversarial matrix (`.claude/rules/testing.md`), and where it accepts a cell that matrix calls hostile,
   the test names the cell and the reason — an accepted cell nobody wrote down is indistinguishable from a
   missed one.
