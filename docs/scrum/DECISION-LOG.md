@@ -602,6 +602,66 @@ later is a new ADR, not a silent edit.
 
 ---
 
+## ADR-019 — Typography: Playfair Display + Inter Variable, latin subsets, 148.2 kB
+
+**Date**: 2026-10-16 · **Status**: Accepted
+
+**Context.** ADR-005 chose the baseline pair and deferred final confirmation to E2-S5, with two hard
+constraints: everything self-hosted (no CDN, no runtime request), and added font payload under
+~200 KB. DESIGN-SYSTEM §4.4 fixes the rest: display weights 400/500 only; UI weights 300/400/500;
+no raw `font-family` in components; **latin subsets only**. The §4.2 import snippet predated the
+packages, so E2-S5 measured every candidate reading before adopting one (full numbers in the
+report).
+
+**Decision.**
+
+1. **The pair stands: Playfair Display (display) + Inter Variable (UI).** The consulted references
+   (DESIGN-REFERENCES §6) back both halves: Typewolf notes Playfair's delicate, high-contrast
+   strokes hinder readability at small sizes — it is a titles-only face by nature; Inter's neutral
+   grotesque is the text face. Butterick: bold/italic as little as possible — hence two display
+   weights, no italics shipped.
+2. **Playfair ships as its packaged latin entrypoints** — `latin-400.css` + `latin-500.css`,
+   imported from `main.tsx` before `global.css`. Each face brings a woff2 and a legacy woff:
+   21,856 + 26,900 B (400) and 23,048 + 28,100 B (500) = 99,904 B.
+3. **Inter Variable ships as its packaged latin woff2 behind one hand-written `@font-face`**
+   (`global.css`, block 2): the package exposes no per-subset CSS (all seven subsets ride in every
+   entrypoint; `wght.css` alone weighs 218,512 B of woff2), and one 48,256 B variable file carries
+   the entire 100–900 axis — every UI weight §4.4 allows, including 300, in a single download. The
+   static alternative (Inter latin faces) costs 109,916 B for two weights and 164,844 B for three,
+   in as many files.
+4. **Measured payload, shipped**: 148,160 B (148.2 kB) of font assets in `dist/` — 74% of the
+   budget; the stylesheet grew 480 B (8,697 → 9,177 B) — the three `@font-face` rules, the
+   `.font-display` utility, the theme variables and the `body` declarations; the entry chunk keeps
+   its 283.41 kB (its hash moves once versus E2-S4 with the renamed lazy chunks). Rejected
+   readings: §4.2-literal all-subsets = 453,384 B
+   (453.4 kB); variable Inter all-subsets + Playfair latin = 318,416 B (318.4 kB); all-static latin
+   = 209,820 B (209.8 kB — over budget read either as 200 kB or 200 KiB).
+5. **Wiring.** The families are declared once in `@theme static` in `global.css` — values are
+   static, so they live in the theme layer where the utilities compile from the same declaration;
+   `static` makes emission unconditional by construction (measured in review: byte-identical
+   output with and without the keyword on the pinned Tailwind — it stays as intent). `body` reads
+   `var(--font-ui)` + `--tracking-ui`; the three placeholder `h1`s carry `font-display`. No
+   component declares a raw `font-family`.
+6. **Probe-verified on the built app** (offline Chromium, `--dump-dom`): the `h1` computes
+   `"Playfair Display", Georgia, "Times New Roman", serif` at weight 400 with −0.015em tracking;
+   body and UI paragraphs compute the Inter Variable stack with +0.01em; every declared face loads
+   (Playfair 400/500; Inter Variable answers both 300 and 700 from the one file); zero external
+   requests, zero console errors.
+
+**Consequences.** The legacy `woff` twins (55,000 B) ride inside the packaged Playfair entrypoints
+— accepted, because hand-writing those `@font-face`s would buy 55.0 kB but cost the upstream
+import; the budget does not require it. The Inter `@font-face` points at a packaged, hashed path,
+so a package update that renames files breaks the build loudly, never at runtime. Adding a display
+weight or an italic is one import + a line here; adding a non-latin subset breaks §4.4 and needs a
+new ADR. Two headless-probe discoveries are recorded in the report for reuse: `--dump-dom` snapshots
+the app at `load`, and it never paints — so probe pages must land on a routable URL and trigger
+faces with `document.fonts.load()`.
+
+**Evidence.** `reports/verify-e2-s5-20261016.md` — payload measurements, build output, the Chromium
+probe JSON, the gate log, and the probe-technique findings.
+
+---
+
 ## Template for new ADRs
 
 ```markdown
