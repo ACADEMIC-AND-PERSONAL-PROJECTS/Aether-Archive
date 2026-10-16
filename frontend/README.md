@@ -1,8 +1,8 @@
 # Frontend — React + Vite + TypeScript
 
-Scaffolded in Sprint 2 (**E2-S1**). The toolchain runs end to end; the app shell is E2-S2, the design
-tokens E2-S3. Structure targets `docs/engineering/ARCHITECTURE.md` §6, styling rules
-`docs/engineering/DESIGN-SYSTEM.md` and `.claude/rules/frontend.md`.
+Scaffolded in Sprint 2 (**E2-S1**), with the app shell — routes, providers, typed API client — added
+by **E2-S2**; the design tokens are E2-S3. Structure targets `docs/engineering/ARCHITECTURE.md` §6,
+styling rules `docs/engineering/DESIGN-SYSTEM.md` and `.claude/rules/frontend.md`.
 
 ## Commands (from `frontend/`)
 
@@ -26,6 +26,8 @@ test together. Anything that needs a different major version records the evidenc
 | Package                                                       | Version                   | Why it is here                                                                                                                                      |
 | ------------------------------------------------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `react` / `react-dom`                                         | 19.3.1                    | The UI runtime (mandated stack).                                                                                                                    |
+| `react-router`                                                | 8.4.0                     | Routing (mandated stack). Peer `react`/`react-dom` ≥ 19.2.7 — satisfied; no `--legacy-peer-deps`.                                                   |
+| `@tanstack/react-query`                                       | 5.104.3                   | Server state (mandated stack, ADR-004). Peer `react` `^18 \|\| ^19` — satisfied.                                                                    |
 | `vite` + `@vitejs/plugin-react`                               | 8.3.4 + 6.1.2             | Dev server, build, React fast refresh.                                                                                                              |
 | `typescript`                                                  | 6.0.3                     | Newest version the lint stack accepts; `latest` is 7.0.2 (ADR-015).                                                                                 |
 | `tailwindcss` + `@tailwindcss/vite`                           | 4.3.3                     | Utility CSS, CSS-first configuration (ADR-014).                                                                                                     |
@@ -40,8 +42,62 @@ test together. Anything that needs a different major version records the evidenc
 | `globals`                                                     | 17.13.0                   | Browser/Node global sets for the flat config.                                                                                                       |
 | `@types/*` (`react`, `react-dom`, `node`)                     | 19.3.0 / 19.3.0 / 22.20.5 | Types for React, the DOM side of it, and `vite.config.ts`.                                                                                          |
 
-Not installed on purpose yet: React Router, TanStack Query, Framer Motion, `@dnd-kit` (E2-S2+, one story
-each), Fontsource packages (E2-S5). A dependency lands with the story that needs it.
+Not installed on purpose yet: Framer Motion and `@dnd-kit` (E4/E5, one story each), Fontsource packages
+(E2-S5). A dependency lands with the story that needs it. E2-S2's two additions were installed the way
+this table was proven: `npm ci` from the lockfile with **no peer warnings and 0 vulnerabilities**, and
+the registry's own peer ranges checked against the installed React 19.3.1
+(`reports/verify-e2-s2-20261016.md`).
+
+## Where the API lives — one origin, in every environment
+
+The app never talks to a URL it does not share an origin with. The API base is **empty** by default:
+requests are relative (`/api/v1/photos`) and `Photo.url` is a path (`/images/<uuid>.<ext>`), so the
+browser resolves both against whatever served the SPA. That is what makes the default work everywhere
+without per-environment code:
+
+| Environment         | The SPA is served by | `/api/v1` and `/images` reach the backend because…                                        |
+| ------------------- | -------------------- | ----------------------------------------------------------------------------------------- |
+| Dev on the PC       | Vite (`:5173`)       | `server.proxy` in `vite.config.ts` forwards to `VITE_API_PROXY_TARGET` (default `:8080`). |
+| Dev from a phone    | Vite on the LAN IP   | the same proxy — a phone needs no `VITE_API_BASE_URL` of its own.                         |
+| Container (ADR-010) | nginx                | nginx proxies `/api/**` and `/images/**` to the `api` service.                            |
+
+Measured in E2-S2: with a backend on `:8099` and `VITE_API_PROXY_TARGET` pointing at it,
+`curl http://localhost:5173/api/v1/photos` → **200** and `curl http://localhost:5173/images/<uuid>.png`
+→ **200 `image/png`** — through the dev server, so the phone path is the PC path.
+
+`VITE_API_BASE_URL` (declared in `src/vite-env.d.ts`) exists for one case only: a client build that must
+call an API on **another origin**. It takes an absolute **origin — no `/api/v1` suffix**; the client
+adds the prefix itself, so a value that already ends in `/api/v1` doubles it, and E2-S2's probe measured
+exactly that: `…/api/v1/api/v1/photos` → 404. (`.env.example` used to suggest the suffixed form; it was
+corrected, and a test now pins the composition.) A cross-origin base leaves `Photo.url` pointing at the
+SPA's origin, so it is a debugging aid, not a deployment shape — the archive is same-origin by design
+(ADR-016).
+
+## How a failure arrives — measured against the running API
+
+`fetch` reports failures through two channels: an HTTP failure **resolves** with `ok === false` and the
+archive's problem+json body, while a transport failure **rejects**. `src/api/client.ts` maps both onto
+one typed `ApiError` (`kind`, `status`, `code`, `problem`). The shapes below were measured, not modelled
+— against a real backend (`spring-boot:run` on `:8099`, throwaway data directory) and the real `fetch`,
+with the probe file deleted afterwards and its output recorded in `reports/verify-e2-s2-20261016.md`:
+
+| Event                                    | What `fetch` did                                                                                                                   | `ApiError`                                                                     |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `POST /api/v1/dumps` with `photoIds: []` | resolves; `400`; problem+json `code: "validation-failure"`, `errors: [{field: "photoIds", message: "must name exactly 6 photos"}]` | `kind: "http"`, `status: 400`, `code` kept, `problem` kept                     |
+| Unmapped path                            | resolves; `404`; problem+json `code: "not-found"`                                                                                  | `kind: "http"`, `status: 404`                                                  |
+| Nothing listening (`ECONNREFUSED`)       | rejects; `TypeError: fetch failed`, cause `ECONNREFUSED`                                                                           | `kind: "network"`, no `status`                                                 |
+| Unresolvable host (`ENOTFOUND`)          | rejects; `TypeError: fetch failed`, cause `ENOTFOUND`                                                                              | `kind: "network"`                                                              |
+| Deadline (`AbortSignal.timeout`)         | rejects; `DOMException` named `TimeoutError`                                                                                       | `kind: "timeout"`                                                              |
+| Caller cancellation                      | rejects; `DOMException` named `AbortError`                                                                                         | rethrown unchanged — cancelling is not failing                                 |
+| `200` carrying non-JSON                  | resolves                                                                                                                           | `kind: "parse"` (unit-tested: the archive cannot be made to do this on demand) |
+
+5xx follows the same resolving channel as 4xx (`kind: "http"` with the status and any `code`); no
+endpoint fails on demand, so that branch is pinned by the unit tests with a stubbed response.
+
+In the Vitest + jsdom test environment the same paths run end to end — `fetch` is stubbed, but
+`AbortSignal.timeout`, `AbortSignal.any` and `Response` are the runtime's. The error **names** are
+checked, not `instanceof DOMException`: the thrown error is Node's `DOMException` while the global is
+jsdom's, so `instanceof` is false even for a real timeout (client.ts, `classifyTransportFailure`).
 
 ## Layout
 
@@ -54,13 +110,13 @@ frontend/
 ├── tsconfig.app.json     src/ — DOM + strict flags
 ├── tsconfig.node.json    vite.config.ts — Node types
 └── src/
-    ├── app/              App shell (E2-S2 replaces the placeholder) + its test
-    ├── features/         README.md only — splash/ menu/ river/ workshop/ arrive in E2-S2+
+    ├── app/              App shell: routes, providers, query client, fallback + tests (E2-S2)
+    ├── features/         splash/ river/ workshop/ — placeholder views for the routes (E2-S2); menu/ in E3
     ├── components/       README.md only — GlassPanel and shared primitives (E2-S6)
     ├── lib/              README.md per folder (color/ image/ motion/) — pure TS, no React
-    ├── api/              README.md only — typed client + query keys (E2-S2)
+    ├── api/              typed client, query keys, retry policy + tests (E2-S2)
     ├── hooks/            README.md only — reusable hooks
-    ├── types/            README.md only — mirrors _docs/openapi.yml
+    ├── types/            wire types mirroring _docs/openapi.yml (E2-S2)
     ├── styles/           global.css — the `@theme` token layer lives here
     └── test/setup.ts     jest-dom matchers + RTL cleanup
 ```
@@ -82,8 +138,9 @@ frontend/
   `playwright.config.ts` would sit outside `tsc -b` until it is added to that project's `include`.
 - **Lint is type-unaware on purpose** (no `projectService`; `tsc -b` owns type errors and ESLint stays
   fast). Rules that need types therefore do not run — `no-floating-promises` and `no-misused-promises`
-  among them. When E2-S2 adds the async API client, enabling type-aware linting is the option; measure
-  the lint-time cost before switching the whole config.
+  among them. E2-S2 added the async API client with linting still type-unaware: `tsc -b` checks its
+  types, and switching to `projectService` remains available to a story that needs those rules —
+  measure the lint-time cost before switching the whole config.
 - **Tailwind v4 scans this file**: its automatic source detection walks the project root, so README prose
   generates utilities (the word "static" shipped `.static{position:static}`). Scoping is E2-S3's — ADR-014.
 
@@ -153,5 +210,5 @@ Images first and UI almost invisible; Dark Glassmorphism only; mobile-first (390
 safe-area insets, ≥ 44 px targets); theme colours from the extracted palette (`--aura-*`), never a hex in a
 component; fonts only via Fontsource NPM packages; **a request leaving the machine is a bug**.
 
-Rules: `.claude/rules/frontend.md` · design language: `.claude/rules/design-language.md` · decisions of this
-story: `docs/scrum/DECISION-LOG.md` ADR-014 (Tailwind v4, CSS-first) and ADR-015 (TypeScript 6.0.3).
+Rules: `.claude/rules/frontend.md` · design language: `.claude/rules/design-language.md` · decisions of
+these stories: `docs/scrum/DECISION-LOG.md` ADR-014 and ADR-015 (E2-S1), ADR-016 (E2-S2).

@@ -25,6 +25,7 @@ Statuses: `Proposed` · `Accepted` · `Superseded by ADR-NNN` · `Rejected`.
 | [ADR-013](#adr-013--the-error-vocabulary-is-a-declared-part-of-the-contract) | 2026-10-15 | The error vocabulary is a declared part of the contract | Accepted |
 | [ADR-014](#adr-014--tailwind-css-v4-configured-css-first) | 2026-10-16 | Tailwind CSS v4, configured CSS-first | Accepted |
 | [ADR-015](#adr-015--typescript-603-while-the-lint-stack-cannot-parse-7) | 2026-10-16 | TypeScript 6.0.3 while the lint stack cannot parse 7 | Accepted |
+| [ADR-016](#adr-016--the-frontend-reaches-the-api-on-its-own-origin) | 2026-10-16 | The frontend reaches the API on its own origin | Accepted |
 
 ---
 
@@ -456,6 +457,38 @@ lint stack. Every other package in the story is at its current major (Vite 8.3.4
 `typescript-eslint` release whose peer range accepts it, then a one-line version bump plus a fresh
 `npm run lint` / `tsc -b` / `npm run test` / `npm run build` — a story that does it records that evidence,
 and does not silently use `--legacy-peer-deps`.
+
+---
+
+## ADR-016 — The frontend reaches the API on its own origin
+
+**Date**: 2026-10-16 · **Status**: Accepted
+
+**Context.** E2-S2 gives the app its data layer, and the API base URL has three candidate shapes: a
+relative path resolved against whatever served the SPA, an absolute URL configured per environment, or
+cross-origin calls with CORS (bounded by ADR-012). Two constraints decide between them: `Photo.url` is
+a **path** (`/images/<uuid>.<ext>`, ADR-011 and `_docs/openapi.yml`), so an app on a different origin
+than the API cannot render photos without a second rewrite; and the product is used from a phone on
+the LAN, where "localhost" means the phone.
+
+**Decision.** The base URL is **empty** by default. The client requests relative paths under `/api/v1`,
+and the SPA is served on the same origin as the API in every environment: the Vite dev server proxies
+`/api/v1` and `/images` to `VITE_API_PROXY_TARGET` (default `http://localhost:8080`), and the
+container's nginx proxies the same prefixes to the `api` service (ADR-010). `VITE_API_BASE_URL` —
+declared in `frontend/src/vite-env.d.ts`, documented in `.env.example` — remains as an escape hatch for
+a client that must call an API elsewhere: it takes an **absolute origin, no `/api/v1` suffix**, because
+the client adds the prefix itself.
+
+**Measured (E2-S2).** Through the dev server with a backend on `:8099`: `GET /api/v1/photos` → `200`
+and `GET /images/<uuid>.png` → `200 image/png`. With the suffixed form (`…:8099/api/v1`) the app
+requested `…/api/v1/api/v1/photos` → `404` — the probe caught it before any test did, `.env.example`
+was corrected, and a test now pins the composition (`api/client.test.ts`).
+
+**Consequences.** No CORS is needed on the default path, no per-device URL configuration exists for the
+phone, and photos render from the origin that served the page. A deployment that genuinely serves the
+SPA and the API on different origins must also rewrite `Photo.url` and open CORS — that is a new ADR,
+not a config tweak. `npm run preview` serves the built bundle without the dev proxy; previewing against
+a real API is the container's job.
 
 ---
 
