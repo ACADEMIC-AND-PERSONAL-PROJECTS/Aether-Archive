@@ -7,7 +7,7 @@ import { AppProviders } from "./AppProviders";
 import { RouteFallback } from "./RouteFallback";
 
 /**
- * The route smoke test: each of the three URLs resolves to its own view.
+ * The route smoke test: each URL resolves to its own view.
  *
  * `App` is rendered under a `MemoryRouter` at a chosen URL, with the real providers — the router and the
  * query cache are what the app itself mounts (`main.tsx`), so this exercises the shell as it ships
@@ -44,6 +44,12 @@ describe("App", () => {
     renderAt("/curate");
 
     expect(await screen.findByRole("heading", { level: 1, name: /Workshop/ })).toBeVisible();
+  });
+
+  it("should show the design-system check page at /check", async () => {
+    renderAt("/check");
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Theme check" })).toBeVisible();
   });
 
   it("should render exactly one view per URL", async () => {

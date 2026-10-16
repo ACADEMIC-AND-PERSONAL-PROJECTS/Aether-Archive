@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { deltaEok, oklabToRgb, oklabToOklch, rgbToHex, rgbToOklab, rgbToOklch } from "./oklch";
+import {
+  deltaEok,
+  oklabToRgb,
+  oklabToOklch,
+  oklchToHex,
+  oklchToOklab,
+  rgbToHex,
+  rgbToOklab,
+  rgbToOklch,
+} from "./oklch";
 
 describe("rgbToOklch", () => {
   it("matches the published reference values", () => {
@@ -79,5 +88,21 @@ describe("deltaEok", () => {
     const farTone = rgbToOklab(120, 40, 200);
     expect(deltaEok(a, identicalTone)).toBeLessThan(0.02); // below the merge threshold
     expect(deltaEok(a, farTone)).toBeGreaterThan(0.02);
+  });
+});
+
+describe("oklchToOklab / oklchToHex", () => {
+  it("round-trips through oklabToOklch", () => {
+    const oklch = { l: 0.62, c: 0.13, h: 45 };
+    const back = oklabToOklch(oklchToOklab(oklch));
+    expect(back.l).toBeCloseTo(oklch.l, 10);
+    expect(back.c).toBeCloseTo(oklch.c, 10);
+    expect(back.h).toBeCloseTo(oklch.h, 10);
+  });
+
+  it("converts a triplet to hex through the existing pipeline", () => {
+    expect(oklchToHex({ l: 1, c: 0, h: 0 })).toBe("#ffffff");
+    expect(oklchToHex({ l: 0, c: 0, h: 0 })).toBe("#000000");
+    expect(oklchToHex(rgbToOklch(232, 230, 227))).toBe("#e8e6e3");
   });
 });

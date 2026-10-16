@@ -55,6 +55,10 @@ export default defineConfig(({ mode }) => {
       globals: false,
       setupFiles: ["./src/test/setup.ts"],
       restoreMocks: true,
+      // `?raw` imports must return the file's text, not the empty stub: vitest stubs CSS by
+      // default, which also blanks `global.css?raw` — the theme drift test reads exactly that
+      // file (E2-S6). Processing CSS makes Vite answer the raw import with the source.
+      css: true,
       // Hermetic: now that Vite reads the repository-root `.env` (`envDir` above), a machine-set
       // `VITE_API_BASE_URL` would otherwise change test outcomes. A test that wants a configured base
       // stubs the value itself; `vi.unstubAllEnvs` restores this empty default.
