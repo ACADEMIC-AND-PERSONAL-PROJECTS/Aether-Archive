@@ -37,9 +37,10 @@ A story is `Done` only when the Definition of Done (`DEFINITION-OF-DONE.md`) is 
 > do not enter that sprint implicitly), so the sprint map still sums to 181. The 8 points are unscheduled
 > work awaiting a deliberate decision, not a backlog error.
 >
-> **E6-S17** (2 pts) was added during Sprint 2 from E1-S5's static-serving probes — two behaviours no request
-> can reach but that a file placed by hand can widen, so they were routed rather than patched inside E1-S5.
-> It is unscheduled like the rest of E6-S13…S17.
+> **E6-S17** (2 pts, `p1`) was added during Sprint 2 from E1-S5's static-serving probes — behaviours no
+> request can reach but that a file placed by hand, a restore, or a sync can widen, so they were routed
+> rather than patched inside E1-S5. Its `p1` is argued in the story: the security rule's `p0` assumes a
+> request can reach the finding, and none can. It is unscheduled like the rest of E6-S13…S17.
 
 ```text
 Sprint 1  E1  Foundation & Backend              (34)
@@ -474,7 +475,7 @@ delivery, documentation, and a clean v1.0.
 | E6-S14 | Framework end-of-life decision & migration plan (audit SEC-02, issue #72) | p1 | 2 | — | Todo |
 | E6-S15 | Dependency patch level from the Sprint 1 audit (SEC-03, PR #70) | p1 | 1 | — | Done |
 | E6-S16 | Low-severity hardening from the Sprint 1 audit (SEC-04…10, issue #73) | p2 | 3 | — | Todo |
-| E6-S17 | Static-serving hardening found by E1-S5's probes (issue #79) | p2 | 2 | — | Todo |
+| E6-S17 | Static-serving hardening found by E1-S5's probes (issue #79) | p1 | 2 | — | Todo |
 
 ### E6-S1 — CI on every PR · 5 pts | p0
 
@@ -566,23 +567,37 @@ delivery, documentation, and a clean v1.0.
 - [ ] Backup/restore scripts (E6-S7) verified against the containerized stack.
 - [ ] `docs/engineering/DEPLOYMENT.md` moved from TARGET to shipped reality; README updated.
 
-### E6-S17 — Static-serving hardening found by E1-S5's probes · 2 pts | p2
+### E6-S17 — Static-serving hardening found by E1-S5's probes · 2 pts | p1
 
 *As the owner, I want `/images/**` to serve only what the archive wrote, so that a file placed by hand cannot
 widen what the URL space exposes.*
 
-Found by E1-S5's hostile-path battery (its report), not by a request: both need an actor who can already write
-into `data-dir/images/`, which is why they are hardening rather than a defect, and why they were routed to a
-story instead of patched inside E1-S5.
+Found by E1-S5's hostile-path battery (its report) and widened by that PR's review, which measured the layout
+the first report had not: **with `images/` itself a symlink to a directory outside the data directory, the boot
+succeeds, its write-probe is written through the link, reads follow it — and uploads are refused.** The actor
+there is an operator, not an attacker: a `cp -a`/`rsync -a`/tarball restore, or a manual link into a synced
+folder. Nothing here is reachable by a request — 46 hostile paths, a hostile client filename and encoded
+separators were all refused — so it stays hardening rather than a defect.
+
+**Priority is `p1`, not `p2`, and not the `p0` that `.claude/rules/security.md` reserves for
+"something looks exploitable":** the rule's p0 assumes a request can reach it, and none can. `p1` records that
+the precondition is *ordinary operator behaviour* (a restore or a sync), not malice, which is more than can be
+said for most hardening. It is not fixed in E1-S5 because closing it changes serving semantics — that needs
+the ADR below, not a patch inside a serving story.
 
 - [ ] **Symlinks inside `images/` are followed, including out of the data directory.** A link to a file
-      outside answers 200 with that file's bytes; Spring's containment check is textual (URL prefix), so a
-      link that resolves elsewhere passes it. Decide and record (ADR) whether serving re-checks
-      `Path.toRealPath()` under `data-dir/images` — the hook is a `PathResourceResolver` subclass on
-      `setResourceChain(true)` — or whether the guarantee is "the write path never creates a link", which is
-      already true (ADR-012).
+      outside answers 200 with that file's bytes, and so does a link to a *directory* outside
+      (`/images/<link>/x.txt`); Spring's containment check reads the URL, so a link that resolves elsewhere
+      passes it. Cover both layouts: a link planted at a name inside `images/`, and **`images/` itself a link**
+      (boot succeeds, write-probe written through it, reads follow it, uploads refused). Decide and record
+      (ADR) whether serving re-checks `Path.toRealPath()` under `data-dir/images` — the hook is a
+      `PathResourceResolver` subclass on `setResourceChain(true)` — or whether the guarantee is "the write
+      path never creates a link", which ADR-012's own rule only half-covers: uploads are refused, the boot is
+      silent. Whichever way it goes, the boot should say something about a data directory whose `images/`
+      resolves outside it.
 - [ ] **A hand-placed file whose extension the archive never writes is served under the platform's media type**
-      — `.html` as `text/html`, `.svg` as `image/svg+xml`, probe evidence in E1-S5's report — and
+      — measured: `.html` as `text/html`, `.svg` as `image/svg+xml`, `.txt` as `text/plain`,
+      `.jpeg.exe` as `application/x-msdownload`, no extension as `application/octet-stream` — and
       `nosniff` does not stop a browser rendering those. Deciding means choosing between the current
       behaviour (documented), `application/octet-stream`, and `Content-Disposition: attachment` for names
       outside the upload whitelist.
