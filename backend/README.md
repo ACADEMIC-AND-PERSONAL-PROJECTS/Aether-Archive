@@ -187,9 +187,9 @@ curates it. A photo is answered as:
 ```
 
 `url` is relative to the API host and names the file's generated UUID under the data directory's
-`images/` folder — it is not a filesystem location and not an external address. Serving it is E1-S5
-(Sprint 2): until that resource handler lands the archive knows the name, and no endpoint serves the
-bytes. `uploadedAt` is the row's `created_at` in UTC, at the precision PostgreSQL keeps (microseconds);
+`images/` folder — it is not a filesystem location and not an external address, and it is a path a browser
+loads: E1-S5 serves it (see *Serving images*). `uploadedAt` is the row's `created_at` in UTC, at the
+precision PostgreSQL keeps (microseconds);
 the feed and the `201` that created a photo therefore name the same instant.
 
 What an upload can answer besides the `201`:
@@ -345,6 +345,52 @@ the file's name from its identifier and validated extension, proves the target s
 removes it idempotently, so a retry cannot fail on work already done. An upload calls it when the row cannot
 be saved (the `500` in *API*), which is what keeps an accepted upload from leaving an image no API can reach.
 
+## Serving images
+
+The `url` a photo is answered with is a `GET` that works (E1-S5): `config/ImageServingConfig` — a
+`WebMvcConfigurer` — maps `/images/**` to `file:${AETHER_DATA_DIR}/images/`, the one directory
+`StorageService` writes originals into, and to no other location. A stored file is answered with:
+
+| Header | Value | Why |
+| --- | --- | --- |
+| `Content-Type` | the media type of the stored extension | decided by the name on disk, never by a request |
+| `Cache-Control` | `max-age=31536000, public, immutable` | a UUID name never changes: one fetch per image, ever |
+| `X-Content-Type-Options` | `nosniff` | the audit's SEC-N2: a browser renders the type above instead of guessing another |
+
+The media types come from the platform's table, keyed by the same extension whitelist the upload path
+writes: `.jpg` and `.jpeg` are `image/jpeg`, `.png` is `image/png`, `.gif` is `image/gif`, `.webp` is
+`image/webp`, `.avif` is `image/avif`. Every extension `ImageFormat` can store has one, and
+`ImageServingFlowTest` checks the serving map against `ImageFormat.acceptedExtensions()` rather than
+against a list of its own — a format added to the enum fails the test until its media type is decided.
+`X-Content-Type-Options` is added by an interceptor on the same path pattern, so it reaches the refusal
+that answers a missing image as well as the file itself; the year-long cache is set by the resource
+handler, so a refusal carries none of it (a 404 is not worth remembering), and neither answer contains a
+filesystem path.
+
+**A path that climbs out of `images/` is refused, by whichever layer sees it first.** A path that still
+contains a `..` segment when it reaches the archive is not resolved at all — the archive answers its 404
+rather than handing back a file of the data directory — while `%2f`, `%5c` and a null byte are refused by
+Tomcat with a 400 before the servlet is reached. Neither answer repeats the contents of a file outside the
+directory. `ImageServingFlowTest` pins sixteen of those paths, each with the status the running server
+answers, plus two that name a file that really is stored, so a `..` tidied up before the lookup would fail
+the test instead of passing unnoticed.
+
+**There is no directory listing, with or without the trailing slash.** `GET /images`, `/images/`,
+`/images/nested` and `/images/nested/` answer 404, like any other name that holds no file: the images
+directory is a name space for the files the API published, not one a client can browse.
+
+**A file the archive did not write is served with the type of its extension.** The upload path stores the
+canonical extension of the sniffed format and nothing else, so a stored file is always one of the six
+above; a file dropped into `images/` by hand is answered with the media type the platform's MIME table
+gives that extension, which is not always `application/octet-stream` (`.xyz` is `chemical/x-xyz`, and a
+`.html` would be `text/html`). Serving only the archive's own formats would be a decision of its own —
+no request can currently place such a file — so it is stated rather than assumed.
+
+Images are subject to the same CORS rule as the API (`AETHER_CORS_ALLOWED_ORIGINS`): an allowed origin
+gets `Access-Control-Allow-Origin` on the image response, which is what a later story's colour extraction
+needs — a canvas that reads an image's pixels without it is tainted. `thumbnails/` is not served yet:
+E1-S5 maps `images/` only, and the story that serves derivatives adds its own mapping.
+
 ## Errors
 
 Every failure leaves as an RFC 9457 problem detail in `application/problem+json`, produced by one
@@ -438,7 +484,7 @@ down; moving it into the spec is a contract change and needs an ADR.
 `./mvnw verify` runs the whole suite; from the repository root that is
 `mvn -f backend/pom.xml -B clean verify`. It needs Docker and nothing else — a missing daemon fails the
 build loudly rather than skipping the database tests — and takes about 45–55 s on the development machine
-(280 tests, 2026-10-16), depending on the class order and on what else the machine is doing: a loaded one
+(306 tests, 2026-10-16), depending on the class order and on what else the machine is doing: a loaded one
 has been measured at 58 s. Treat 60 s as a ceiling that is close, not as headroom. Nothing in the suite
 sleeps or reads the clock: time is injected, a fixed `Clock` per test.
 
@@ -469,7 +515,11 @@ Three layers, each with the job it is there for:
 - **Integration** — `@SpringBootTest` for the flows that cross HTTP, database and disk:
   `DumpApiFlowTest` is the one the backend rules ask to see end to end (six uploads through the photo API,
   the dump published from them, that dump read back, on a real Tomcat, the real data directory and a real
-  PostgreSQL), plus `PhotoApiFlowTest`, `PhotoUploadCompensationTest` and `MultipartUploadCeilingTest`.
+  PostgreSQL), plus `PhotoApiFlowTest`, `PhotoUploadCompensationTest`, `MultipartUploadCeilingTest` and
+  `ImageServingFlowTest` — the last one is HTTP and disk rather than the database, and names a database of
+  its own only because the context boots one; its hostile paths go through the JDK's `HttpClient` instead
+  of `TestRestTemplate`, because the request has to arrive exactly as written for the refusal to be the
+  server's and not the test client's.
 
 A `@WebMvcTest` slice loads the web layer and its advice but not the typed configuration properties those
 beans are built from, so a slice that expects an error response needs
