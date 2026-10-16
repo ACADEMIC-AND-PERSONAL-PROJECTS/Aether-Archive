@@ -21,21 +21,38 @@ export async function fetchRandomPhoto(signal?: AbortSignal): Promise<Photo> {
 }
 
 /**
+ * How long a random photo stays fresh — **zero**, against the app-wide 30 s (`app/queryClient.ts`).
+ *
+ * Criterion: "fresh random photo per visit". The default is right for the feed (moving between
+ * `/`, `/river` and `/curate` must not re-read what was just read) and wrong for this endpoint: its
+ * answer is deliberately different the second time, so a cached one is not a stale copy of the truth,
+ * it is a different photo withheld. Measured: with the defaults, an unmount and a remount inside the
+ * same 30 s served the cached photo and issued **no** request at all (probe output in the PR).
+ */
+export const RANDOM_PHOTO_STALE_TIME_MS = 0;
+
+/**
+ * How long the cached photo survives its last observer — also **zero**.
+ *
+ * `staleTime` alone is not enough: it makes the cached photo stale, but the cache would still *hold*
+ * it, so returning to the splash would paint the previous visit's photo first and swap it a moment
+ * later — the wrong photo, visibly, on the one screen whose whole promise is a new one. Dropping the
+ * entry on unmount means a visit starts from nothing and fetches.
+ *
+ * Cost, stated: in dev, `StrictMode` double-mounts, so a visit issues two requests there. In the built
+ * app it is one per visit, which the browser probe confirms.
+ */
+export const RANDOM_PHOTO_GC_TIME_MS = 0;
+
+/**
  * The splash hero's photo. `data` is absent while loading and after a failure — the caller branches on
  * `isPending` / `isError` (and on `error.code` for the empty archive) rather than on a placeholder.
- *
- * **Caching, for now: the app-wide default** (`app/queryClient.ts`: 30 s `staleTime`). This endpoint is
- * per-visit state by nature — it answers differently on purpose, so a cached answer is not a stale copy
- * of the truth but a different photo withheld. The per-visit policy (`staleTime: 0` **and** `gcTime: 0`;
- * measured across an unmount and a remount inside one client: defaults → 1 request, the policy → 2)
- * belongs to **E3-S1B**, the follow-up slice of this story — the same slice that adds the re-roll which
- * makes a second visit observable at all. Until it lands, a second visit inside 30 s is served the
- * cached photo and issues no request; ADR-021 keeps the decision and its measurement so the slice can
- * restore them rather than rediscover them.
  */
 export function useRandomPhoto() {
   return useQuery({
     queryKey: queryKeys.randomPhoto,
     queryFn: ({ signal }) => fetchRandomPhoto(signal),
+    staleTime: RANDOM_PHOTO_STALE_TIME_MS,
+    gcTime: RANDOM_PHOTO_GC_TIME_MS,
   });
 }
