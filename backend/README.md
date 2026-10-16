@@ -435,24 +435,82 @@ down; moving it into the spec is a contract change and needs an ADR.
 
 ## Tests
 
+`./mvnw verify` runs the whole suite; from the repository root that is
+`mvn -f backend/pom.xml -B clean verify`. It needs Docker and nothing else — a missing daemon fails the
+build loudly rather than skipping the database tests — and takes about 45–55 s on the development machine
+(280 tests, 2026-10-16), depending on the class order and on what else the machine is doing: a loaded one
+has been measured at 58 s. Treat 60 s as a ceiling that is close, not as headroom. Nothing in the suite
+sleeps or reads the clock: time is injected, a fixed `Clock` per test.
+
+Class order is the other half of that promise, and it is kept knowingly. Two pieces of global state are in
+play: the Logback logger tree, which the whole JVM shares and whose root level every `test`-profile context
+sets to `WARN` without restoring it, and the test databases below, where a context that names none is not
+allowed to exist. So a test that captures a log pins that logger's level itself and puts back what it found
+(`DumpServiceTest`) — a capture that trusted the level it inherited would pass or fail depending on which
+class ran first. When you touch a test that reads global state, run the suite both ways —
+`-Dsurefire.runOrder=alphabetical` and `-Dsurefire.runOrder=reversealphabetical` — because the default
+order is the one your IDE and CI are least likely to reproduce.
+
+Run it with `clean` whenever an IDE has been compiling the project. An IDE writes `target/classes` with
+its own timestamps and its own compiler, and Maven's incremental check can then treat a stale
+`target/test-classes` as up to date and skip recompiling it — the build goes green against classes that no
+longer match the source (observed during E1-S7). `clean` costs a full compile and removes the doubt.
+
+Three layers, each with the job it is there for:
+
+- **Unit** — services and utilities, with `@TempDir` for anything that touches the filesystem
+  (`StorageServiceTest`, `DumpServiceTest`, `PhotoServiceTest`, `ImageFormatTest`, `StorageInitializerTest`).
+  No Spring context: these are the fast tests that name the rule itself.
+- **Slice** — `@WebMvcTest` per controller family (`PhotoControllerTest`, `DumpControllerTest`), asserting
+  the status and the exact body of every outcome the contract names, refusals included: `400`, `404`,
+  `409`, `413`, `415`. `@DataJpaTest` for the repositories against the real PostgreSQL — the four classes
+  share one context and one schema because their annotations are identical, and their assertions are about
+  the whole archive (`DumpQueryTest` reads every dump there is).
+- **Integration** — `@SpringBootTest` for the flows that cross HTTP, database and disk:
+  `DumpApiFlowTest` is the one the backend rules ask to see end to end (six uploads through the photo API,
+  the dump published from them, that dump read back, on a real Tomcat, the real data directory and a real
+  PostgreSQL), plus `PhotoApiFlowTest`, `PhotoUploadCompensationTest` and `MultipartUploadCeilingTest`.
+
 A `@WebMvcTest` slice loads the web layer and its advice but not the typed configuration properties those
 beans are built from, so a slice that expects an error response needs
 `@EnableConfigurationProperties({ StorageProperties.class, CorsProperties.class })` — without it the context
 fails on the advice's constructor, not on the test.
 
-`./mvnw test` needs Docker, nothing else: every context-booting test runs against a throwaway
-PostgreSQL container (`postgres:17-alpine`, the same tag as the dev database, ADR-009) that
-`support/PostgresTestConfiguration` hands to Spring via `@ServiceConnection`. Flyway applies the real
-migration to it and `ddl-auto=validate` then runs against the real schema, so a drift between the
-entities and `db/migration` fails the suite. Docker must be running: a missing daemon fails the build
-loudly rather than skipping the database tests. Each test context gets its own container, and
-Testcontainers removes them when the run is over — nothing to stop by hand, nothing left behind.
+`DumpQueryTest` counts the statements of the dump read path and needs Hibernate's statistics, which the
+test profile turns on (`application-test.yml`): the counters cost one increment per event and are off
+everywhere else.
 
-`DumpApiFlowTest` is the flow the backend rules ask to see end to end — six uploads through the photo
-API, a dump published from them, and that dump read back — on a real Tomcat, the real data directory and
-a real PostgreSQL. `DumpQueryTest` counts the statements of the dump read path and needs Hibernate's
-statistics, which the test profile turns on (`application-test.yml`): the counters cost one increment per
-event and are off everywhere else.
+### One container, one database per context
+
+`support/PostgresTestConfiguration` starts one `postgres:17-alpine` container for the whole JVM — the same
+tag as the dev database, ADR-009 — and gives each Spring context its own database on it (a
+`JdbcConnectionDetails` bean, built from Testcontainers' own coordinates). Flyway applies the real
+migrations to that database and `ddl-auto=validate` then runs against the real schema, so a drift between
+the entities and `db/migration` fails the suite.
+
+One database per context preserves the isolation the suite had when every context had its own server: the
+flow classes delete rows and add test-only Flyway migrations, and either would otherwise reach the
+repository slices, whose assertions are about the whole archive. A context names its database with
+`@TestPropertySource(properties = "aether.test.database=<name>")`, and **naming one is required**: there is
+no default, so a context that boots a database without a name fails on the spot with a message saying what
+to add. Sharing is then always written down in both classes rather than inherited from whichever ran first
+— the four repository slices all name `repository` on purpose, and a class added to that family that reads
+no row it did not write can name it too.
+
+The container is deliberately not a Spring bean — it is started in a static initialiser and the framework
+never closes it. As a bean it would be closed by the first context that shuts down, and every later context
+would meet a dead port. Nothing else stops it either: cleanup is Testcontainers' reaper, Ryuk, which is on
+by default and removes the container when the JVM exits. That is a precondition rather than a detail — a run
+with `TESTCONTAINERS_RYUK_DISABLED=true` (or with a Ryuk that cannot reach the Docker socket, which
+Testcontainers reports as a warning and then continues past) leaves one `postgres:17-alpine` container
+running per build, and the next one starts another. Find them with `docker ps --filter
+ancestor=postgres:17-alpine` and remove them with `docker rm -f <id>`; the databases inside a container are
+worth nothing, so nothing is lost by that.
+
+Adding a test class: choose the family it belongs to and copy that family's annotations. An identical
+annotation set shares a context and a database with the classes that already carry it, which is what keeps
+the suite at 13 contexts; a new combination is a new context (about 1 s) and, if it boots a database, a new
+database migrated from scratch.
 
 ### Data directory
 

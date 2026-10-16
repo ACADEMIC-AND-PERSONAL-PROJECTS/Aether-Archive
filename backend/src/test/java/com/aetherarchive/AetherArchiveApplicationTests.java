@@ -13,6 +13,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 
 import com.aetherarchive.config.StorageProperties;
 import com.aetherarchive.support.PostgresTestConfiguration;
@@ -22,9 +23,14 @@ import com.aetherarchive.support.PostgresTestConfiguration;
  * PostgreSQL container and {@code ddl-auto=validate} then proves the entities still match it, so
  * this context load is also the end-to-end check of the migration. No database has to be running
  * before the suite (ADR-009).
+ *
+ * <p>It writes no row, and names its own database all the same: a context that boots one has to say which
+ * it takes, so that two of them sharing a schema is always something a reader can see
+ * ({@code PostgresTestConfiguration}).
  */
 @SpringBootTest
 @ActiveProfiles("test")
+@TestPropertySource(properties = "aether.test.database=bootstrap")
 @Import(PostgresTestConfiguration.class)
 class AetherArchiveApplicationTests {
 

@@ -51,12 +51,17 @@ import com.aetherarchive.support.PostgresTestConfiguration;
  * transaction would hide the very thing under test, because the item would be rolled back by the test
  * framework rather than by the failed publish. Every write is therefore committed or rolled back for real,
  * and the assertions read the database afterwards.
+ *
+ * <p>It owns a database for the same reason: the refusal is a row in {@code flyway_schema_history} and a
+ * check constraint on {@code photo}, and both outlive the context. Applied to a database another class
+ * connects to, the constraint would refuse that class's every curation.
  */
 @DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@TestPropertySource(
-        properties = "spring.flyway.locations=classpath:db/migration,classpath:db/test-migration-curation")
+@TestPropertySource(properties = {
+        "spring.flyway.locations=classpath:db/migration,classpath:db/test-migration-curation",
+        "aether.test.database=dump_curation" })
 @Import({ PostgresTestConfiguration.class, DumpService.class,
         DumpPublishAtomicityTest.FixedClockConfiguration.class })
 @Transactional(propagation = Propagation.NOT_SUPPORTED)

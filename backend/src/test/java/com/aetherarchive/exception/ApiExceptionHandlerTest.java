@@ -42,6 +42,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.MessageSourceResolvable;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.support.DefaultMessageSourceResolvable;
 import org.springframework.core.MethodParameter;
@@ -691,9 +692,20 @@ class ApiExceptionHandlerTest {
         Method method = PhotoCountGuard.class.getDeclaredMethod("photosPerDump", int.class);
         ParameterValidationResult result = new ParameterValidationResult(new MethodParameter(method, 0), 0,
                 List.of(new DefaultMessageSourceResolvable(new String[0], null,
-                        "must be greater than or equal to " + ValidationConstraints.DUMP_PHOTO_COUNT)));
+                        "must be greater than or equal to " + ValidationConstraints.DUMP_PHOTO_COUNT)),
+                null, null, null, ApiExceptionHandlerTest::noSourceObject);
         return new MethodValidationException(
                 MethodValidationResult.create(new PhotoCountGuard(), method, List.of(result)));
+    }
+
+    /**
+     * What the framework's shorter constructors install for a result that carries no container: this
+     * argument did not arrive inside a collection, a map or a container object, so no source object of
+     * that argument can be looked up. The advice reads the parameter's name and the resolvable's default
+     * message and never unwraps anything, but the result has to behave like a real one in every respect.
+     */
+    private static Object noSourceObject(MessageSourceResolvable resolvable, Class<?> type) {
+        throw new IllegalArgumentException("No source object of the given type");
     }
 
     /**

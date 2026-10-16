@@ -21,6 +21,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 
 import com.aetherarchive.domain.ArchiveItem;
 import com.aetherarchive.domain.ItemType;
@@ -33,6 +34,7 @@ import com.aetherarchive.support.PostgresTestConfiguration;
  */
 @DataJpaTest
 @ActiveProfiles("test")
+@TestPropertySource(properties = "aether.test.database=repository")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import(PostgresTestConfiguration.class)
 class ArchiveItemRepositoryTest {

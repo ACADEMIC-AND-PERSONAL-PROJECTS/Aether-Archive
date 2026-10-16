@@ -22,6 +22,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 
 import com.aetherarchive.domain.ArchiveItem;
 import com.aetherarchive.domain.Photo;
@@ -49,6 +50,7 @@ import com.aetherarchive.support.PostgresTestConfiguration;
  */
 @DataJpaTest
 @ActiveProfiles("test")
+@TestPropertySource(properties = "aether.test.database=repository")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import(PostgresTestConfiguration.class)
 class SchemaBaselineTest {
