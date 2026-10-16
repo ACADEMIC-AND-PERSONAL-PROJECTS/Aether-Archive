@@ -12,7 +12,7 @@
  */
 export function RouteFallback() {
   return (
-    <div className="min-h-dvh" role="status">
+    <div className="flex-1" role="status">
       <span className="sr-only">Loading view</span>
     </div>
   );

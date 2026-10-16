@@ -6,14 +6,15 @@
  * the shell's contract — one `<main>` per view, one `<h1>` naming it — so the route smoke test asserts
  * something true rather than a marker that has to be deleted later.
  *
- * The colours are the scaffold's placeholders; `--aura-*` replaces them in E2-S3/E2-S6.
+ * The colours and tracking read the token layer (`global.css`, E2-S3); a dump's generated
+ * palette takes them over in E2-S6.
  */
 export function SplashView() {
   return (
-    <main className="grid min-h-dvh place-items-center p-8 text-center">
+    <main className="grid flex-1 place-items-center p-8 text-center">
       <div className="space-y-2">
-        <h1 className="text-2xl font-normal tracking-tight text-neutral-200">Aether Archive</h1>
-        <p className="text-sm text-neutral-400">The splash view arrives in E3-S1.</p>
+        <h1 className="text-2xl font-normal tracking-display text-aura-text">Aether Archive</h1>
+        <p className="text-sm text-aura-muted">The splash view arrives in E3-S1.</p>
       </div>
     </main>
   );
