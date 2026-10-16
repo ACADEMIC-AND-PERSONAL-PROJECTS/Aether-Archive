@@ -20,7 +20,7 @@
 
 | # | ID | Story | Points | Priority | Status | PR |
 | --- | --- | --- | --- | --- | --- | --- |
-| 0 | S03-C1 | *chore*: land the Sprint-2 working changes in `.claude/` (number provenance, guard canonicalisation, adversarial review control) | — | — | Todo | — |
+| 0 | S03-C1 | *chore*: land the Sprint-2 working changes in `.claude/` (number provenance, guard canonicalisation, adversarial review control) | — | — | Done | #97 |
 | 1 | E3-S1 | Immersive splash view | 5 | p0 | Todo | — |
 | 2 | E3-S2 | Glass menu overlay | 5 | p0 | Todo | — |
 | 3 | E3-S3 | Route transitions & motion system | 3 | p0 | Todo | — |
@@ -132,3 +132,16 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   `@tanstack/react-query` is already a dependency, so E4-S1's query invalidation adds no package; the
   carried security items (#71, #72, #73, #79) are kept out by name, with the decision recorded in
   `docs/scrum/PRODUCT-BACKLOG.md`.
+- 2026-10-16 — **S03-C1 (#97) landed, and its own review is the evidence that change 3 works.** The first
+  version of the guard rule said path guards must "canonicalise both sides with `toRealPath()`". The
+  reviewer compiled a probe against `target/classes`, called `StorageService.requireInside` with the
+  adversarial matrix *that same PR* prescribes, and the rule lost: the guard normalises the candidate
+  lexically, and `toRealPath()` on a not-yet-existing upload target throws `NoSuchFileException`. So the
+  standard indicted correct, reviewed code — the failure the retrospective's change 1 exists to prevent,
+  caught one level up because change 3 made somebody execute the claim instead of reading it. The rule now
+  states the invariant and names its one open exception (E6-S17 / #79, `p1`); the round-2 audit found three
+  more clauses that were true only under their author's reading (`Files.move` vs an `open`-style write; link
+  *position*; "pinned by tests" asserted about a suite that has no such test), each fixed by naming rather
+  than generalising. Cost of all of it: 89 changed lines and two review rounds. Worth recording because the
+  shape generalises — a rule, a spec or a report that describes behaviour nobody executed is the defect this
+  project keeps finding, and it is cheapest to catch when the document is the diff.
