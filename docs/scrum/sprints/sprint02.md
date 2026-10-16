@@ -21,7 +21,7 @@
 | 1 | E2-S1 | Scaffold the frontend toolchain | 5 | p0 | Done | #78 |
 | 2 | E1-S5 | Serve images at `/images/**` | 2 | p0 | Done | #80 |
 | 3 | E2-S2 | App shell, routing & typed API client | 5 | p0 | Done | #81 |
-| 4 | E2-S3 | Global CSS foundation | 3 | p0 | Todo | — |
+| 4 | E2-S3 | Global CSS foundation | 3 | p0 | Done | #84 |
 | 5 | E2-S4 | Dominant-colour extraction algorithm | 8 | p0 | Todo | — |
 | 6 | E2-S5 | Fontsource typography system | 3 | p0 | Todo | — |
 | 7 | E2-S6 | Dark Glassmorphism theme layer & GlassPanel | 5 | p0 | Todo | — |
@@ -159,3 +159,9 @@ reader can check it afterwards:
   `reports/verify-e2-s2-20261016.md` §7 — was re-checked against the diff, mutations included, and held;
   the branch merges whole. This line is the clause's last step for E2-S2: the sprint notes record the
   outcome.
+- 2026-10-16 — **E2-S3's review: no blocking findings, and the size is noted and accepted.** The reviewer
+  re-ran every probe in a throwaway copy — the scan sentinels including the pre-fix `p6vokHjt` → `B7cX_O_f`
+  baseline, the palette wipe, reduced motion under the forced preference, the nine overflow cells and the
+  contrast values — and sustained `index-DYfMmtpW.css` / `424+ 18- 442`. The 442 hand-written is ~10% over
+  the DoD's soft guideline and under the branch-split trigger, so the claim clause is not triggered; both
+  numbers are stated in the PR and `reports/verify-e2-s3-20261016.md` §8.
