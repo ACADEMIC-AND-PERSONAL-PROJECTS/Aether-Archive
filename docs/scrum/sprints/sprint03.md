@@ -21,8 +21,8 @@
 | # | ID | Story | Points | Priority | Status | PR |
 | --- | --- | --- | --- | --- | --- | --- |
 | 0 | S03-C1 | *chore*: land the Sprint-2 working changes in `.claude/` (number provenance, guard canonicalisation, adversarial review control) | — | — | Done | #97 |
-| 1a | E3-S1A | Immersive splash — the photo, its tone, the quiet states (criteria 1, 2, 5) | 3 | p0 | Todo | — |
-| 1b | E3-S1B | Immersive splash — the tap intent, the pull-to-refresh, the per-visit photo (criteria 3, 4) | 2 | p0 | Todo | — |
+| 1a | E3-S1A | Immersive splash — the photo, its tone, the quiet states (criteria 1, 2, 5) | 3 | p0 | Done | #100 |
+| 1b | E3-S1B | Immersive splash — the tap intent, the pull-to-refresh, the per-visit photo (criteria 3, 4) | 2 | p0 | Done | #101 |
 | 2 | E3-S2 | Glass menu overlay | 5 | p0 | Todo | — |
 | 3 | E3-S3 | Route transitions & motion system | 3 | p0 | Todo | — |
 | 4 | E3-S4 | Quiet loading / empty / error states | 2 | p1 | Todo | — |
@@ -62,13 +62,20 @@ acceptance criteria). The claim was withdrawn and the story re-cut on the review
 (criteria 1, 2, 5 — the photo, its tone, the quiet states, 3 pts) then **E3-S1B** (criteria 3, 4 — the tap
 intent, the pull, the per-visit photo, 2 pts) from an updated `develop`. Points are unchanged at 5.
 
-Two things this records honestly rather than tidily. **The split did not solve the size problem**: E3-S1A is
-1,367 changed lines on its own, still over both budgets, because the view, the pipeline and their test files
-are shared by both halves — the review's own estimate of ~950 for slice A was optimistic. And **a 5-point
-story producing a four-figure diff is a planning signal**, not a compliance detail: this codebase's
-documentation density (a third of new source lines are comments carrying decisions and probe results) means
-a story-sized *feature* no longer fits a size budget written for leaner code. Both numbers go to the
-retrospective; that is the change this sprint should evaluate, not the split mechanics.
+Both slices merged (E3-S1A `2d8af90`, E3-S1B `79859c4`), so the numbers are final rather than projected, and
+they are the reason this note exists. **The split did not solve the size problem — it made the story 50%
+larger.** 1,367 + 929 = **2,296 changed lines for one 5-point story**, against **1,516** for the unsliced
+branch. The review decomposed the 780-line difference rather than assuming it: **prose went 194 → 758
+(+564), non-prose 1,322 → 1,521 (+199)** — **74% of the split's cost is re-stated prose**, because each
+slice writes its own verify report, its own README rows and its own pass over the ADR. One further cut was
+available (the cache policy alone, ~250 lines with its prose) and would still not have reached ~400.
+
+So the split bought reviewability — three passes found a claim that did not survive, then rebuilt it into
+one that did, then an untested half of the behaviour the slice exists to deliver — at 780 lines of extra
+writing. **That trade, not the split mechanics, is what this sprint should evaluate**: either this
+codebase's documentation density (a third of new source lines are comments carrying decisions and probe
+results) has outgrown a budget written for leaner code, or "one story" needs to mean a smaller feature than
+it currently does. Both readings are defensible and neither is settled by two green PRs.
 
 ## Definition of Ready check
 
