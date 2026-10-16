@@ -1,4 +1,13 @@
 # Tests never touch the real data directory (AETHER_DATA_DIR): they work under the system temp dir.
+spring:
+  jpa:
+    properties:
+      hibernate:
+        # `DumpQueryTest` counts the statements a read path issues: `GET /dumps` has to stay at two, and a
+        # per-dump query or a lazy association reached while grouping would show up as extra ones. The
+        # counters cost one increment per event and are on in the test profile only.
+        generate_statistics: true
+
 aether:
   storage:
     data-dir: ${java.io.tmpdir}/aether-archive-test-data
