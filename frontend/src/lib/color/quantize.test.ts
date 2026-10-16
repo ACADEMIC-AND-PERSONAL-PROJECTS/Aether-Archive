@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+
 import { rgbToOklab } from "./oklch";
 import { ALPHA_FLOOR, clusterKmeans, clusterMedianCut, toOklabPixels } from "./quantize";
+
 import type { Oklab, PixelImage } from "./types";
 
 function mulberry32(seed: number): () => number {
@@ -14,7 +16,12 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-function jitteredPoints(center: Oklab, count: number, spread: number, random: () => number): Oklab[] {
+function jitteredPoints(
+  center: Oklab,
+  count: number,
+  spread: number,
+  random: () => number,
+): Oklab[] {
   return Array.from({ length: count }, () => ({
     l: center.l + (random() - 0.5) * spread,
     a: center.a + (random() - 0.5) * spread,
@@ -30,18 +37,30 @@ describe("toOklabPixels", () => {
   it("converts row-major and honours the alpha floor", () => {
     const image: PixelImage = {
       data: new Uint8ClampedArray([
-        255, 0, 0, 255, // kept
-        0, 255, 0, 254, // kept
-        0, 0, 255, 0, // discarded: transparent
-        0, 0, 0, 127, // discarded: one below the floor
+        255,
+        0,
+        0,
+        255, // kept
+        0,
+        255,
+        0,
+        254, // kept
+        0,
+        0,
+        255,
+        0, // discarded: transparent
+        0,
+        0,
+        0,
+        127, // discarded: one below the floor
       ]),
       width: 2,
       height: 2,
     };
     const points = toOklabPixels(image);
     expect(points).toHaveLength(2);
-    expect(points[0]!.l).toBeCloseTo(rgbToOklab(255, 0, 0).l, 12);
-    expect(points[1]!.b).toBeCloseTo(rgbToOklab(0, 255, 0).b, 12);
+    expect(points[0]?.l).toBeCloseTo(rgbToOklab(255, 0, 0).l, 12);
+    expect(points[1]?.b).toBeCloseTo(rgbToOklab(0, 255, 0).b, 12);
     expect(ALPHA_FLOOR).toBe(128);
   });
 });
@@ -59,10 +78,10 @@ describe("clusterKmeans", () => {
     expect(clusters).toHaveLength(3);
     const byCount = [...clusters].sort((a, b) => b.count - a.count);
     expect(byCount.map((cluster) => cluster.count)).toEqual([100, 60, 40]);
-    expect(byCount[0]!.centroid.l).toBeCloseTo(ORANGE.l, 2);
-    expect(byCount[0]!.centroid.a).toBeCloseTo(ORANGE.a, 2);
-    expect(byCount[1]!.centroid.l).toBeCloseTo(TEAL.l, 2);
-    expect(byCount[2]!.centroid.b).toBeCloseTo(BLUE.b, 2);
+    expect(byCount[0]?.centroid.l).toBeCloseTo(ORANGE.l, 2);
+    expect(byCount[0]?.centroid.a).toBeCloseTo(ORANGE.a, 2);
+    expect(byCount[1]?.centroid.l).toBeCloseTo(TEAL.l, 2);
+    expect(byCount[2]?.centroid.b).toBeCloseTo(BLUE.b, 2);
   });
 
   it("is deterministic: identical input, identical output", () => {
@@ -73,7 +92,7 @@ describe("clusterKmeans", () => {
     const same = Array.from({ length: 10 }, () => ({ ...ORANGE }));
     const clusters = clusterKmeans(same, 5);
     expect(clusters).toHaveLength(1);
-    expect(clusters[0]!.count).toBe(10);
+    expect(clusters[0]?.count).toBe(10);
   });
 
   it("returns one cluster per point when k exceeds the point count", () => {
@@ -97,9 +116,9 @@ describe("clusterMedianCut", () => {
     const clusters = clusterMedianCut(points, 2);
     expect(clusters).toHaveLength(2);
     const byLightness = [...clusters].sort((x, y) => x.centroid.l - y.centroid.l);
-    expect(byLightness[0]!.count).toBe(50);
-    expect(byLightness[0]!.centroid.l).toBeCloseTo(0.245, 6);
-    expect(byLightness[1]!.centroid.l).toBeCloseTo(0.745, 6);
+    expect(byLightness[0]?.count).toBe(50);
+    expect(byLightness[0]?.centroid.l).toBeCloseTo(0.245, 6);
+    expect(byLightness[1]?.centroid.l).toBeCloseTo(0.745, 6);
   });
 
   it("recovers two equal, well-separated groups", () => {
@@ -114,8 +133,8 @@ describe("clusterMedianCut", () => {
     expect(clusters).toHaveLength(2);
     const byLightness = [...clusters].sort((x, y) => x.centroid.l - y.centroid.l);
     expect(byLightness.map((cluster) => cluster.count)).toEqual([100, 100]);
-    expect(byLightness[0]!.centroid.l).toBeCloseTo(low.l, 2);
-    expect(byLightness[1]!.centroid.l).toBeCloseTo(high.l, 2);
+    expect(byLightness[0]?.centroid.l).toBeCloseTo(low.l, 2);
+    expect(byLightness[1]?.centroid.l).toBeCloseTo(high.l, 2);
   });
 
   it("is deterministic: identical input, identical output", () => {
@@ -126,7 +145,7 @@ describe("clusterMedianCut", () => {
     const same = Array.from({ length: 10 }, () => ({ ...ORANGE }));
     const clusters = clusterMedianCut(same, 5);
     expect(clusters).toHaveLength(1);
-    expect(clusters[0]!.count).toBe(10);
+    expect(clusters[0]?.count).toBe(10);
   });
 
   it("handles empty input", () => {

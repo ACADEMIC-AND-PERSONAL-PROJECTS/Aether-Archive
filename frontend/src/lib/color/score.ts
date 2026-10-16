@@ -3,6 +3,7 @@
  * the ΔE threshold, and score by weight × chroma × mid-lightness. Pure functions over clusters.
  */
 import { deltaEok, oklabToOklch } from "./oklch";
+
 import type { Cluster } from "./quantize";
 import type { Oklab } from "./types";
 
@@ -43,14 +44,21 @@ export function filterClusters(clusters: Cluster[]): Cluster[] {
  * input order; ties resolve to the earliest pair.
  */
 export function mergeClusters(clusters: Cluster[], threshold: number = MERGE_THRESHOLD): Cluster[] {
-  const merged = clusters.map((cluster) => ({ centroid: { ...cluster.centroid }, count: cluster.count }));
+  const merged = clusters.map((cluster) => ({
+    centroid: { ...cluster.centroid },
+    count: cluster.count,
+  }));
 
   for (;;) {
     let pair: readonly [number, number] | null = null;
     let closest = threshold;
     for (let i = 0; i < merged.length; i++) {
+      const a = merged[i];
+      if (!a) continue;
       for (let j = i + 1; j < merged.length; j++) {
-        const distance = deltaEok(merged[i]!.centroid, merged[j]!.centroid);
+        const b = merged[j];
+        if (!b) continue;
+        const distance = deltaEok(a.centroid, b.centroid);
         if (distance < closest) {
           closest = distance;
           pair = [i, j];
@@ -60,8 +68,9 @@ export function mergeClusters(clusters: Cluster[], threshold: number = MERGE_THR
     if (!pair) break;
 
     const [i, j] = pair;
-    const a = merged[i]!;
-    const b = merged[j]!;
+    const a = merged[i];
+    const b = merged[j];
+    if (!a || !b) break;
     const count = a.count + b.count;
     merged[i] = { centroid: blend(a.centroid, b.centroid, a.count, b.count), count };
     merged.splice(j, 1);

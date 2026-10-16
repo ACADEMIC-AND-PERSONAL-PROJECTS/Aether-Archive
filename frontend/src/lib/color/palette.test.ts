@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   ORANGE,
   dominantHue,
@@ -31,8 +32,8 @@ describe("extractPalette — the §2.1 pipeline", () => {
   it("finds the dominant hue first and reports weights that sum to 1", () => {
     const { colors } = extractPalette(dominantHue());
     expect(colors.length).toBeGreaterThanOrEqual(3);
-    expect(colors[0]!.hex).toBe(rgbToHex(ORANGE[0], ORANGE[1], ORANGE[2]));
-    expect(colors[0]!.weight).toBeCloseTo(0.7, 2);
+    expect(colors[0]?.hex).toBe(rgbToHex(ORANGE[0], ORANGE[1], ORANGE[2]));
+    expect(colors[0]?.weight).toBeCloseTo(0.7, 2);
     const sum = colors.reduce((total, color) => total + color.weight, 0);
     expect(sum).toBeCloseTo(1, 9);
   });
@@ -58,8 +59,8 @@ describe("extractPalette — the §2.1 pipeline", () => {
   it("ignores fully transparent regions — no black bleed, full weight", () => {
     const { colors } = extractPalette(transparentHalf());
     expect(colors).toHaveLength(1);
-    expect(colors[0]!.hex).toBe(rgbToHex(ORANGE[0], ORANGE[1], ORANGE[2]));
-    expect(colors[0]!.weight).toBeCloseTo(1, 9);
+    expect(colors[0]?.hex).toBe(rgbToHex(ORANGE[0], ORANGE[1], ORANGE[2]));
+    expect(colors[0]?.weight).toBeCloseTo(1, 9);
   });
 
   it("is deterministic: identical input, identical palette", () => {
@@ -79,8 +80,12 @@ describe("extractPalette — the §2.1 pipeline", () => {
       const { colors } = extractPalette(image);
       for (let i = 0; i < colors.length; i++) {
         for (let j = i + 1; j < colors.length; j++) {
+          const a = colors[i];
+          const b = colors[j];
           // a hair under the threshold: hex rounding can shave 0.001 off the distance
-          expect(deltaBetween(colors[i]!.hex, colors[j]!.hex)).toBeGreaterThan(MERGE_THRESHOLD - 0.003);
+          if (a && b) {
+            expect(deltaBetween(a.hex, b.hex)).toBeGreaterThan(MERGE_THRESHOLD - 0.003);
+          }
         }
       }
     }
@@ -104,8 +109,8 @@ describe("extractPalette — the §2.1 pipeline", () => {
 
     const { colors } = extractPalette(image);
     expect(colors).toHaveLength(1);
-    expect(colors[0]!.hex).toBe(rgbToHex(120, 90, 60));
-    expect(colors[0]!.weight).toBeCloseTo(1, 9);
+    expect(colors[0]?.hex).toBe(rgbToHex(120, 90, 60));
+    expect(colors[0]?.weight).toBeCloseTo(1, 9);
   });
 
   it("keeps the dominant region's mass when a textured region splits across clusters", () => {

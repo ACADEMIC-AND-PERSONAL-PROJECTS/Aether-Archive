@@ -130,11 +130,9 @@ export function syntheticPhoto(width = 64, height = 64): PixelImage {
   const data = new Uint8ClampedArray(width * height * 4);
   const total = width * height;
   let cursor = 0;
-  PHOTO_GROUND_TRUTH.forEach(({ rgb }, index) => {
+  PHOTO_GROUND_TRUTH.forEach(({ rgb, share }, index) => {
     const end =
-      index === PHOTO_GROUND_TRUTH.length - 1
-        ? total
-        : cursor + Math.round(total * PHOTO_GROUND_TRUTH[index]!.share);
+      index === PHOTO_GROUND_TRUTH.length - 1 ? total : cursor + Math.round(total * share);
     for (let i = cursor; i < end; i++) {
       data[i * 4] = rgb[0] + (random() - 0.5) * 24;
       data[i * 4 + 1] = rgb[1] + (random() - 0.5) * 24;

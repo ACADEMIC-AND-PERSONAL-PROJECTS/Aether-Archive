@@ -4,8 +4,8 @@
  * the error funnel is unit-tested here with injected dependencies while the real path is exercised
  * by the offline Chromium probe with real PNG bytes.
  */
-import { MAX_EDGE, extractPalette } from "./palette";
-import type { ExtractOptions } from "./palette";
+import { MAX_EDGE, extractPalette, type ExtractOptions } from "./palette";
+
 import type { Palette, PixelImage } from "./types";
 
 export type PaletteErrorCode = "unsupported" | "decode-failed";

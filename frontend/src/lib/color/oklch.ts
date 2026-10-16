@@ -56,7 +56,9 @@ export function rgbToOklch(r: number, g: number, b: number): Oklch {
 /** Lowercase `#rrggbb`; inputs are rounded and clamped like `oklabToRgb`. */
 export function rgbToHex(r: number, g: number, b: number): string {
   const byte = (channel: number): string =>
-    Math.max(0, Math.min(255, Math.round(channel))).toString(16).padStart(2, "0");
+    Math.max(0, Math.min(255, Math.round(channel)))
+      .toString(16)
+      .padStart(2, "0");
   return `#${byte(r)}${byte(g)}${byte(b)}`;
 }
 

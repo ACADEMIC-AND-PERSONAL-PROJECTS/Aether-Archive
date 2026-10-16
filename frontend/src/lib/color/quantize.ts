@@ -8,6 +8,7 @@
  * then have to pay for. Determinism comes from a fixed-order input, a seeded PRNG, and stable sorts.
  */
 import { rgbToOklab } from "./oklch";
+
 import type { Oklab, PixelImage } from "./types";
 
 /** Pixels below this alpha are ignored — §2.1's transparent-PNG case. */
@@ -28,8 +29,8 @@ export function toOklabPixels(image: PixelImage, alphaFloor: number = ALPHA_FLOO
   const points: Oklab[] = [];
   const { data } = image;
   for (let i = 0; i < data.length; i += 4) {
-    if (data[i + 3]! < alphaFloor) continue;
-    points.push(rgbToOklab(data[i]!, data[i + 1]!, data[i + 2]!));
+    if ((data[i + 3] ?? 0) < alphaFloor) continue;
+    points.push(rgbToOklab(data[i] ?? 0, data[i + 1] ?? 0, data[i + 2] ?? 0));
   }
   return points;
 }
@@ -49,6 +50,15 @@ function mulberry32(seed: number): () => number {
   };
 }
 
+interface Sum {
+  l: number;
+  a: number;
+  b: number;
+  n: number;
+}
+
+const emptySum = (): Sum => ({ l: 0, a: 0, b: 0, n: 0 });
+
 export interface KmeansOptions {
   seed?: number;
   maxIterations?: number;
@@ -59,49 +69,47 @@ export interface KmeansOptions {
  * are dropped, so a degenerate input (every pixel identical) yields one cluster rather than k
  * copies of itself.
  */
-export function clusterKmeans(
-  points: Oklab[],
-  k: number,
-  options: KmeansOptions = {},
-): Cluster[] {
-  if (points.length === 0 || k <= 0) return [];
+export function clusterKmeans(points: Oklab[], k: number, options: KmeansOptions = {}): Cluster[] {
+  const first = points[0];
+  if (!first || k <= 0) return [];
   const target = Math.min(k, points.length);
   const random = mulberry32(options.seed ?? KMEANS_SEED);
   const maxIterations = options.maxIterations ?? 24;
+  const pointAt = (index: number): Oklab => points[index] ?? first;
 
-  const centers: Oklab[] = [{ ...points[Math.floor(random() * points.length)]! }];
+  const centers: Oklab[] = [{ ...pointAt(Math.floor(random() * points.length)) }];
   const nearest = new Float64Array(points.length).fill(Infinity);
   while (centers.length < target) {
-    const last = centers[centers.length - 1]!;
+    const last = centers[centers.length - 1] ?? first;
     let total = 0;
     for (let i = 0; i < points.length; i++) {
-      const distance = distanceSquared(points[i]!, last);
-      if (distance < nearest[i]!) nearest[i] = distance;
-      total += nearest[i]!;
+      const distance = distanceSquared(pointAt(i), last);
+      if (distance < (nearest[i] ?? 0)) nearest[i] = distance;
+      total += nearest[i] ?? 0;
     }
     if (total === 0) break; // every point already coincides with a centre
 
     let pick = random() * total;
     let index = points.length - 1;
     for (let i = 0; i < points.length; i++) {
-      pick -= nearest[i]!;
+      pick -= nearest[i] ?? 0;
       if (pick <= 0) {
         index = i;
         break;
       }
     }
-    centers.push({ ...points[index]! });
+    centers.push({ ...pointAt(index) });
   }
 
   const assignment = new Int32Array(points.length); // 0 = unassigned, otherwise centre index + 1
   for (let iteration = 0; iteration < maxIterations; iteration++) {
     let moved = false;
     for (let i = 0; i < points.length; i++) {
-      const point = points[i]!;
+      const point = pointAt(i);
       let best = 0;
       let bestDistance = Infinity;
       for (let c = 0; c < centers.length; c++) {
-        const distance = distanceSquared(point, centers[c]!);
+        const distance = distanceSquared(point, centers[c] ?? first);
         if (distance < bestDistance) {
           bestDistance = distance;
           best = c;
@@ -111,30 +119,34 @@ export function clusterKmeans(
       assignment[i] = best + 1;
     }
 
-    const sums = centers.map(() => ({ l: 0, a: 0, b: 0, n: 0 }));
+    const sums = centers.map(emptySum);
     for (let i = 0; i < points.length; i++) {
-      const point = points[i]!;
-      const sum = sums[assignment[i]! - 1]!;
-      sum.l += point.l;
-      sum.a += point.a;
-      sum.b += point.b;
-      sum.n += 1;
+      const point = pointAt(i);
+      const sum = sums[(assignment[i] ?? 1) - 1];
+      if (sum) {
+        sum.l += point.l;
+        sum.a += point.a;
+        sum.b += point.b;
+        sum.n += 1;
+      }
     }
     for (let c = 0; c < centers.length; c++) {
-      const sum = sums[c]!;
-      if (sum.n > 0) centers[c] = { l: sum.l / sum.n, a: sum.a / sum.n, b: sum.b / sum.n };
+      const sum = sums[c];
+      if (sum && sum.n > 0) centers[c] = { l: sum.l / sum.n, a: sum.a / sum.n, b: sum.b / sum.n };
     }
     if (!moved && iteration > 0) break;
   }
 
-  const totals = centers.map(() => ({ l: 0, a: 0, b: 0, n: 0 }));
+  const totals = centers.map(emptySum);
   for (let i = 0; i < points.length; i++) {
-    const point = points[i]!;
-    const total = totals[assignment[i]! - 1]!;
-    total.l += point.l;
-    total.a += point.a;
-    total.b += point.b;
-    total.n += 1;
+    const point = pointAt(i);
+    const total = totals[(assignment[i] ?? 1) - 1];
+    if (total) {
+      total.l += point.l;
+      total.a += point.a;
+      total.b += point.b;
+      total.n += 1;
+    }
   }
   return totals
     .filter((total) => total.n > 0)
@@ -160,7 +172,8 @@ export function clusterMedianCut(points: Oklab[], k: number): Cluster[] {
     let chosenChannel: (typeof channels)[number] = "l";
     let chosenRange = 0;
     for (let i = 0; i < boxes.length; i++) {
-      const box = boxes[i]!;
+      const box = boxes[i];
+      if (!box) continue;
       for (const channel of channels) {
         let min = Infinity;
         let max = -Infinity;
@@ -179,7 +192,8 @@ export function clusterMedianCut(points: Oklab[], k: number): Cluster[] {
     }
     if (chosenBox === -1) break; // every box is a single colour — nothing left to split
 
-    const box = boxes[chosenBox]!;
+    const box = boxes[chosenBox];
+    if (!box) break;
     box.sort((p, q) => p[chosenChannel] - q[chosenChannel]);
     const mid = Math.floor(box.length / 2);
     boxes.splice(chosenBox, 1, box.slice(0, mid), box.slice(mid));

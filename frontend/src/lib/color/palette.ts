@@ -7,6 +7,7 @@ import { downscale } from "./downscale";
 import { oklabToHex, oklabToOklch } from "./oklch";
 import { ALPHA_FLOOR, clusterKmeans, clusterMedianCut, toOklabPixels } from "./quantize";
 import { filterClusters, mergeClusters, scoreClusters } from "./score";
+
 import type { Oklab, Oklch, Palette, PaletteColor, PixelImage } from "./types";
 
 /** §2.1's palette bounds. */
@@ -44,7 +45,10 @@ export interface ExtractOptions {
  */
 export function extractPalette(image: PixelImage, options: ExtractOptions = {}): Palette {
   const algorithm = options.algorithm ?? DEFAULT_ALGORITHM;
-  const points = toOklabPixels(downscale(image, options.maxEdge ?? MAX_EDGE), options.alphaFloor ?? ALPHA_FLOOR);
+  const points = toOklabPixels(
+    downscale(image, options.maxEdge ?? MAX_EDGE),
+    options.alphaFloor ?? ALPHA_FLOOR,
+  );
   if (points.length === 0) return { colors: [] };
 
   let k = Math.min(options.k ?? MAX_COLORS, points.length);

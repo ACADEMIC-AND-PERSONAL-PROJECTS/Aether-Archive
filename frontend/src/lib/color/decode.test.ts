@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   PaletteExtractionError,
   decodeToPixels,
@@ -69,12 +70,12 @@ describe("decodeToPixels", () => {
       height,
       getContext: () => null,
     });
-    await expect(
-      decodeToPixels(new Uint8Array([1, 2, 3]), { dependencies }),
-    ).rejects.toMatchObject({
-      name: "PaletteExtractionError",
-      code: "unsupported",
-    });
+    await expect(decodeToPixels(new Uint8Array([1, 2, 3]), { dependencies })).rejects.toMatchObject(
+      {
+        name: "PaletteExtractionError",
+        code: "unsupported",
+      },
+    );
   });
 
   it("reports 'unsupported' where the globals are absent — the probe's jsdom finding", async () => {
@@ -92,8 +93,8 @@ describe("extractPaletteFromBytes", () => {
     const palette = await extractPaletteFromBytes(new Uint8Array([1, 2, 3]), {
       dependencies: fakeDependencies(),
     });
-    expect(palette.colors).toHaveLength(1);
-    expect(palette.colors[0]!.hex).toBe("#c8c8c8");
-    expect(palette.colors[0]!.weight).toBeCloseTo(1, 9);
+    const [color] = palette.colors;
+    expect(color?.hex).toBe("#c8c8c8");
+    expect(color?.weight).toBeCloseTo(1, 9);
   });
 });

@@ -10,7 +10,7 @@ import type { PixelImage } from "./types";
 export const MAX_EDGE = 64;
 
 export function downscale(image: PixelImage, maxEdge: number = MAX_EDGE): PixelImage {
-  const { width, height } = image;
+  const { data, width, height } = image;
   if (width <= maxEdge && height <= maxEdge) return image;
 
   const scale = maxEdge / Math.max(width, height);
@@ -33,10 +33,10 @@ export function downscale(image: PixelImage, maxEdge: number = MAX_EDGE): PixelI
       for (let y = y0; y < y1; y++) {
         for (let x = x0; x < x1; x++) {
           const i = (y * width + x) * 4;
-          const alpha = image.data[i + 3]! / 255;
-          r += image.data[i]! * alpha;
-          g += image.data[i + 1]! * alpha;
-          b += image.data[i + 2]! * alpha;
+          const alpha = (data[i + 3] ?? 0) / 255;
+          r += (data[i] ?? 0) * alpha;
+          g += (data[i + 1] ?? 0) * alpha;
+          b += (data[i + 2] ?? 0) * alpha;
           alphaSum += alpha;
           samples++;
         }

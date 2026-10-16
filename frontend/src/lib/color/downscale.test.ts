@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+
 import { downscale } from "./downscale";
+
 import type { PixelImage } from "./types";
 
 function solid(rgba: [number, number, number, number], width: number, height: number): PixelImage {
@@ -36,7 +38,9 @@ describe("downscale", () => {
     for (let y = 0; y < 4; y++) {
       for (let x = 0; x < 4; x++) {
         const q = (y < 2 ? 0 : 2) + (x < 2 ? 0 : 1);
-        const [r, g, b] = quadrant[q]!;
+        const quadrantColor = quadrant[q];
+        if (!quadrantColor) continue;
+        const [r, g, b] = quadrantColor;
         const i = (y * 4 + x) * 4;
         image.data[i] = r;
         image.data[i + 1] = g;
@@ -71,9 +75,12 @@ describe("downscale", () => {
   it("keeps a uniform colour exactly uniform", () => {
     const out = downscale(solid([37, 84, 201, 255], 128, 96), 64);
     for (let i = 0; i < out.width * out.height; i++) {
-      expect([out.data[i * 4], out.data[i * 4 + 1], out.data[i * 4 + 2], out.data[i * 4 + 3]]).toEqual(
-        [37, 84, 201, 255],
-      );
+      expect([
+        out.data[i * 4],
+        out.data[i * 4 + 1],
+        out.data[i * 4 + 2],
+        out.data[i * 4 + 3],
+      ]).toEqual([37, 84, 201, 255]);
     }
   });
 });
