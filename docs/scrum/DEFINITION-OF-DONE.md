@@ -35,7 +35,8 @@ request. "It works on my machine" is not evidence; a command and its output tail
 - [ ] A `code-reviewer` pass was run on the diff; every blocking finding is fixed or explicitly deferred
       with a backlog entry and the user informed.
 - [ ] The PR is one story, ideally under ~400 **hand-written** changed lines (generated files excluded
-      and named); larger work was split. Both numbers are stated in the PR.
+      and named); larger work was split. Both numbers are stated in the PR. (One exception, claimed by name
+      and judged in review: the atomic-story clause in `.claude/rules/git-workflow.md`.)
 - [ ] The PR description follows `.github/PULL_REQUEST_TEMPLATE.md` and links the issue (`Closes #NN`).
 
 ## Repository hygiene

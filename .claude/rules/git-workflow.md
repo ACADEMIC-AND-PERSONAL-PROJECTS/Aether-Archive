@@ -45,6 +45,13 @@ main      ← released, protected, PR-only, tag sprint-NN at each sprint end
   splits a *branch* past ~500 changed lines, `DEFINITION-OF-DONE.md` and the `open-pr` skill want a story *PR*
   ideally under ~400. Sprint 1 averaged ~1,300 *total* because nobody separated them, so both readings looked
   hopeless at once.
+- **The atomic-story exception.** A story that cannot be sliced without failing one of its own acceptance
+  criteria is not cut into artificial stories: it stays on one branch and is split into *production / tests /
+  docs* commits that the review takes in turn (`retrospectives/sprint01.md`, change 2). The PR claims the
+  exception by name — the story, why a slice would break an acceptance criterion, and both size numbers; the
+  review judges the claim and the sprint notes record the outcome. E2-S1 and E2-S2 claim it under this clause.
+  An over-budget PR that does not claim it, or whose claim does not survive review, is a finding to resolve
+  before merge.
 - **Stage explicit paths, never a directory.** `git add <dir>` cannot tell your files from one another agent
   is writing at the same moment: in Sprint 1 it swept a security report into an unrelated story commit, and
   since history here is append-only the fix was a follow-up untrack commit rather than an amend. Run

@@ -78,7 +78,8 @@ Branch model: `main` (released) ← `develop` (integration) ← `feature/*` (one
 2. **Never rewrite history**: no `rebase`, no `--force`/`--force-with-lease`, no `filter-branch`,
    no amending a commit that is already pushed, no squash merges. Merge commits only.
 3. **Never delete** `main`, `develop`, or a merged release tag.
-4. Keep PRs small and single-story. If a branch grows past ~500 changed lines, split it.
+4. Keep PRs small and single-story. If a branch grows past ~500 changed lines, split it — one exception,
+   claimed and judged: the atomic-story clause in `.claude/rules/git-workflow.md`.
 5. Never fake verification. If a test or a build cannot run, say so and report it as `SKIPPED`.
 6. Never commit secrets, `.env`, or local data. No telemetry, no analytics, no external requests.
 7. Ask before anything destructive: deleting the data directory, dropping tables, `rm -rf`, migrations
