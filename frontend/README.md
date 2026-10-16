@@ -113,11 +113,11 @@ frontend/
 ├── tsconfig.node.json    vite.config.ts — Node types
 └── src/
     ├── app/              App shell: routes, providers, query client, fallback + tests (E2-S2)
-    ├── features/         splash/ — the immersive hero (E3-S1A); river/ workshop/ placeholders (E2-S2); menu/ in E3
+    ├── features/         splash/ — the immersive hero (E3-S1); river/ workshop/ placeholders (E2-S2); menu/ in E3
     ├── components/       README.md only — GlassPanel and shared primitives (E2-S6)
-    ├── lib/              README.md per folder (color/ image/ motion/) — pure TS, no React
-    ├── api/              typed client, query keys, retry policy, photo queries + tests (E2-S2, E3-S1A)
-    ├── hooks/            useHeroImage (E3-S1A) — reusable hooks
+    ├── lib/              README.md per folder (color/ image/ gesture/ motion/) — pure TS, no React
+    ├── api/              typed client, query keys, retry policy, photo queries + tests (E2-S2, E3-S1)
+    ├── hooks/            useHeroImage + usePullToRefresh (E3-S1) — reusable hooks
     ├── types/            wire types mirroring _docs/openapi.yml (E2-S2)
     ├── styles/           global.css — the `@theme` token layer lives here
     └── test/setup.ts     jest-dom matchers + RTL cleanup
@@ -161,11 +161,11 @@ frontend/
 | `typeof Image`                             | `function`                                                                                                                                                                                  | not probed                                                                                                     |
 | `typeof matchMedia`                        | **`undefined`**                                                                                                                                                                             | `function` — `matchMedia("(prefers-reduced-motion: reduce)").matches` → `false`, `(…: no-preference)` → `true` |
 | `typeof requestAnimationFrame`             | `function`                                                                                                                                                                                  | not probed                                                                                                     |
-| `typeof HTMLImageElement.prototype.decode` | **`undefined`** — `await img.decode()` rejects `TypeError: img.decode is not a function`, on a data URL and on an unreachable one alike                                                     | decodes; the reveal waits for it (E3-S1A)                                                                      |
+| `typeof HTMLImageElement.prototype.decode` | **`undefined`** — `await img.decode()` rejects `TypeError: img.decode is not a function`, on a data URL and on an unreachable one alike                                                     | decodes; the reveal waits for it (E3-S1)                                                                       |
 | `img` pointed at a data URL                | fires **neither** `load` nor `error` (100 ms watched); `complete` goes `true` → `false`; `naturalWidth` stays `0`                                                                           | loads                                                                                                          |
-| `URL.createObjectURL(blob)`                | `function` → `blob:nodedata:<uuid>`, assignable to `img.src`, revocable — the one image-adjacent API jsdom fakes                                                                            | `blob:http://…/<uuid>`; `naturalWidth` 1200 measured on E3-S1A's hero                                          |
-| `new TouchEvent(…)`                        | **`ReferenceError: Touch is not defined`** (neither `TouchEvent` nor `Touch` exists)                                                                                                        | not probed in this slice                                                                                       |
-| Input events reaching React                | `fireEvent.touchStart` **and** `fireEvent.pointerDown/Move/Up/Cancel` all arrive with `clientY` intact                                                                                      | not probed in this slice (E3-S1B measures real input against its tap target)                                   |
+| `URL.createObjectURL(blob)`                | `function` → `blob:nodedata:<uuid>`, assignable to `img.src`, revocable — the one image-adjacent API jsdom fakes                                                                            | `blob:http://…/<uuid>`; `naturalWidth` 1200 measured on E3-S1's hero                                           |
+| `new TouchEvent(…)`                        | **`ReferenceError: Touch is not defined`** (neither `TouchEvent` nor `Touch` exists)                                                                                                        | not needed — the gesture uses pointer events, and `Input.dispatchTouchEvent` reaches them                      |
+| Input events reaching React                | `fireEvent.touchStart` **and** `fireEvent.pointerDown/Move/Up/Cancel` all arrive with `clientY` intact                                                                                      | real `Input.dispatchMouseEvent` at (195, 400) hits the full-screen `BUTTON`; real `Escape` closes the menu     |
 | unstubbed `fetch("/api/v1/…")`             | rejects `TypeError: Failed to parse URL from /api/v1/photos/random` — _not_ a network attempt                                                                                               | real request                                                                                                   |
 | `new Response(blob).blob()`                | **rejects `TypeError: object.stream is not a function`** — a jsdom `Blob` is not a `BodyInit` the Node `Response` accepts                                                                   | n/a                                                                                                            |
 | `new Response("…").blob()`                 | a real `Blob`, whose object URL assigns to `img.src`; the difference decides whether an image test reaches the decode at all                                                                | n/a                                                                                                            |
@@ -213,16 +213,36 @@ protocol over Node 22's built-in `WebSocket` (`--remote-debugging-port`, `Page.n
 clock, `Page.captureScreenshot`, `Runtime.evaluate` for the DOM facts at the moment of the capture). The
 probe scripts live outside the repository; the capture they produced is `reports/e3s1-splash-390.png`, taken
 against the **built** bundle served with `/api/**` and `/images/**` proxied the way the container's nginx
-does. Its DOM facts were `state=ready`, `imgSrc=blob:http://127.0.0.1:4180/<uuid>`, `naturalWidth=1200`,
-`--aura-bg=#001421`, `viewport=[390,844]`, `text="Aether Archive"`, `tapTarget=null`. The photo in it is a
-generated 1200×1800 PNG, because the development data directory is a placeholder that does not resolve —
-the archive it shows is not a real one.
+does, and it is the generated 1200×1800 PNG the throwaway archive holds (the development data directory is a
+placeholder that does not resolve, so the archive it shows is not a real one). Re-measured at E3-S1's tip,
+its DOM facts are `state=ready`, `imgSrc=blob:http://127.0.0.1:8138/<uuid>`, `naturalWidth=1200`,
+`--aura-bg=#001421`, `viewport=[390,844]`, `text="Aether Archive"`, `tapTarget="Open the menu"`,
+`elementAtCentre=BUTTON`, `touchAction=pan-x pinch-zoom`. The file itself did not change: the fresh capture
+is byte-identical (43,053 bytes) to the committed one **and** to a second capture taken with the tap target
+`display: none` — which is the "UI invisible" rule measured rather than asserted.
 
-## The splash hero — measured (E3-S1A)
+## The splash hero — measured (E3-S1)
 
-Three questions this slice could not answer by reading the code, each measured against a running archive
+Four questions this story could not answer by reading the code, each measured against a running archive
 (backend on `:8097`, throwaway data directory **and** throwaway database `aether_e3s1_hero`, one uploaded
-1200×1800 PNG). Probe files were deleted afterwards; every number below is copied from the command output.
+1200×1800 PNG). Probe scripts live outside the repository; every number below is copied from the output.
+
+**Fresh per visit, without re-reading what was just read.** `GET /photos/random` answers differently on
+purpose, so the app-wide 30 s `staleTime` is wrong for it. Counted requests across an unmount and a
+remount inside one query client:
+
+| Policy                                     | After one visit | After leaving and coming back                                  |
+| ------------------------------------------ | --------------- | -------------------------------------------------------------- |
+| `createQueryClient()` defaults (30 s)      | 1               | **1** — the cached photo, which is the bug the criterion names |
+| the splash's (`staleTime: 0`, `gcTime: 0`) | 1               | **2**                                                          |
+
+`gcTime: 0` is the half that is easy to miss: a stale-but-cached entry is still _painted_ first, and the
+splash's whole promise is that the photo on screen belongs to this visit. The table is what the unit test
+asserts, and it is also what that test fails without — with the policy set back to the app defaults, the
+freshness test is the only one in the file that dies. In the **built** bundle the same criterion is
+measurable without a reload: navigating to `/river` and back client-side issued `/api/v1/photos/random`
+**#2** where the first visit issued #1 (`history.pushState` + a real `popstate`; the app's own router
+answered).
 
 **The photo's bytes are read once.** `lib/image/hero.ts` fetches the bytes, decodes them through a blob
 URL and derives the palette from _those_ bytes. The cache headers make the alternative cheap rather than
@@ -250,27 +270,59 @@ from black; covering the transfer as well would need the tone to come from somew
 (a remembered tone, or a per-photo field — neither is in `_docs/openapi.yml`; raised as an open question in
 ADR-021 rather than invented here).
 
+**The tap target is really on top of the photo.** jsdom cannot answer this — it has no hit testing — so it
+was measured with real input events in Chromium: `document.elementFromPoint(195, 400).tagName === "BUTTON"`
+with the photo painted, a real `Input.dispatchMouseEvent` press/release at that point flipped
+`aria-expanded` `false → true`, and a real `Escape` key event flipped it back. Focus was measured too: after
+the synthetic tap `document.activeElement` is the `BUTTON` and it matches `:focus-visible`, so the splash's
+only focusable element does paint an indicator (2,440 pixels, a 1 px inset frame at 3,3 → 386,840; the tap
+is synthetic — see the residual risk in `reports/verify-e3-s1b-20261016.md`).
+
+**The pull gesture does not survive the browser's default `touch-action` — and jsdom cannot say so.** The
+test suite dispatches pointer events, which assumes the very thing worth checking: that a finger produces
+them, and that the browser lets the whole gesture through. Chromium, driven with a synthesised touch drag
+(`Input.dispatchTouchEvent`) on the **built** bundle, answered both — the first pass is the shipped surface:
+
+```text
+computed=pan-x pinch-zoom   requests 2->3   menuOpen=false
+  events: pointerdown@300 pointermove@320 pointermove@340 pointermove@360 pointermove@380 pointermove@400 pointermove@420 pointermove@440 pointermove@460 pointerup@460
+computed=auto               requests 3->3   menuOpen=false
+  events: pointerdown@300 pointermove@320 pointercancel@0
+```
+
+the second forces the browser's default `touch-action: auto` back on, and the difference is the defect: the
+browser claimed the vertical drag for scrolling after the first move and cancelled the pointer stream, so
+pull-to-refresh was dead on a phone while the unit suite was green (172 tests, including the four that
+dispatch the same events by hand). `touch-pan-x touch-pinch-zoom` (Tailwind v4 composes the property from
+`--tw-pan-x`/`--tw-pan-y`/`--tw-pinch-zoom`, so two standard utilities emit
+`touch-action: var(--tw-pan-x,) var(--tw-pan-y,) var(--tw-pinch-zoom,)` — checked in `dist/`) fixes it and
+keeps pinch-zoom, which `touch-action: none` would have taken away. The class is pinned by a test in
+`SplashView.test.tsx`; the _effect_ is only provable in a browser, which is what the trace above is. Note
+also that Chromium fired **no `click`** after this drag — the hook's click-suppression is still needed for
+drags a browser would treat as a tap, and it is the tests that cover that half.
+
 **One request per visit, nothing off this origin, on the built bundle.** The page's own account of what it
 fetched (`performance.getEntriesByType("resource")`), after two loads of `dist/` through the proxy:
 **1 `/api/v1/photos/random` + 1 `/images/<uuid>.png` per visit**, seven resources in total, **0 requests off
-this origin**. Re-measured at this slice's tip: `assets/index-*.js`, `assets/index-*.css`,
+this origin**. Re-measured at this story's tip: `assets/index-*.js`, `assets/index-*.css`,
 `assets/SplashView-*.js`, `assets/theme-*.js`, `assets/inter-*.woff2` and the two above. A reload resets the
-query cache, so this count holds whatever the cache policy is; the policy is about a _return_ inside one
-running app, and that is E3-S1B's.
-
-**Not in this slice.** The per-visit cache policy (`staleTime: 0` + `gcTime: 0`), the tap target and the
-pull-to-refresh gesture — including the measurement that caught a real browser claiming the drag as a scroll
-until `touch-action` was narrowed — belong to **E3-S1B**, the follow-up slice of this story. ADR-021 keeps
-those decisions and their numbers so that slice restores them instead of rediscovering them.
+query cache, so this count cannot show the per-visit policy by itself; the policy's evidence is the
+freshness table above — pinned by a test that dies without it, and visible in the browser on a client-side
+return (request #2).
 
 ## Zero external requests — measured on the built bundle
 
 ```bash
 grep -rohE 'https?://[a-zA-Z0-9.-]+' dist/ | sort | uniq -c | sort -rn
-#      18 http://www.w3.org      (SVG/MathML/XML namespace identifiers, not requests)
-#       2 https://react.dev      (URLs inside React's production error messages)
-#       1 https://tailwindcss.com (the licence banner comment in the CSS)
+#      18 http://www.w3.org       (SVG/MathML/XML namespace identifiers, not requests)
+#       2 https://react.dev       (URLs inside React's production error messages)
+#       2 http://localhost        (React Router's URL-resolution base, `new URL("http://localhost")`)
+#       1 https://reactrouter.com (a URL inside React Router's "must be used within a data router" message)
 ```
+
+Re-measured at E3-S1's tip; the list is not stable between builds (the Tailwind licence banner the E2-S6 run
+saw is not in this build's CSS, and the router's own strings are new to it), so it is quoted from the
+command rather than carried forward.
 
 No `url(https://…)`, `@import` of a remote sheet, `<link href="https://…">`, `<script src="https://…">` or
 `fetch("https://…")` exists in `dist/`, no source maps are emitted, and no font file is shipped.
@@ -290,4 +342,4 @@ safe-area insets, ≥ 44 px targets); theme colours from the extracted palette (
 component; fonts only via Fontsource NPM packages; **a request leaving the machine is a bug**.
 
 Rules: `.claude/rules/frontend.md` · design language: `.claude/rules/design-language.md` · decisions of
-these stories: `docs/scrum/DECISION-LOG.md` ADR-014 and ADR-015 (E2-S1), ADR-016 (E2-S2), ADR-021 (E3-S1A).
+these stories: `docs/scrum/DECISION-LOG.md` ADR-014 and ADR-015 (E2-S1), ADR-016 (E2-S2), ADR-021 (E3-S1).
