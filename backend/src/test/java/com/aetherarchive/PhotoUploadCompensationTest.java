@@ -51,10 +51,16 @@ import com.aetherarchive.support.TempDataDirectory;
  * {@code src/test/resources/db/test-migration} and is on no classpath the application runs from, so the
  * production schema is untouched — the assertions of every other test in the suite run against the schema
  * the archive ships.
+ *
+ * <p>It owns a database for the same reason: the refusal is a row in {@code flyway_schema_history} and a
+ * trigger on {@code photo}, and both outlive the context. Applied to a database another class connects
+ * to, the trigger would refuse that class's every upload.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
-@TestPropertySource(properties = "spring.flyway.locations=classpath:db/migration,classpath:db/test-migration")
+@TestPropertySource(properties = {
+        "spring.flyway.locations=classpath:db/migration,classpath:db/test-migration",
+        "aether.test.database=photo_refusal" })
 @Import(PostgresTestConfiguration.class)
 class PhotoUploadCompensationTest {
 

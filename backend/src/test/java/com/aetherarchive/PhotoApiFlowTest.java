@@ -30,6 +30,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
@@ -53,9 +54,14 @@ import com.aetherarchive.support.TempDataDirectory;
  *
  * <p>The archive writes into this class's own directory under the system temp dir, so no assertion here
  * depends on, or touches, a developer's {@code AETHER_DATA_DIR}.
+ *
+ * <p>It also writes into a database of its own. The empty-archive test below deletes every photo, and a
+ * delete here is permanent: on the database the rest of the suite shares, it would empty dumps this class
+ * knows nothing about, and a dump read back with fewer than six photos fails the read path on purpose.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
+@TestPropertySource(properties = "aether.test.database=photo_flow")
 @Import(PostgresTestConfiguration.class)
 class PhotoApiFlowTest {
 

@@ -21,6 +21,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 
 import com.aetherarchive.domain.ArchiveItem;
 import com.aetherarchive.domain.ItemType;
@@ -44,14 +45,22 @@ import com.aetherarchive.support.PostgresTestConfiguration;
  *
  * <p>The service is built by hand instead of imported: a {@code @DataJpaTest} does not scan
  * {@code @Service} beans, and importing one would change this class's context configuration — every
- * {@code @DataJpaTest} of the suite shares a single throwaway PostgreSQL container, and only because
+ * {@code @DataJpaTest} of the suite shares a single context and a single database, and only because
  * their annotations are identical. Hand-built, the service is also unproxied: no transaction wraps these
  * two queries, so what this class measures is the statements they issue and nothing more. The endpoint's
  * real transaction boundary is exercised by {@code DumpApiFlowTest}, and what a rollback of it leaves
  * behind by {@code DumpPublishAtomicityTest}.
+ *
+ * <p>The database is named because these tests read the <em>whole</em> archive: the assertion below is
+ * that the list holds exactly the two dumps it published, and {@code PhotoRepositoryTest} counts every
+ * photo there is. A database another context commits into would make both of them describe that context's
+ * data instead. The name is the same in all four repository slices, so the four keep sharing one context
+ * and one schema; a class added to this family that reads no row it did not write belongs in {@code test}
+ * instead.
  */
 @DataJpaTest
 @ActiveProfiles("test")
+@TestPropertySource(properties = "aether.test.database=repository")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import(PostgresTestConfiguration.class)
 class DumpQueryTest {

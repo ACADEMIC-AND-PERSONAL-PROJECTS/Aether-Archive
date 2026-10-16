@@ -30,6 +30,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
@@ -59,9 +60,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * <p>Both halves of the exchange are read from the wire rather than through the archive's own records: the
  * request bodies are {@link Map}s and the responses are parsed as {@link JsonNode}, so a field renamed on
  * one side of the API surfaces here as a failure instead of round-tripping silently.
+ *
+ * <p>It publishes into a database of its own: it commits dumps, and the suite's repository slices assert
+ * on the whole archive — {@code DumpQueryTest} reads every dump there is — so a publish of this class must
+ * not land in their database.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
+@TestPropertySource(properties = "aether.test.database=dump_flow")
 @Import(PostgresTestConfiguration.class)
 class DumpApiFlowTest {
 
