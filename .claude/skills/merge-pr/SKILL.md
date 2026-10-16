@@ -21,8 +21,9 @@ gh pr checks <n>          # if CI exists; "no checks" is acceptable only before 
 2. **Story link** present (`Closes #NN`) and the issue is in the current sprint milestone.
 3. **Verification evidence** present in the description (commands + results). If it is missing or
    unverifiable, send it back — do not merge on faith.
-4. **Review gate**: run the `code-reviewer` subagent on the diff (or invoke `/review`). Post the
-   verdict as a PR comment:
+4. **Review gate**: run the `code-reviewer` subagent on the diff (or invoke `/review`). The verdict is
+   incomplete without its `### Adversarial control` section, with the control's result — a verdict missing
+   it goes back to the reviewer, not into the merge. Post the verdict as a PR comment:
 
 ```bash
 gh pr comment <n> --body-file /tmp/review.md

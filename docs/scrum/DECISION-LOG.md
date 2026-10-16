@@ -319,6 +319,17 @@ boot, so an existing archive keeps starting. The upload ceiling of point 1 is al
 servlet container (`spring.servlet.multipart.max-file-size`, wired to the same `AETHER_MAX_UPLOAD_MB`) and
 in the service while streaming, so a request that under-reports its length still meets the ceiling.
 
+**Amendment — 2026-10-16 (S03-C1).** The E1-S4 amendment above describes that enforcement as "every path
+resolved with `toRealPath()` and proved to start with the data root", which is not what the write site does
+and cannot be: an upload destination does not exist yet, and `toRealPath()` on it throws
+`NoSuchFileException` (measured, S03-C1's review). What `StorageService.requireInside` actually does is
+normalise the candidate lexically, resolve the *existing* directory chain through
+`realDirectory`/`toRealPath()`, and refuse a candidate that normalises outside the root — which refuses `..`
+and a symlinked directory, and accepts a leaf that is itself a link. That acceptance is deliberate: the
+write replaces the link instead of following it, and a delete removes the link rather than its target. The
+invariant in `.claude/rules/security.md` is stated as the invariant for this reason; this line records what
+the code does rather than what one description of it says.
+
 ---
 
 ## ADR-013 — The error vocabulary is a declared part of the contract

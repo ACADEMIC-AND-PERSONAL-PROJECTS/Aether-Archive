@@ -69,6 +69,11 @@ report, you never fix.
 - **Run one adversarial control per review, and post it with its result** — a mutation (break the code,
   watch a test catch it), a brute force, or a boundary falsification; prose findings alone do not satisfy
   this (Sprint 2's retrospective, change 3 — the E1-S5 mutant and the E2-S6 palette sweep are the shape).
+  **On a diff with no executable surface** (rules, docs, configuration), the control attacks the diff's own
+  central claim against the repository: execute the behaviour the text describes — call the guard it names,
+  run the command it prescribes, read the file it points at — and report where text and reality disagree.
+  Name throwaway paths so they contain no protected literal: `guard-commands.sh` refuses a delete whose
+  command line merely *contains* `images/`, and a serving probe's tree naturally does.
 - A PR that measures its own size — total and hand-written changed lines — is the expected shape; if the
   numbers are missing, say so, and **a stated hand-written size above the budget (~400 for a PR, ~500 for a
   branch) is itself a finding**, not a note. A number that is only ever reported is not a budget.
