@@ -194,7 +194,7 @@ user's own images, Dark Glassmorphism tokens, local Fontsource typography — is
 | --- | --- | --- | --- | --- | --- |
 | E2-S1 | Scaffold the frontend toolchain | p0 | 5 | 2 | Done |
 | E2-S2 | App shell, routing & typed API client | p0 | 5 | 2 | Done |
-| E2-S3 | Global CSS foundation | p0 | 3 | 2 | Todo |
+| E2-S3 | Global CSS foundation | p0 | 3 | 2 | Done |
 | E2-S4 | Dominant-colour extraction algorithm | p0 | 8 | 2 | Todo |
 | E2-S5 | Fontsource typography system | p0 | 3 | 2 | Todo |
 | E2-S6 | Dark Glassmorphism theme layer & GlassPanel | p0 | 5 | 2 | Todo |
