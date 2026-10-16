@@ -298,7 +298,7 @@ opens on tap, feels tactile, and gets out of the way.
 - [ ] Fresh random photo per visit; pull-to-refresh re-rolls without reloading the app shell.
 - [ ] Empty archive → quiet empty state from E3-S4, never a crash.
 
-### E3-S2 — Glass menu overlay · 5 pts | p0
+### E3-S2 — Glass menu overlay · 5 pts · p0
 
 *As the curator, I want a discreet menu, so that navigation is available but never shouts.*
 
@@ -308,7 +308,7 @@ opens on tap, feels tactile, and gets out of the way.
 - [ ] Tap on the backdrop closes; body scroll locked while open; `prefers-reduced-motion` honoured.
 - [ ] Tests: open/close, keyboard path, focus restoration.
 
-### E3-S3 — Route transitions & motion system · 3 pts | p0
+### E3-S3 — Route transitions & motion system · 3 pts · p0
 
 *As a mobile user, I want fluid transitions, so that moving between views feels continuous.*
 
@@ -318,7 +318,7 @@ opens on tap, feels tactile, and gets out of the way.
 - [ ] Reduced motion disables transforms (opacity only).
 - [ ] Screenshots/recording attached for the review.
 
-### E3-S4 — Quiet loading / empty / error states · 2 pts | p1
+### E3-S4 — Quiet loading / empty / error states · 2 pts · p1
 
 *As the curator, I want graceful silence when there is nothing to show, so that the aesthetic is never broken.*
 
@@ -327,7 +327,7 @@ opens on tap, feels tactile, and gets out of the way.
 - [ ] API error = discreet glass notice with a retry affordance; no raw messages, no alerts.
 - [ ] All three states rendered in tests.
 
-### E3-S5 — View tests & accessibility pass · 3 pts | p0
+### E3-S5 — View tests & accessibility pass · 3 pts · p0
 
 *As the team, we want the entry experience verified, so that regressions are caught.*
 
@@ -350,7 +350,7 @@ opens on tap, feels tactile, and gets out of the way.
 | E4-S4 | Aura colour picker with palette suggestions | p0 | 5 | 4 | Todo |
 | E4-S5 | Publish dump with optimistic UI | p0 | 5 | 4 | Todo |
 
-### E4-S1 — Single photo upload · 5 pts | p0
+### E4-S1 — Single photo upload · 5 pts · p0
 
 *As the curator, I want to add one photo at a time, so that my archive grows gradually.*
 
@@ -360,7 +360,7 @@ opens on tap, feels tactile, and gets out of the way.
 - [ ] Success updates the archive without a page reload (query invalidation).
 - [ ] Tests: validation rejects, error retry path, success invalidation.
 
-### E4-S2 — Multi-select (≤ 6) & client-side downscale · 5 pts | p0
+### E4-S2 — Multi-select (≤ 6) & client-side downscale · 5 pts · p0
 
 *As the curator, I want to pick several images at once, so that building a dump is fast.*
 
@@ -370,7 +370,7 @@ opens on tap, feels tactile, and gets out of the way.
 - [ ] Uploads run sequentially or bounded-concurrent; one failure never aborts the others silently.
 - [ ] Tests for the cap and for the downscale decision function (pure).
 
-### E4-S3 — Drag-and-drop ordering · 8 pts | p0
+### E4-S3 — Drag-and-drop ordering · 8 pts · p0
 
 *As the curator, I want to reorder my 6 images by touch, so that the dump tells the story I want.*
 
@@ -380,7 +380,7 @@ opens on tap, feels tactile, and gets out of the way.
 - [ ] Auto-scroll while dragging near edges; drop animation feels tactile (≤ 300 ms).
 - [ ] Tests: reducer, keyboard move, reorder persistence in the payload.
 
-### E4-S4 — Aura colour picker with palette suggestions · 5 pts | p0
+### E4-S4 — Aura colour picker with palette suggestions · 5 pts · p0
 
 *As the curator, I want to choose the dump's background colour, so that the river reflects its mood.*
 
@@ -390,7 +390,7 @@ opens on tap, feels tactile, and gets out of the way.
 - [ ] Selection survives reordering and page refresh within the workshop session.
 - [ ] Tests for validation, suggestion mapping and preview tokens.
 
-### E4-S5 — Publish dump with optimistic UI · 5 pts | p0
+### E4-S5 — Publish dump with optimistic UI · 5 pts · p0
 
 *As the curator, I want to publish my dump, so that it joins the river.*
 
@@ -413,7 +413,7 @@ opens on tap, feels tactile, and gets out of the way.
 | E5-S3 | Image loading performance (LQIP, no CLS) | p0 | 5 | 5 | Todo |
 | E5-S4 | Virtualisation decision & implementation | p1 | 3 | 5 | Todo |
 
-### E5-S1 — River feed & timeline markers · 8 pts | p0
+### E5-S1 — River feed & timeline markers · 8 pts · p0
 
 *As the curator, I want to scroll my whole archive, so that I can relive it in order.*
 
@@ -423,7 +423,7 @@ opens on tap, feels tactile, and gets out of the way.
 - [ ] Scroll position is preserved when navigating back from a detail/menu overlay.
 - [ ] Tests: grouping logic (pure function), pagination boundaries, empty archive.
 
-### E5-S2 — Ambient background per dump · 5 pts | p0
+### E5-S2 — Ambient background per dump · 5 pts · p0
 
 *As the curator, I want the background to melt into each dump's colour, so that scrolling feels like a journey.*
 
@@ -433,7 +433,7 @@ opens on tap, feels tactile, and gets out of the way.
 - [ ] Observer disconnected on unmount; only one active section at a time (threshold tuned visually).
 - [ ] Test the selector logic; recording attached for visual proof.
 
-### E5-S3 — Image loading performance (LQIP, no CLS) · 5 pts | p0
+### E5-S3 — Image loading performance (LQIP, no CLS) · 5 pts · p0
 
 *As a mobile user, I want images to appear smoothly, so that scrolling never janks.*
 
@@ -446,7 +446,7 @@ opens on tap, feels tactile, and gets out of the way.
       `images/` alone, so `/images/thumbnails/**` resolves *inside* the originals directory today. Whoever
       generates derivatives names their own directory and adds its mapping rather than widening E1-S5's.
 
-### E5-S4 — Virtualisation decision & implementation · 3 pts | p1
+### E5-S4 — Virtualisation decision & implementation · 3 pts · p1
 
 *As a maintainer, I want the feed to stay fast with hundreds of items, so that the app ages well.*
 
@@ -482,34 +482,34 @@ delivery, documentation, and a clean v1.0.
 | E6-S16 | Low-severity hardening from the Sprint 1 audit (SEC-04…10, issue #73) | p2 | 3 | — | Todo |
 | E6-S17 | Static-serving hardening found by E1-S5's probes (issue #79) | p1 | 2 | — | Todo |
 
-### E6-S1 — CI on every PR · 5 pts | p0
+### E6-S1 — CI on every PR · 5 pts · p0
 
 - [ ] GitHub Actions: backend job (`./mvnw -B verify`) and frontend job (`npm ci && lint && test && build`).
 - [ ] Jobs cache Maven/NPM; total wall time < 8 min; failures are actionable (artefacts/upload logs).
 - [ ] Runs on PRs into `develop` and `main`, and on pushes to `develop`.
 - [ ] Workflow file reviewed for supply-chain safety (pinned actions, minimal permissions).
 
-### E6-S2 — Required status checks · 2 pts | p0
+### E6-S2 — Required status checks · 2 pts · p0
 
 - [ ] Branch protection on `main` and `develop` requires the CI jobs before merging.
 - [ ] A deliberately failing test on a scratch PR is blocked (proof captured in the PR).
 - [ ] Documented in `docs/scrum/SPRINT-PLAYBOOK.md`.
 
-### E6-S3 — Accessibility audit (WCAG 2.2 AA) · 3 pts | p1
+### E6-S3 — Accessibility audit (WCAG 2.2 AA) · 3 pts · p1
 
 - [ ] Axe/pa11y run on every view; zero serious violations.
 - [ ] Keyboard-only walkthrough of the whole app documented (including drag-and-drop alternative).
 - [ ] Contrast, focus visibility, motion preferences, touch targets audited and fixed.
 - [ ] Screen-reader pass on the splash, menu and workshop (VoiceOver or TalkBack) summarised.
 
-### E6-S4 — Real-device verification pass · 3 pts | p0
+### E6-S4 — Real-device verification pass · 3 pts · p0
 
 - [ ] App opened from a phone on the LAN; all four views exercised; issues logged with repro.
 - [ ] iOS Safari + Android Chrome quirks captured (dvh, backdrop-filter, scroll, gesture conflicts).
 - [ ] Results written in `reports/` and converted into backlog items with priorities.
 - [ ] LAN setup documented in the README (host exposure, firewall note).
 
-### E6-S5 — Security & robustness pass · 5 pts | p0
+### E6-S5 — Security & robustness pass · 5 pts · p0
 
 - [ ] Upload fuzzing: malformed images, wrong magic bytes, zip bombs, 0-byte, unicode filenames.
 - [ ] Path traversal attempts on `photoId`, filenames and static serving — all inert (tests added).
@@ -517,14 +517,14 @@ delivery, documentation, and a clean v1.0.
 - [ ] Dependency audit (`npm audit`, `./mvnw dependency:tree`) with findings fixed or justified.
 - [ ] Report in `reports/security-*.md` with residual risk.
 
-### E6-S6 — Documentation & runbook · 3 pts | p1
+### E6-S6 — Documentation & runbook · 3 pts · p1
 
 - [ ] README: what/why, quickstart (dev and containers), phone access, troubleshooting, backup instructions.
 - [ ] `docs/engineering/ARCHITECTURE.md` updated to the shipped reality (components, data flow, files).
 - [ ] Runbook: restore from backup (`pg_dump`/`psql` or scripts), migrate the data directory, rebuild containers, rotate DB credentials.
 - [ ] A new contributor can run the stack from a clean clone following only the README (verified).
 
-### E6-S7 — Backup / export utility · 5 pts | p2
+### E6-S7 — Backup / export utility · 5 pts · p2
 
 - [ ] `scripts/backup.sh` produces a timestamped archive: `pg_dump` of the database + `images/` (and thumbnails) with a manifest.
 - [ ] `scripts/restore.sh` restores safely (`psql` + files; refuses to overwrite a non-empty target without `--force`).
@@ -533,28 +533,28 @@ delivery, documentation, and a clean v1.0.
 - [ ] The runbook states that a backup must include `AETHER_DATA_DIR` as well as the database
       (audit SEC-N5).
 
-### E6-S8 — Performance budget pass · 5 pts | p1
+### E6-S8 — Performance budget pass · 5 pts · p1
 
 - [ ] Budgets defined (bundle size, LCP, memory, upload time) and measured on a mid-range profile.
 - [ ] Violations fixed or recorded with a decision; numbers in an ADR.
 - [ ] Bundle analysed (`rollup-plugin-visualizer` or equivalent), unused weight removed.
 - [ ] Regression guard: size/measurement check in CI where practical.
 
-### E6-S9 — Polish pass · 5 pts | p1
+### E6-S9 — Polish pass · 5 pts · p1
 
 - [ ] Motion audit against `docs/engineering/DESIGN-SYSTEM.md` (durations, easings, distances consistent).
 - [ ] Gesture conflicts resolved (pull-to-refresh vs scroll, drag vs scroll, double-tap zoom).
 - [ ] iOS Safari + Android Chrome visual pass: glass rendering, safe areas, font smoothing.
 - [ ] Before/after capture attached to the PR.
 
-### E6-S10 — v1.0 release · 3 pts | p0
+### E6-S10 — v1.0 release · 3 pts · p0
 
 - [ ] All p0/p1 stories of E1–E6 are `Done` or explicitly deferred with a reason.
 - [ ] `README` reflects reality; screenshots or a short recording embedded.
 - [ ] Release PR `develop` → `main`, merged, tagged `v1.0.0` (annotated) on top of `sprint-06`.
 - [ ] Retrospective for sprint 6 written; backlog groomed for post-v1 ideas.
 
-### E6-S11 — Container images (`api`, `web`) · 3 pts | p0
+### E6-S11 — Container images (`api`, `web`) · 3 pts · p0
 
 *As the owner, I want the application packaged as containers, so that the machine runs it without toolchains installed.*
 
@@ -563,7 +563,7 @@ delivery, documentation, and a clean v1.0.
 - [ ] Runtime makes zero external requests; no secrets baked into any image layer.
 - [ ] Healthchecks defined for `db` and `api` (consumed by E6-S12).
 
-### E6-S12 — One-command stack & clean-clone verification · 5 pts | p0
+### E6-S12 — One-command stack & clean-clone verification · 5 pts · p0
 
 *As the owner, I want `docker compose up` to run the whole stack, so that v1.0 is one command on any machine.*
 
@@ -572,7 +572,7 @@ delivery, documentation, and a clean v1.0.
 - [ ] Backup/restore scripts (E6-S7) verified against the containerized stack.
 - [ ] `docs/engineering/DEPLOYMENT.md` moved from TARGET to shipped reality; README updated.
 
-### E6-S17 — Static-serving hardening found by E1-S5's probes · 2 pts | p1
+### E6-S17 — Static-serving hardening found by E1-S5's probes · 2 pts · p1
 
 *As the owner, I want `/images/**` to serve only what the archive wrote, so that a file placed by hand cannot
 widen what the URL space exposes.*
