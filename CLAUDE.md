@@ -50,7 +50,9 @@ reports/     Generated verification / analysis reports
 ## 4. Commands
 
 Backend (from `backend/`): `./mvnw spring-boot:run` · `./mvnw test` · `./mvnw verify` · `./mvnw package` (jar in `backend/target/`)
-Frontend (once scaffolded): `npm install` · `npm run dev` · `npm run test` · `npm run build` · `npm run lint`
+Frontend (from `frontend/`, Node 22.22.2 / 24.15 / 26+ — see `frontend/package.json` `engines`):
+`npm install` · `npm run dev` (dev server on :5173, LAN-bound) · `npm run test` · `npm run lint` · `npm run typecheck` ·
+`npm run format:check` · `npm run build` (static bundle in `frontend/dist/`) · `npm run preview` (serves `dist/` on :4173)
 Dev database (once scaffolded): `docker compose -f docker-compose.dev.yml up -d` · v1.0 stack: `docker compose up`
 Full check before a commit: the `verify` skill (`.claude/skills/verify/SKILL.md`).
 **Keep this section accurate** — every story that adds or renames a command updates it here.
@@ -76,7 +78,8 @@ Branch model: `main` (released) ← `develop` (integration) ← `feature/*` (one
 2. **Never rewrite history**: no `rebase`, no `--force`/`--force-with-lease`, no `filter-branch`,
    no amending a commit that is already pushed, no squash merges. Merge commits only.
 3. **Never delete** `main`, `develop`, or a merged release tag.
-4. Keep PRs small and single-story. If a branch grows past ~500 changed lines, split it.
+4. Keep PRs small and single-story. If a branch grows past ~500 changed lines, split it — one exception,
+   claimed and judged: the atomic-story clause in `.claude/rules/git-workflow.md`.
 5. Never fake verification. If a test or a build cannot run, say so and report it as `SKIPPED`.
 6. Never commit secrets, `.env`, or local data. No telemetry, no analytics, no external requests.
 7. Ask before anything destructive: deleting the data directory, dropping tables, `rm -rf`, migrations

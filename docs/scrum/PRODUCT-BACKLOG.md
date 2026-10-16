@@ -26,14 +26,21 @@ A story is `Done` only when the Definition of Done (`DEFINITION-OF-DONE.md`) is 
 | **E3** | Immersive Splash & Glass Menu | S3 | 5 | 18 | The signature entry experience: full-bleed random photo + glass menu. |
 | **E4** | Curator's Workshop | S3–S4 | 5 | 28 | Upload, order and publish a 6-photo dump with its aura colour. |
 | **E5** | The Time River | S5 | 4 | 21 | The chronological feed with ambient per-dump background. |
-| **E6** | Quality, Delivery & Release | S4–S6 | 16 | 55 | CI, accessibility, hardening, containerization, documentation and the v1.0 release. |
+| **E6** | Quality, Delivery & Release | S4–S6 | 17 | 57 | CI, accessibility, hardening, containerization, documentation and the v1.0 release. |
 
-**Total: 47 stories · 189 points · 6 sprints (~2 weeks each, 25–34 points per sprint).**
+**Total: 48 stories · 191 points · 6 sprints (~2 weeks each, 25–34 points per sprint).**
 
 > E6-S13…S16 were added after Sprint 1 from the release security audit (`reports/security-audit-sprint01.md`).
 > They are **not** Sprint 1 stories and are not counted in its velocity: E6-S15 is `Done` because the reachable
 > finding (SEC-03) was fixed before that sprint closed, in PR #70, and the remaining 8 points await Sprint-2
-> planning — the sprint map below still sums to 181 for that reason.
+> planning. **Sprint 2 planning has since decided they stay unassigned** (they are E6-S13/E6-S14 and
+> do not enter that sprint implicitly), so the sprint map still sums to 181. The 8 points are unscheduled
+> work awaiting a deliberate decision, not a backlog error.
+>
+> **E6-S17** (2 pts, `p1`) was added during Sprint 2 from E1-S5's static-serving probes — behaviours no
+> request can reach but that a file placed by hand, a restore, or a sync can widen, so they were routed
+> rather than patched inside E1-S5. Its `p1` is argued in the story: the security rule's `p0` assumes a
+> request can reach the finding, and none can. It is unscheduled like the rest of E6-S13…S17.
 
 ```text
 Sprint 1  E1  Foundation & Backend              (34)
@@ -57,12 +64,12 @@ serves images and exposes the `/api/v1` contract from `_docs/openapi.yml` — fu
 | E1-S2 | Configuration & local data directory | p0 | 2 | 1 | Done |
 | E1-S3 | PostgreSQL persistence + Flyway baseline | p0 | 5 | 1 | Done |
 | E1-S4 | StorageService — safe local file storage | p0 | 5 | 1 | Done |
-| E1-S5 | Serve images at `/images/**` | p0 | 2 | 2 | Todo |
+| E1-S5 | Serve images at `/images/**` | p0 | 2 | 2 | Done |
 | E1-S6 | Photo API — upload, list, random | p0 | 5 | 1 | Done |
 | E1-S7 | Dump API — create and list 6-photo dumps | p0 | 5 | 1 | Done |
 | E1-S8 | Error handling (RFC 9457) & validation | p0 | 2 | 1 | Done |
 | E1-S9 | Backend test suite | p0 | 5 | 1 | Done |
-| E1-S10 | Dev seed script & curl smoke collection | p2 | 2 | 2 | Todo |
+| E1-S10 | Dev seed script & curl smoke collection | p2 | 2 | 2 | Done |
 | E1-S11 | Dev PostgreSQL via Docker Compose | p0 | 2 | 1 | Done |
 
 ### E1-S1 — Scaffold the Spring Boot project · 3 pts · p0
@@ -185,12 +192,12 @@ user's own images, Dark Glassmorphism tokens, local Fontsource typography — is
 
 | ID | Story | P | Pts | Sprint | Status |
 | --- | --- | --- | --- | --- | --- |
-| E2-S1 | Scaffold the frontend toolchain | p0 | 5 | 2 | Todo |
-| E2-S2 | App shell, routing & typed API client | p0 | 5 | 2 | Todo |
-| E2-S3 | Global CSS foundation | p0 | 3 | 2 | Todo |
-| E2-S4 | Dominant-colour extraction algorithm | p0 | 8 | 2 | Todo |
-| E2-S5 | Fontsource typography system | p0 | 3 | 2 | Todo |
-| E2-S6 | Dark Glassmorphism theme layer & GlassPanel | p0 | 5 | 2 | Todo |
+| E2-S1 | Scaffold the frontend toolchain | p0 | 5 | 2 | Done |
+| E2-S2 | App shell, routing & typed API client | p0 | 5 | 2 | Done |
+| E2-S3 | Global CSS foundation | p0 | 3 | 2 | Done |
+| E2-S4 | Dominant-colour extraction algorithm | p0 | 8 | 2 | Done |
+| E2-S5 | Fontsource typography system | p0 | 3 | 2 | Done |
+| E2-S6 | Dark Glassmorphism theme layer & GlassPanel | p0 | 5 | 2 | Done |
 
 ### E2-S1 — Scaffold the frontend toolchain · 5 pts · p0
 
@@ -199,6 +206,12 @@ user's own images, Dark Glassmorphism tokens, local Fontsource typography — is
 - [ ] Vite + React + TypeScript (strict) under `frontend/`; Tailwind CSS configured.
 - [ ] ESLint + Prettier with a `lint` script; import order and unused-import rules on.
 - [ ] Vitest + React Testing Library wired (`npm run test`), one placeholder test.
+- [ ] The **Tailwind major version** is recorded as an ADR with its reason: v3's config file and v4's CSS-first
+      theme decide how the next four stories write styles, so leaving it implicit inside a config file would
+      make four stories guess (Sprint 2 plan §Risks).
+- [ ] The **test environment's capabilities are probed and recorded** (does the runner provide a canvas?
+      which DOM implementation, and what it does not support?) and the screenshot mechanism the later UI
+      stories need is identified — both are E2-S4/E2-S3's known risks and are cheap to settle here.
 - [ ] `npm run build` outputs a static bundle; dev server reachable from the LAN (`--host`).
 - [ ] `CLAUDE.md` §Commands updated; `.editorconfig` respected.
 
@@ -217,6 +230,9 @@ user's own images, Dark Glassmorphism tokens, local Fontsource typography — is
 *As a mobile user, I want the app to fill the screen cleanly, so that browsing feels native.*
 
 - [ ] `styles/global.css`: reset, dark base, hidden scrollbars, `100dvh`, safe-area insets, overscroll behaviour.
+- [ ] **Tailwind's content scan is scoped explicitly** (`@source`) so the built CSS depends on `src/` alone:
+      found in E2-S1's review, the default scan reaches `frontend/README.md` prose — a doc edit currently
+      changes the CSS hash, and `w-[43px]` written in a document ships a rule.
 - [ ] Typographic scale variables (`--text-*`) and spacing scale defined once.
 - [ ] `prefers-reduced-motion` guard available globally.
 - [ ] No horizontal overflow at 320/390/430 px widths; verified with screenshots.
@@ -421,6 +437,9 @@ opens on tap, feels tactile, and gets out of the way.
 - [ ] No cumulative layout shift on a 390 px viewport (measured, number reported).
 - [ ] First viewport budget respected (LCP < 1.5 s over LAN reported in the PR).
 - [ ] Fallback for broken images without breaking layout.
+- [ ] The thumbnail URL space is decided and mapped before anything is served from it: E1-S5 maps
+      `images/` alone, so `/images/thumbnails/**` resolves *inside* the originals directory today. Whoever
+      generates derivatives names their own directory and adds its mapping rather than widening E1-S5's.
 
 ### E5-S4 — Virtualisation decision & implementation · 3 pts | p1
 
@@ -456,6 +475,7 @@ delivery, documentation, and a clean v1.0.
 | E6-S14 | Framework end-of-life decision & migration plan (audit SEC-02, issue #72) | p1 | 2 | — | Todo |
 | E6-S15 | Dependency patch level from the Sprint 1 audit (SEC-03, PR #70) | p1 | 1 | — | Done |
 | E6-S16 | Low-severity hardening from the Sprint 1 audit (SEC-04…10, issue #73) | p2 | 3 | — | Todo |
+| E6-S17 | Static-serving hardening found by E1-S5's probes (issue #79) | p1 | 2 | — | Todo |
 
 ### E6-S1 — CI on every PR · 5 pts | p0
 
@@ -546,6 +566,47 @@ delivery, documentation, and a clean v1.0.
 - [ ] From a clean clone: `cp .env.example .env && docker compose up` serves the app to the phone (evidence in the PR).
 - [ ] Backup/restore scripts (E6-S7) verified against the containerized stack.
 - [ ] `docs/engineering/DEPLOYMENT.md` moved from TARGET to shipped reality; README updated.
+
+### E6-S17 — Static-serving hardening found by E1-S5's probes · 2 pts | p1
+
+*As the owner, I want `/images/**` to serve only what the archive wrote, so that a file placed by hand cannot
+widen what the URL space exposes.*
+
+Found by E1-S5's hostile-path battery (its report) and widened by that PR's review, which measured the layout
+the first report had not: **with `images/` itself a symlink to a directory outside the data directory, the boot
+succeeds, its write-probe is written through the link, reads follow it — and uploads are refused.** The actor
+there is an operator, not an attacker: a `cp -a`/`rsync -a`/tarball restore, or a manual link into a synced
+folder. Nothing here is reachable by a request — 46 hostile paths, a hostile client filename and encoded
+separators were all refused — so it stays hardening rather than a defect. The Sprint-2 release audit
+re-confirmed exactly this classification (SEC2-01, Low, not release-blocking —
+`reports/security-audit-sprint02.md`).
+
+**Priority is `p1`, not `p2`, and not the `p0` that `.claude/rules/security.md` reserves for
+"something looks exploitable":** the rule's p0 assumes a request can reach it, and none can. `p1` records that
+the precondition is *ordinary operator behaviour* (a restore or a sync), not malice, which is more than can be
+said for most hardening. It is not fixed in E1-S5 because closing it changes serving semantics — that needs
+the ADR below, not a patch inside a serving story.
+
+- [ ] **Symlinks inside `images/` are followed, including out of the data directory.** A link to a file
+      outside answers 200 with that file's bytes, and so does a link to a *directory* outside
+      (`/images/<link>/x.txt`); Spring's containment check reads the URL, so a link that resolves elsewhere
+      passes it. Cover both layouts: a link planted at a name inside `images/`, and **`images/` itself a link**
+      (boot succeeds, write-probe written through it, reads follow it, uploads refused). Decide and record
+      (ADR) whether serving re-checks `Path.toRealPath()` under `data-dir/images` — the hook is a
+      `PathResourceResolver` subclass on `setResourceChain(true)` — or whether the guarantee is "the write
+      path never creates a link", which ADR-012's own rule only half-covers: uploads are refused, the boot is
+      silent. Whichever way it goes, the boot should say something about a data directory whose `images/`
+      resolves outside it.
+- [ ] **A hand-placed file whose extension the archive never writes is served under the platform's media type**
+      — measured: `.html` as `text/html`, `.svg` as `image/svg+xml`, `.txt` as `text/plain`,
+      `.jpeg.exe` as `application/x-msdownload`, no extension as `application/octet-stream` — and
+      `nosniff` does not stop a browser rendering those. Deciding means choosing between the current
+      behaviour (documented), `application/octet-stream`, and `Content-Disposition: attachment` for names
+      outside the upload whitelist.
+- [ ] **Tomcat's own 400 refusals are HTML and carry no `nosniff`** (the traversal strings that never reach
+      Spring). An error-page mapping to `problem+json` would close the shape mismatch; decide whether it is
+      worth it or whether the 400 is acceptable as-is.
+- [ ] Re-run E1-S5's path battery afterwards and record the statuses that changed.
 
 ---
 

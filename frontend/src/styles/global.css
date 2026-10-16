@@ -1,0 +1,234 @@
+/*
+ * Aether Archive — global CSS foundation (E2-S3; the faces landed in E2-S5).
+ *
+ * Five blocks, in order:
+ *   1. Scan scope     — Tailwind's build inputs, declared, never discovered (ADR-017).
+ *   2. Faces          — the two families, self-hosted, never a CDN (ADR-005, ADR-019).
+ *   3. Theme          — what Tailwind knows: colour namespace, type scale, the two families.
+ *   4. Runtime tokens — what CSS and JS read: the fallback palette, safe areas, spacing.
+ *   5. Base           — dark page, full height, scrollbars, overscroll, reduced motion.
+ */
+
+/* ---------------------------------------------------------------- 1. Scan scope --- */
+
+@import "tailwindcss" source(none);
+@import "./glass.css";
+
+/*
+ * Automatic detection walked the whole project from this file and stopped at `.gitignore`,
+ * which made `frontend/README.md` a build input: a sentence containing `w-[43px]` shipped a
+ * rule and moved the CSS hash (measured in the E2-S1 review and again in E2-S3's report,
+ * pre-fix). `source(none)` turns discovery off; the globs below are the entire candidate
+ * set — the source tree, and the one other build input that can carry class names.
+ * A new top-level input that can carry classes must be registered here
+ * (`.claude/rules/frontend.md`).
+ */
+@source "../**/*.ts";
+@source "../**/*.tsx";
+@source "../../index.html";
+
+/* -------------------------------------------------------------------- 2. Faces --- */
+
+/*
+ * The two faces, both from Fontsource packages, both self-hosted by Vite: no `<link>`, no
+ * CDN, no request to anyone but the app itself (ADR-005).
+ *
+ * Playfair Display arrives as its packaged latin subsets, imported from `main.tsx` (§4.2):
+ * `latin-400.css` + `latin-500.css` — the only display weights the rules allow (§4.4) — and
+ * the latin subset is the only one the app can render. Inter Variable has no per-subset
+ * entrypoint (every `wght*.css` ships all seven subsets: 218.5 kB of woff2, measured in
+ * E2-S5), so its latin woff2 is declared here instead — one 48.3 kB file carrying the whole
+ * 100–900 weight axis. Added payload, measured: 148.2 kB in total, inside the < 200 KB
+ * budget; the all-static alternative weighed 209.8 kB (ADR-019).
+ */
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("@fontsource-variable/inter/files/inter-latin-wght-normal.woff2") format("woff2");
+}
+
+/* ------------------------------------------------------------------- 3. Theme --- */
+
+/*
+ * The raw palette and the default families do not exist: with the namespaces emptied,
+ * `bg-red-500` and `font-sans` cannot compile, so colour and type in components can only
+ * come from the layers declared below (ADR-017, ADR-019).
+ */
+@theme {
+  --color-*: initial;
+  --font-*: initial;
+}
+
+/*
+ * The runtime palette (DESIGN-SYSTEM §2.2). `inline` because each value is itself a
+ * variable: `bg-aura-bg` must resolve `var(--aura-bg)` where it is used, so the theme
+ * E2-S4/S6 generates rewrites the page without a rebuild. The values are the neutral
+ * fallbacks defined under "3. Runtime tokens".
+ */
+@theme inline {
+  --color-aura-bg: var(--aura-bg);
+  --color-aura-surface: var(--aura-surface);
+  --color-aura-glass: var(--aura-glass);
+  --color-aura-text: var(--aura-text);
+  --color-aura-muted: var(--aura-muted);
+  --color-aura-accent: var(--aura-accent);
+  --color-aura-accent-contrast: var(--aura-accent-contrast);
+}
+
+/* `--aura-hairline` is a border shorthand, not a colour, so no colour utility maps to it;
+ * components read it as `var(--aura-hairline)` (DESIGN-SYSTEM §2.2). */
+
+/*
+ * The two faces (ADR-019), declared in the theme layer so the utilities compile from the same
+ * source the variables do (DESIGN-SYSTEM §4.3). Static values: unlike the palette they are
+ * never rewritten at runtime, and `static` makes their emission unconditional by construction.
+ * With the pinned Tailwind and today's rules the output is byte-identical without the keyword
+ * (measured in the E2-S5 review) — it stays as intent, not as a fix. Components write
+ * `font-display` today; `font-ui` backs the body default in block 5.
+ */
+@theme static {
+  --font-display: "Playfair Display", Georgia, "Times New Roman", serif;
+  --font-ui: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/*
+ * The fluid type scale (DESIGN-SYSTEM §4.3), defined once: `text-xl` and `var(--text-xl)`
+ * are the same value. The default scale is emptied, so an off-scale size cannot compile.
+ * Line heights follow §4.4 — display sizes 1.1–1.25, UI sizes 1.4–1.6.
+ */
+@theme {
+  --text-*: initial;
+
+  --text-xs: clamp(0.72rem, 0.7rem + 0.1vw, 0.78rem);
+  --text-xs--line-height: 1.5;
+  --text-sm: clamp(0.82rem, 0.79rem + 0.15vw, 0.9rem);
+  --text-sm--line-height: 1.5;
+  --text-base: clamp(0.95rem, 0.92rem + 0.2vw, 1.05rem);
+  --text-base--line-height: 1.5;
+  --text-lg: clamp(1.15rem, 1.08rem + 0.45vw, 1.35rem);
+  --text-lg--line-height: 1.4;
+  --text-xl: clamp(1.5rem, 1.35rem + 1vw, 2rem);
+  --text-xl--line-height: 1.25;
+  --text-2xl: clamp(2rem, 1.7rem + 2vw, 3.2rem);
+  --text-2xl--line-height: 1.2;
+
+  --tracking-display: -0.015em;
+  --tracking-ui: 0.01em;
+}
+
+/* ----------------------------------------------------------- 4. Runtime tokens --- */
+
+:root {
+  color-scheme: dark;
+
+  /*
+   * The neutral fallback palette (DESIGN-SYSTEM §2.2) — the app's identity until a dump's
+   * extracted palette takes over (E2-S4/S6), and the value set used when extraction fails.
+   * Contrast, measured over these exact values in the E2-S3 report (WCAG 2.x):
+   * text on bg 15.79:1 · text on surface 15.01:1 · text on glass-over-bg 16.20:1 ·
+   * muted on bg 6.40:1 · accent-contrast on accent 8.46:1 — all ≥ 4.5:1 (§8).
+   */
+  --aura-bg: #0b0b0d;
+  --aura-surface: #121215;
+  --aura-glass: rgba(0, 0, 0, 0.4);
+  /*
+   * The glass material's fallback (§3): the same black tint at the raised opacity that
+   * glass.css's @supports branch swaps in when backdrop-filter is missing.
+   */
+  --aura-glass-solid: rgba(0, 0, 0, 0.72);
+  --aura-hairline: 1px solid rgba(255, 255, 255, 0.08);
+  --aura-text: #e8e6e3;
+  --aura-muted: rgba(232, 230, 227, 0.62);
+  --aura-accent: #b5a98f;
+  --aura-accent-contrast: #0b0b0d;
+
+  /* Safe-area insets as variables (DESIGN-SYSTEM §6): zero where the device has none. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+
+  /*
+   * The 4 px rhythm (DESIGN-SYSTEM §6). Tailwind's numeric utilities carry the same unit
+   * (`gap-2` = 0.5rem = `--space-2`); these variables are the raw-CSS access to it.
+   */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+}
+
+/* -------------------------------------------------------------------- 5. Base --- */
+
+/*
+ * `html` carries the page colour, so the region revealed by overscroll is the app's own
+ * base and never the browser's white sheet (§6). The vh line is the fallback for browsers
+ * without dvh.
+ */
+html {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: var(--aura-bg);
+  overscroll-behavior: none;
+}
+
+/*
+ * The safe areas pad the page once, here — a view never has to know about the notch.
+ * `border-box` (preflight) keeps the padding inside the 100dvh, and the flex column lets
+ * the mount point take exactly the height the insets leave.
+ *
+ * The UI face and its slight positive tracking are the page default (§4.4): every screen is
+ * UI text until a title overrides both with `font-display tracking-display`.
+ */
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+  overflow-wrap: break-word;
+  font-family: var(--font-ui);
+  letter-spacing: var(--tracking-ui);
+}
+
+/* The mount point: fills what the insets leave, so a view fills the page without a
+ * `100dvh` of its own (§6: full height is defined once, at the root). */
+#root {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+/* No visible scrollbars, on any scroller (§6). Scrolling itself is untouched. */
+* {
+  scrollbar-width: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
+}
+
+/*
+ * Reduced motion (§5): animations freeze at their end state — a loop that only communicates
+ * state (the loading pulse) becomes a still frame. Transitions are left to the components,
+ * which switch movement to opacity-only with Tailwind's `motion-safe:` / `motion-reduce:`
+ * variants; and nothing scrolls smoothly.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  html {
+    scroll-behavior: auto !important;
+  }
+}

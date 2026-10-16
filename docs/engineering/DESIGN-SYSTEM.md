@@ -61,6 +61,7 @@ All UI colour is read from CSS custom properties applied to `:root` at runtime:
 | `--aura-bg` | The page background (per-view; a dump's `backgroundColor` in the river) |
 | `--aura-surface` | Opaque-ish base for content that must not be translucent |
 | `--aura-glass` | The glass tint — default `rgba(0, 0, 0, 0.4)` |
+| `--aura-glass-solid` | The same tint at fallback opacity for engines without `backdrop-filter` — default `rgba(0, 0, 0, 0.72)` |
 | `--aura-hairline` | `1px solid rgba(255, 255, 255, 0.08)` highlight edge |
 | `--aura-text` | Primary text |
 | `--aura-muted` | Secondary text / quiet labels |
@@ -69,7 +70,16 @@ All UI colour is read from CSS custom properties applied to `:root` at runtime:
 
 Rules: contrast of `--aura-text` on `--aura-bg` and on glass ≥ **4.5:1** (≥ 3:1 only for text ≥ 24 px);
 monotonic lightness for surfaces; **neutral fallback palette** for extraction failures. A hex literal
-outside the theme layer is a review blocker.
+outside the theme layer — `lib/color/theme.ts` plus this stylesheet's `:root` block (ADR-020) — is a
+review blocker.
+
+**Fallback values (the token layer's neutral set, E2-S3).** `--aura-bg #0b0b0d` · `--aura-surface
+#121215` · `--aura-glass rgba(0, 0, 0, 0.4)` · `--aura-glass-solid rgba(0, 0, 0, 0.72)` ·
+`--aura-hairline 1px solid rgba(255, 255, 255, 0.08)` ·
+`--aura-text #e8e6e3` · `--aura-muted rgba(232, 230, 227, 0.62)` · `--aura-accent #b5a98f` ·
+`--aura-accent-contrast #0b0b0d`. Contrast, measured (WCAG 2.x, E2-S3 report): text on bg **15.79:1**,
+text on surface 15.01:1, text on glass-over-bg 16.20:1, muted on bg **6.40:1**, accent-contrast on
+accent **8.46:1** — every pair ≥ 4.5:1 (§8).
 
 ### 2.3 Where colour changes
 
@@ -82,15 +92,17 @@ outside the theme layer is a review blocker.
 ```css
 .glass {
   background: var(--aura-glass);            /* rgba(0,0,0,0.4) over the aura background */
+  -webkit-backdrop-filter: blur(15px) saturate(1.2);   /* prefix first — the bundler keeps the
+                                                          last declaration of the pair (ADR-020) */
   backdrop-filter: blur(15px) saturate(1.2);
-  -webkit-backdrop-filter: blur(15px) saturate(1.2);
   border: var(--aura-hairline);
   border-radius: 20px;                      /* generous, editorial */
 }
 ```
 
-- Exactly **one** glass primitive component (`GlassPanel`); everything else composes it.
-- Fallback when `backdrop-filter` is unsupported: raise the glass opacity (≥ 0.72) so text stays readable.
+- Exactly **one** glass primitive component (`components/GlassPanel.tsx`); everything else composes it.
+- Fallback when `backdrop-filter` is unsupported: the `@supports` branch in `glass.css` swaps
+  `--aura-glass` for `--aura-glass-solid` (`rgba(0, 0, 0, 0.72)`) so text stays readable.
 - No drop shadows beyond a soft `0 8px 24px rgba(0,0,0,0.24)` when elevation must be communicated.
 - Scrim rule: text over an image always sits on a gradient scrim or glass — never directly on pixels.
 
@@ -104,7 +116,9 @@ outside the theme layer is a review blocker.
 | UI sans | **Inter variable** | `@fontsource-variable/inter` | Glass menu, buttons, labels, numbers |
 
 Allowed alternatives (must also exist as Fontsource packages): Cormorant Garamond, Fraunces (display);
-Work Sans, Manrope (UI). The final pair is fixed by an ADR at E2-S5 and recorded here afterwards.
+Work Sans, Manrope (UI). The pair above was **confirmed at E2-S5** — measured payload, weights and
+why each alternative stayed on the shelf are in ADR-019. Replacing the pair is a new ADR, not a
+silent edit.
 
 ### 4.2 Installation (local only — no CDN, ever)
 
@@ -113,20 +127,34 @@ npm install @fontsource/playfair-display @fontsource-variable/inter
 ```
 
 ```ts
-// frontend/src/main.tsx — imported BEFORE global.css so variables resolve
-import "@fontsource/playfair-display/400.css";
-import "@fontsource/playfair-display/500.css";
-import "@fontsource-variable/inter/wght.css";
+// frontend/src/main.tsx — imported BEFORE global.css
+import "@fontsource/playfair-display/latin-400.css";
+import "@fontsource/playfair-display/latin-500.css";
 import "./styles/global.css";
 ```
+
+- The `latin-*.css` entrypoints: the latin subset is the only one the app can render (§4.4), and the
+  import is what ships — each face brings one woff2 plus one legacy woff.
+- **Inter Variable has no per-subset entrypoint** (every packaged CSS file carries all seven
+  subsets; `wght.css` alone weighs 218.5 kB of woff2 — measured at E2-S5). Its packaged latin woff2
+  is therefore declared as a single `@font-face` in `global.css`, block 2: one 48.3 kB file for the
+  whole 100–900 axis, Vite-fingerprinted like any other asset.
+- Measured added payload (E2-S5 report): **148.2 kB** in `dist/` — inside the budget. The
+  all-subsets reading of the old snippet weighed 453.4 kB; all-static latin weighed 209.8 kB.
 
 ### 4.3 Variables in the global stylesheet
 
 ```css
-:root {
+/* The families are declared once, in the theme layer, so the utilities compile from the same
+   declaration; `static` records that these values are fixed (emission is unconditional by
+   construction — with the pinned Tailwind the output is identical either way, measured in the
+   E2-S5 review). */
+@theme static {
   --font-display: "Playfair Display", Georgia, "Times New Roman", serif;
   --font-ui: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
 
+@theme {
   --text-xs: clamp(0.72rem, 0.70rem + 0.10vw, 0.78rem);
   --text-sm: clamp(0.82rem, 0.79rem + 0.15vw, 0.90rem);
   --text-base: clamp(0.95rem, 0.92rem + 0.20vw, 1.05rem);
@@ -137,6 +165,11 @@ import "./styles/global.css";
   --tracking-display: -0.015em;
   --tracking-ui: 0.01em;
 }
+
+body {
+  font-family: var(--font-ui);
+  letter-spacing: var(--tracking-ui);
+}
 ```
 
 ### 4.4 Rules
@@ -145,7 +178,8 @@ import "./styles/global.css";
 - UI: weights 300/400/500, slight positive tracking on small sizes, line-height 1.4–1.6.
 - No component declares a raw `font-family`; everything uses `--font-display` / `--font-ui`
   (or a Tailwind theme alias mapped to them).
-- Added font payload budget: **< 200 KB** total; latin subsets only.
+- Added font payload budget: **< 200 KB** total; latin subsets only. (Shipped at E2-S5: 148.2 kB,
+  74% of the budget — ADR-019.)
 
 ## 5. Motion
 
@@ -189,15 +223,110 @@ import "./styles/global.css";
 | Concern | File(s) |
 | --- | --- |
 | Extraction | `frontend/src/lib/color/{downscale,quantize,score,palette}.ts` |
-| Theme generation | `frontend/src/lib/color/theme.ts` |
+| Theme generation | `frontend/src/lib/color/{theme,contrast}.ts` |
 | Tokens & typography | `frontend/src/styles/global.css` |
 | Glass material | `frontend/src/styles/glass.css` + `components/GlassPanel.tsx` |
 | Motion tokens | `frontend/src/lib/motion/` |
 | Tests & fixtures | `frontend/src/lib/color/__fixtures__/`, `*.test.ts` |
+| Verification page | `frontend/src/features/check/CheckView.tsx` (`/check`) |
 
 ## 10. How this is verified
 
 - Fixture-based unit tests for extraction (deterministic palettes within tolerance).
 - Contrast assertions in the theme generator tests (text/background pairs).
-- A visual check page (or story) rendering all tokens, glass states and type styles, screenshot in the PR.
-- Network panel check: **zero external requests** on a loaded page (also part of `verify`).
+- The visual check page at `/check` (`features/check/CheckView.tsx`; §13/ADR-020) renders every token
+  with its live value, the glass over a palette stand-in and the five contrast readouts; screenshots
+  in the PR (`reports/e2s6-check-*.png`).
+- Network panel check: **zero external requests** on a loaded page (also part of `verify`) — the E2-S6
+  probe reports every request same-origin.
+
+## 11. The CSS foundation (E2-S3)
+
+`frontend/src/styles/global.css` is the single source for everything below (decision: ADR-017; probes
+and measurements: `reports/verify-e2-s3-20261016.md`).
+
+- **Build inputs are declared, never discovered.** `source(none)` + explicit `@source` globs — the
+  source tree's `.ts`/`.tsx` and `index.html`. A document is not a build input: editing a README no
+  longer moves the CSS hash, and prose cannot ship a rule. A new top-level input that can carry class
+  names must be registered in `global.css` (`.claude/rules/frontend.md`).
+- **Colour is the runtime palette only.** The default palette is emptied, so `bg-red-500` cannot
+  compile; utilities map to `var(--aura-*)` (inline), and the §2.2 values above are the fallback theme
+  until a dump's palette takes over (E2-S4/S6).
+- **Type and rhythm are defined once.** `--text-xs … --text-2xl` (§4.3 clamps) and `--tracking-*` live
+  in `@theme`: `text-xl` and `var(--text-xl)` are the same value, and off-scale sizes cannot compile.
+  `--space-*` is the raw-CSS spelling of the 4 px rhythm the numeric utilities already carry.
+- **Full height is defined once, at the root.** `html`/`body` carry `100dvh`; body is padded once by
+  the safe insets (`env(safe-area-inset-*, 0px)`, `border-box`); `#root` and every view fill what the
+  insets leave (`flex-1`) — no view repeats `100dvh`, and insets never add scroll.
+- **The app owns its edges.** `html` carries the background and `overscroll-behavior: none`; every
+  scroller has its scrollbar hidden.
+- **Motion degrades globally (§5).** Under `prefers-reduced-motion: reduce` animations freeze at their
+  end state (a state-communicating pulse becomes a still frame) and smooth scrolling is off;
+  transitions that move are the component's responsibility, switched with `motion-safe:` /
+  `motion-reduce:` variants.
+- **Tailwind emits `@theme` variables lazily** — only used steps ship; a `var(--token)` reference in
+  any compiled CSS counts as a use, which keeps raw-CSS consumers (`glass.css`, later) working.
+
+The full visual check page (§10) arrived with the glass material in E2-S6 (§13); E2-S3's visual
+evidence is the three-width screenshot set plus the 9-cell overflow measurement, both in the report.
+
+## 12. Colour extraction (E2-S4)
+
+`frontend/src/lib/color/` implements the §2.1 pipeline (decision: ADR-018; measurements and browser
+probe: `reports/verify-e2-s4-20261016.md`).
+
+- **One pure pipeline, one browser edge.** `palette.ts` (`extractPalette`) runs downscale → cluster →
+  score/filter → 5–8 colours with normalised weights; `decode.ts` is the only environment-bound file
+  (`createImageBitmap` + `OffscreenCanvas` behind injectable dependencies), so the core is testable
+  anywhere and the real path is proven in Chromium.
+- **k-means++ is the default; median cut ships as the measured alternative**
+  (`extractPalette(image, { algorithm: "median-cut" })`). ADR-018 records both, with numbers.
+- **Weights are the honest share of returned colours** — renormalised over the 5–8 kept, not over all
+  pixels, so filtering a 40% near-black region never leaves a palette summing below 1; `oklch` fields
+  are rounded for stable output, and hex is the identity assertions use.
+- **Errors have a vocabulary of two.** `PaletteExtractionError` with `code: "decode-failed"` (bytes no
+  decoder accepts — the corrupted-file funnel) or `"unsupported"` (no canvas in the environment).
+  Nothing else throws.
+- **Roles are not here.** §2.1's role derivation (`background` / `surface` / `accent` / `text` /
+  `muted` / `accentContrast`) and contrast enforcement live in `theme.ts` (§13); E2-S4 ships the
+  scored palette only.
+
+## 13. Theme generation & the glass material (E2-S6)
+
+`frontend/src/lib/color/theme.ts` turns a palette into the §2.2 tokens (decision: ADR-020; probe and
+measurements: `reports/verify-e2-s6-20261016.md`).
+
+- **The §2.1 role mapping is deterministic.** Background = the palette's darkest colour pulled into
+  OKLCh l ∈ [0.10, 0.18] (C ≤ 0.05, hue kept); surface = background + a fixed step (capped); text =
+  the lightest colour (C ≤ 0.02) raised step by step until it clears **4.5:1 on the background, the
+  surface and the glass composite**; muted = text at alpha 0.62 raised until 4.5:1 on the background;
+  accent = the colour with the largest `weight × C` (ties broken on hex), contrasted with a neutral
+  dark or light base, lightness stepped until the pair passes. The same palette always yields the
+  same theme.
+- **Contrast is enforced by construction, not resolved.** The loops only stop at a passing value, so a
+  generated theme cannot ship an under-contrast pair; ratios use float sRGB compositing (WebAIM
+  arithmetic — byte rounding turns the measured 16.20:1 glass pair into 16.17:1).
+- **Runtime application is nine custom properties.** `applyTheme(theme)` writes the §2.2 tokens inline
+  on `document.documentElement`; `clearTheme()` removes them and the stylesheet's `:root` block takes
+  over again. Extraction failure is not a generated theme: it is `applyFallbackTheme()`, the neutral
+  set above — `paletteToTheme` throws on an empty palette.
+- **One material, one fallback token.** `styles/glass.css` implements §3's `.glass`; when
+  `backdrop-filter` is unsupported, `@supports not (…)` swaps `--aura-glass` for `--aura-glass-solid`
+  (`rgba(0, 0, 0, 0.72)`). Build note: the bundler deduplicates the prefixed and standard
+  `backdrop-filter` declarations keeping the *last* one, so the `-webkit-` line sits first and both
+  forms ship.
+- **The theme layer owns every colour literal.** The theme layer is `theme.ts` plus the stylesheet's
+  `:root` block — a drift-guard test reads `global.css` and asserts `FALLBACK_THEME` matches it value
+  for value. The audit, run at the branch tip from `frontend/`:
+
+  ```
+  grep -rn "#[0-9a-fA-F]\{3,8\}" src --include="*.ts" --include="*.tsx" --include="*.css" \
+    | grep -v "\.test\." | grep -v "lib/color/__fixtures__/" \
+    | grep -v "lib/color/theme.ts" | grep -v "styles/global.css"
+  ```
+  → no matches. Every other view composes tokens (`text-aura-*` utilities, `var(--aura-*)`) only.
+- **The check page is the sitting evidence.** `/check` (`features/check/CheckView.tsx`) renders every
+  token with its live value, the type styles, one `GlassPanel` over a palette stand-in and over the
+  page background, and the five contrast readouts (pass/FAIL against 4.5:1); buttons apply the demo
+  palette, the fallback theme, or clear back to the stylesheet, and `?theme=demo` seeds the derived
+  state so the headless probe screenshots it without a click.

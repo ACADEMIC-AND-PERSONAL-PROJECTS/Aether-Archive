@@ -51,5 +51,12 @@ Write `reports/verify-<branch>-<YYYYMMDD>.md` and return a short summary:
 ## Rules
 
 - Evidence or it did not happen: every PASS needs the command and an output tail.
+- **Attack the assumptions, not only the acceptance criteria.** For every claim of the form "this framework
+  does X" or "the browser supports Y", execute it and report what actually happened. Sprint 1's significant
+  defects were all unexecuted beliefs (an exception hierarchy, a default multipart limit, a symlink behaviour,
+  a test-order dependence) and each was invisible to a green test run.
+- **A green suite from one run is not evidence of determinism.** Where a story claims order-independence,
+  timing, or a budget, re-run under a second condition (reversed order, second wall-clock measurement) and
+  report both numbers.
 - Never modify source files, never commit, never push.
 - If you find a serious defect, say so plainly and stop — do not soften the report.

@@ -26,13 +26,17 @@ request. "It works on my machine" is not evidence; a command and its output tail
 - [ ] For API changes: a real HTTP call was exercised (success and at least one failure path).
 - [ ] For UI changes: a screenshot or short recording on a mobile viewport is attached.
 - [ ] For data-touching changes: a migration or format change is described, and the impact on existing data is stated.
-- [ ] Anything not testable yet is explicitly marked `SKIPPED` with the reason — never omitted.
+- [ ] Anything not testable yet is explicitly marked `SKIPPED` with the reason — never omitted, and a
+      deferred acceptance criterion **names the story or issue that will close it** before the PR merges.
+      "Named rather than hidden" is only true if the name is written down.
 
 ## Review
 
 - [ ] A `code-reviewer` pass was run on the diff; every blocking finding is fixed or explicitly deferred
       with a backlog entry and the user informed.
-- [ ] The PR is one story, ideally under ~400 changed lines; larger work was split.
+- [ ] The PR is one story, ideally under ~400 **hand-written** changed lines (generated files excluded
+      and named); larger work was split. Both numbers are stated in the PR. (One exception, claimed by name
+      and judged in review: the atomic-story clause in `.claude/rules/git-workflow.md`.)
 - [ ] The PR description follows `.github/PULL_REQUEST_TEMPLATE.md` and links the issue (`Closes #NN`).
 
 ## Repository hygiene

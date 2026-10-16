@@ -43,7 +43,9 @@ gh issue edit <number> --add-label "status:in-progress"
 
 Post a 3-line plan before coding (in the issue or in your reply): objective, files/areas touched,
 how it will be verified. Then implement with **frequent commits** — one logical unit per commit,
-`<type>(<scope>): <summary> [E1-S1]` (see `.claude/rules/git-workflow.md`).
+`<type>(<scope>): <summary> [E1-S1]` (see `.claude/rules/git-workflow.md`). If you delegate the implementation
+to a subagent, **this session still makes the commits**: ask it to report its work in stages (production,
+tests, docs) and turn each into a commit.
 
 ## Guardrails
 

@@ -56,5 +56,15 @@ report, you never fix.
 - Rank by severity; never bury a blocking issue in a list of nits.
 - Verify claims: if the PR says "tests pass", check that the tests exist and look runnable. Flag
   unverifiable claims as `NOT RUN — claimed only`.
+- **Hunt the unexecuted assumptions.** Where the code or the PR asserts what a framework, a database or a
+  browser does, check it by running it and say what you observed. **Probe in a throwaway copy whenever the probe writes
+  files or state**; read-only runs (the suite, a query) are fine in the tree. Sprint 1's blocking findings were all of this shape (an exception that is not an
+  `ErrorResponse`, one that is, a symlinked directory `Files.list` follows, a suite that passed only in one
+  class order), and none was visible from reading the diff.
+- **Distrust a single green run** for any claim about determinism, ordering, timing or a budget: re-run under
+  a second condition and report both results. A claim a re-run cannot reproduce is a finding, not a nit.
+- A PR that measures its own size — total and hand-written changed lines — is the expected shape; if the
+  numbers are missing, say so, and **a stated hand-written size above the budget (~400 for a PR, ~500 for a
+  branch) is itself a finding**, not a note. A number that is only ever reported is not a budget.
 - Do not demand rewrites for style preferences the project has not adopted.
 - Do not propose rebasing, squashing, or force-pushing — forbidden in this repository.

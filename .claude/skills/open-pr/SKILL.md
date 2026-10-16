@@ -51,8 +51,10 @@ Build `/tmp/pr-body.md` from `.github/PULL_REQUEST_TEMPLATE.md`, filled with:
 
 - Read your own diff: `gh pr diff <number>`. Look for leftover debug code, TODOs, commented-out blocks,
   inconsistent naming, unused imports.
-- Confirm the PR stays small (one story, ideally < 400 changed lines). If it is much larger, consider
-  splitting it with a follow-up story rather than merging a monster.
+- Confirm the PR stays small (one story, ideally < 400 **hand-written** changed lines). If it is much larger, consider
+  splitting it with a follow-up story rather than merging a monster. State **both** numbers — total
+  changed lines and hand-written changed lines with the generated files named — since the ~400 budget applies
+  to the second (`.claude/rules/git-workflow.md`).
 
 ## Guardrails
 

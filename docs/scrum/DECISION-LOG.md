@@ -23,6 +23,13 @@ Statuses: `Proposed` · `Accepted` · `Superseded by ADR-NNN` · `Rejected`.
 | [ADR-011](#adr-011--api-contract-clarifications-for-sprint-1) | 2026-10-15 | API contract clarifications for Sprint 1 | Accepted |
 | [ADR-012](#adr-012--storage-and-cors-constraints) | 2026-10-15 | Storage and CORS constraints | Accepted |
 | [ADR-013](#adr-013--the-error-vocabulary-is-a-declared-part-of-the-contract) | 2026-10-15 | The error vocabulary is a declared part of the contract | Accepted |
+| [ADR-014](#adr-014--tailwind-css-v4-configured-css-first) | 2026-10-16 | Tailwind CSS v4, configured CSS-first | Accepted |
+| [ADR-015](#adr-015--typescript-603-while-the-lint-stack-cannot-parse-7) | 2026-10-16 | TypeScript 6.0.3 while the lint stack cannot parse 7 | Accepted |
+| [ADR-016](#adr-016--the-frontend-reaches-the-api-on-its-own-origin) | 2026-10-16 | The frontend reaches the API on its own origin | Accepted |
+| [ADR-017](#adr-017--the-css-foundation-declared-inputs-runtime-only-colour-one-definition-per-scale) | 2026-10-16 | The CSS foundation: declared inputs, runtime-only colour, one definition per scale | Accepted |
+| [ADR-018](#adr-018--the-clustering-algorithm-and-the-pipelines-open-readings) | 2026-10-16 | The clustering algorithm and the pipeline's open readings | Accepted |
+| [ADR-019](#adr-019--typography-playfair-display--inter-variable-latin-subsets-1482-kb) | 2026-10-16 | Typography: Playfair Display + Inter Variable, latin subsets, 148.2 kB | Accepted |
+| [ADR-020](#adr-020--the-theme-layer-role-mapping-in-oklch-contrast-by-construction-one-glass-fallback) | 2026-10-16 | The theme layer: role mapping in OKLCh, contrast by construction, one glass fallback | Accepted |
 
 ---
 
@@ -369,6 +376,352 @@ apart and has nothing different to do about either; the framework's own message 
 row, so it is logged for the operator and never answered. It is the vocabulary's first code of its status;
 should a future conflict ever demand a different answer from the client, it gets its own code and its own
 amendment rather than a widened meaning for this one.
+
+---
+
+## ADR-014 — Tailwind CSS v4, configured CSS-first
+
+**Date**: 2026-10-16 · **Status**: Accepted
+
+**Context.** The stack table mandates "Tailwind CSS" without a version ([`CLAUDE.md`](../../CLAUDE.md) §2),
+and the Sprint 2 plan names the gap: v3's `tailwind.config.js` and v4's CSS-first `@theme` decide how
+E2-S3, E2-S5 and E2-S6 write every style, so an implicit choice inside a config file would make four
+stories guess (`docs/scrum/sprints/sprint02.md`, Risks). The design system constrains the answer: all
+colour is read from CSS custom properties applied at runtime (`--aura-*`, DESIGN-SYSTEM §2.2), typography
+from `--font-*` (§4.3), and "a hex literal outside the theme layer is a review blocker" (§2.2). Two facts
+were measured, not assumed: `tailwindcss@4.3.3` is current and `@tailwindcss/vite@4.3.3` declares
+`peerDependencies: { vite: "^5.2.0 || ^6 || ^7 || ^8" }`, so the plugin fits the Vite 8.3.4 the same story
+pins; and **6.14 kB of CSS (2.01 kB gzip)** is what the placeholder page ships, i.e. the plugin only emits
+utilities it finds in use.
+
+**Decision.** Tailwind **v4.3.3** as a **CSS-first** install: the `@tailwindcss/vite` plugin in
+`frontend/vite.config.ts`, `@import "tailwindcss";` at the top of `frontend/src/styles/global.css`, and
+**no `tailwind.config.js` anywhere in the repository**. Design tokens are declared in CSS:
+
+- Colour and type values that change at runtime stay plain CSS custom properties on `:root`
+  (`--aura-bg`, `--aura-text`, `--font-display`, …), because the River rewrites them per view
+  (DESIGN-SYSTEM §2.3) and a theme variable declared inside `@theme` is not meant to be rewritten.
+- Tailwind utilities are generated for them through `@theme inline { --color-aura-bg: var(--aura-bg); … }`,
+  which is the v4 pattern for a token whose value is itself a variable. This is the shape E2-S3 follows for
+  the `--aura-*` set and E2-S5 for `--font-*`; the exact token names and the namespace mapping are E2-S3's
+  to fix, and it may supersede this ADR if the runtime-theming requirement is better met another way.
+
+**Consequences.** To add a utility one declares a theme variable — no JS config file exists to edit, and a
+token invented inside a component is a review failure by construction. `@theme` must stay top-level (not
+nested in a selector or media query), and only *used* theme variables reach the bundle unless a block is
+marked `@theme static`. **v4's source detection has no scope by default:** it scans the whole project root
+(ignoring only what `.gitignore` excludes), and that includes documentation — the word "static" in a
+sentence in `frontend/README.md` emitted `.static{position:static}` into the stylesheet, confirmed by
+removing the word and rebuilding (0 occurrences, then 1 again). Documentation prose therefore ships
+utilities: a documentation-only edit that adds or removes such a word changes the stylesheet and its content
+hash with no component change, so a rebuilt CSS hash after a README edit is expected rather than a bug.
+Scoping the scan (`@source` / `source(none)`) is E2-S3's. Two
+further questions this ADR deliberately leaves open for E2-S3: whether to wipe Tailwind's default palette
+(`@theme { --color-*: initial; }`) so a raw palette colour like `bg-red-500` cannot compile at all, and
+whether to add `prettier-plugin-tailwindcss` for class sorting (a dependency needs a story that asks for
+it). The scaffold's placeholder in `src/app/App.tsx` uses default palette utilities precisely because the
+token layer does not exist yet; E2-S3 replaces them.
+
+**Evidence (E2-S1).** Final `npm run build` before the story was closed → `dist/index.html 0.59 kB`,
+`dist/assets/index-*.css 6.14 kB │ gzip: 2.01 kB`, `index-*.js 219.96 kB │ gzip: 68.80 kB`; `npm run lint`,
+`npm run test` (2 tests), `npm run format:check` and `tsc -b` green with the v4 setup in place, and
+`npm ci` audits **0 vulnerabilities** across 270 packages.
+
+---
+
+## ADR-015 — TypeScript 6.0.3 while the lint stack cannot parse 7
+
+**Date**: 2026-10-16 · **Status**: Accepted
+
+**Context.** E2-S1 requires linting with unused-import and import-order rules, which in this repository
+means `typescript-eslint` (no v9 line is published; `8.71.2` is `latest`). The registry's `typescript`
+`latest` is **7.0.2**, but `typescript-eslint@8.71.2`, `@typescript-eslint/parser@8.71.2` and
+`@typescript-eslint/utils@8.71.2` all declare `peerDependencies: { typescript: ">=4.8.4 <6.1.0" }`.
+Measured, not reasoned — a clean install of the pair fails:
+
+```text
+$ npm install --dry-run typescript@7.0.2 typescript-eslint@8.71.2 eslint@10.12.0
+npm error code ERESOLVE
+npm error While resolving: probe@0.0.0
+npm error Found: typescript@7.0.2
+npm error Could not resolve dependency:
+npm error peer typescript@">=4.8.4 <6.1.0" from typescript-eslint@8.71.2
+```
+
+`--legacy-peer-deps` would install a combination the linter does not support, and the security rules put
+dependency discipline above convenience.
+
+**Decision.** Pin **TypeScript 6.0.3** — the newest stable version inside the peer range — and keep the
+lint stack. Every other package in the story is at its current major (Vite 8.3.4, React 19.3.1, Vitest
+5.0.5, ESLint 10.12.0, jsdom 30.1.3).
+
+**Consequences.** The strict flags the story requires are available and proven to bite on this version
+(`noUncheckedIndexedAccess` → `TS18048: 'first' is possibly 'undefined'`; `exactOptionalPropertyTypes` →
+`TS2375`), so nothing the project needs is missing today. Upgrading to TypeScript 7 means waiting for a
+`typescript-eslint` release whose peer range accepts it, then a one-line version bump plus a fresh
+`npm run lint` / `tsc -b` / `npm run test` / `npm run build` — a story that does it records that evidence,
+and does not silently use `--legacy-peer-deps`.
+
+---
+
+## ADR-016 — The frontend reaches the API on its own origin
+
+**Date**: 2026-10-16 · **Status**: Accepted
+
+**Context.** E2-S2 gives the app its data layer, and the API base URL has three candidate shapes: a
+relative path resolved against whatever served the SPA, an absolute URL configured per environment, or
+cross-origin calls with CORS (bounded by ADR-012). Two constraints decide between them: `Photo.url` is
+a **path** (`/images/<uuid>.<ext>`, ADR-011 and `_docs/openapi.yml`), so an app on a different origin
+than the API cannot render photos without a second rewrite; and the product is used from a phone on
+the LAN, where "localhost" means the phone.
+
+**Decision.** The base URL is **empty** by default. The client requests relative paths under `/api/v1`,
+and the SPA is served on the same origin as the API in every environment: the Vite dev server proxies
+`/api/v1` and `/images` to `VITE_API_PROXY_TARGET` (default `http://localhost:8080`), and the
+container's nginx proxies the same prefixes to the `api` service (ADR-010). `VITE_API_BASE_URL` —
+declared in `frontend/src/vite-env.d.ts`, documented in `.env.example` — remains as an escape hatch for
+a client that must call an API elsewhere: it takes an **absolute origin, no `/api/v1` suffix**, because
+the client adds the prefix itself. The key is read from the repository-root `.env`: Vite's `envDir`
+points there, the same file compose and the backend read. E2-S2's review probe found the escape hatch
+had been a silent no-op while Vite read only `frontend/`; the wiring was corrected, and the probe then
+measured both the client value and the dev proxy arriving from that file (review response in
+`reports/verify-e2-s2-20261016.md`).
+
+**Measured (E2-S2).** Through the dev server with a backend on `:8099`: `GET /api/v1/photos` → `200`
+and `GET /images/<uuid>.png` → `200 image/png`. With the suffixed form (`…:8099/api/v1`) the app
+requested `…/api/v1/api/v1/photos` → `404` — the probe caught it before any test did, `.env.example`
+was corrected, and a test now pins the composition (`api/client.test.ts`).
+
+**Consequences.** No CORS is needed on the default path, no per-device URL configuration exists for the
+phone, and photos render from the origin that served the page. A deployment that genuinely serves the
+SPA and the API on different origins must also rewrite `Photo.url` and open CORS — that is a new ADR,
+not a config tweak. `npm run preview` serves the built bundle without the dev proxy; previewing against
+a real API is the container's job.
+
+---
+
+## ADR-017 — The CSS foundation: declared inputs, runtime-only colour, one definition per scale
+
+**Date**: 2026-10-16 · **Status**: Accepted
+
+**Context.** ADR-014 chose Tailwind v4 CSS-first and deliberately left three questions to E2-S3: the
+scan scope (`@source` / `source(none)`), whether to empty the default palette, and the shape of the
+`--aura-*` token layer. The first answer was forced by a measurement: with automatic detection,
+`frontend/README.md` was a build input — a sentence containing `w-[43px]` shipped a rule and moved the
+CSS hash (`index-p6vokHjt.css`, 6.38 kB → `index-B7cX_O_f.css`, 6.40 kB; E2-S1 review, reproduced in
+`reports/verify-e2-s3-20261016.md` before the fix).
+
+**Decision.** `frontend/src/styles/global.css` is the foundation, in four blocks:
+
+1. **Scan scope, declared.** `@import "tailwindcss" source(none);` turns discovery off; explicit
+   `@source` globs — `src/**/*.ts`, `src/**/*.tsx`, `index.html` — are the entire candidate set. The
+   entry HTML is kept because it is a build input that can carry class names, and dropping it would be
+   a silent failure waiting to happen; even markdown inside `src/` is excluded, because a document is
+   not an input. A new top-level input that can carry classes must be registered in `global.css` (the
+   frontend rule names it).
+2. **Theme.** `--color-*: initial` empties the default palette, so a raw palette colour cannot compile
+   (probe: `bg-red-500` → 0 occurrences); the `--aura-*` runtime palette is mapped with `@theme inline`
+   so utilities resolve `var(--aura-*)` at use — ADR-014's shape. The fluid `--text-*` scale (§4.3) and
+   the `--tracking-*` tokens live in `@theme` too, defined once for utilities and raw CSS alike, and
+   the default scale is emptied so an off-scale size cannot compile either (probe: `text-3xl` → 0).
+3. **Runtime tokens.** The neutral fallback palette values, the `--safe-*` insets (`env(…, 0px)`) and
+   the 4 px `--space-*` rhythm are plain custom properties on `:root`. Contrast measured (WCAG 2.x):
+   text/bg 15.79:1, muted/bg 6.40:1, accent-contrast/accent 8.46:1.
+4. **Base.** `html` carries the page colour and `overscroll-behavior: none`; `body` is a flex column
+   padded once by the safe insets with `min-height: 100dvh`; `#root` and the views fill what the insets
+   leave (`flex-1`), so no view repeats `100dvh` and insets never add scroll. Every scrollbar is
+   hidden; the reduced-motion guard freezes animations at their end state and leaves movement
+   transitions to the `motion-safe:` / `motion-reduce:` variants at the component level.
+
+**Consequences.** A document edit no longer moves the CSS hash and the build's inputs are finite and
+reviewable; colour in components can only come from the runtime palette; each scale has one definition
+serving utilities and variables. Tailwind emits `@theme` variables lazily — only used steps ship, and
+a `var(--token)` reference anywhere in compiled CSS counts as a use (probe), which is what keeps raw
+consumers like the future `glass.css` working. `prettier-plugin-tailwindcss` is **not** added: no
+story asks for the dependency, and the pin policy needs one (ADR-014's left-open question, answered).
+
+**Evidence.** `reports/verify-e2-s3-20261016.md` — scan sentinels (README/TS/HTML), palette-wipe and
+emission probes, the reduced-motion probe under `--force-prefers-reduced-motion`, and the 9-cell
+overflow measurement with screenshots at 320/390/430.
+
+---
+
+## ADR-018 — The clustering algorithm and the pipeline's open readings
+
+**Date**: 2026-10-16 · **Status**: Accepted
+
+**Context.** `DESIGN-SYSTEM.md` §2.1 fixes the extraction pipeline's shape — decode → downscale ≤ 64 px
+→ OKLab/OKLCH → weighted clustering → score & filter → 5–8 colours — and leaves three readings open:
+which clustering algorithm ships as the default ("decided with measured numbers in an ADR during
+E2-S4"), the exact curve of `midLightnessBonus(L)`, and the edge between "near-black/near-white" and
+kept tones. The environment constrains the tests: jsdom implements no canvas at all (`OffscreenCanvas`,
+`ImageData`, `createImageBitmap` undefined; `getContext("2d")` null — probe in the E2-S4 report), and
+vitest 5.0.5 exports no `bench` API. So the pure pipeline is unit-tested in jsdom, `decode.ts` sits
+behind an injectable dependency interface, the real decode path is proven by an offline Chromium probe,
+and the measurements come from a probe test over the shipped modules.
+
+**Decision.** All three readings, implemented in `frontend/src/lib/color/`:
+
+1. **k-means++ is the default** (`DEFAULT_ALGORITHM = "kmeans"`); median cut ships beside it,
+   selectable via `extractPalette(image, { algorithm: "median-cut" })` and held to the same suite.
+   On the measured runs (synthetic jittered photo, 45% rust / 30% teal / 15% sand / 10% near-black;
+   Node 22.23.3; full JSON in the report):
+   - **time** — everything inside §2.1's 50 ms budget with room: clustering of 4,096 px in 7.6 ms
+     (median cut 6.6 ms), full pipeline 8.2 ms for 64 px / 10.7 ms for a 512 px input downscaled
+     (median cut 10.5 ms / 15.6 ms — k-means++ ahead on the pipeline, where it matters);
+   - **region fidelity** — k-means++ centroids are means of real pixel subsets, so every returned hex
+     exists in its source region; median cut can blend a mixed box into a colour absent from the image
+     (measured: `#cf855c`, between rust and sand). A theme built on invented blends misrepresents the
+     photo's masses;
+   - **dominant mass survives splitting** — k-means++ describes the textured rust region as three real
+     tones whose weights sum to its true 0.45 (pinned by a unit test at ≥ 0.40). Median cut's better
+     top-1 metric on the same probe (ΔE 0.003 vs 0.24 to the rust centre) is the flip side of that
+     blending: it folds a heterogeneous region into one centroid. If a later story judges top-1
+     dominance the more valuable property, the switch is one line plus the suite.
+2. **`midLightnessBonus(L) = 1 − |L − 0.5|`** — 1.0 at mid lightness, 0.62 at the darkest permitted
+   tone (L = 0.12), 0.55 at the brightest (L = 0.95). §2.1 names the bonus without its curve; this
+   curve stays within [0.55, 1] and so never outvotes a difference in mass.
+3. **Near-black/near-white are §2.1's lightness bounds, exactly**: `L < 0.12` and `L > 0.95` in
+   OKLab. A tone inside a bound is kept by design — a test pins `#08080a` (L ≈ 0.135) as kept.
+4. **Adaptivity.** Without an explicit `k`, the pipeline starts at k = 8 and retries twice (k = 10,
+   then 12, never above the pixel count) when filters and merges leave fewer than five colours.
+   Degenerate inputs — a solid bitmap, one hue, a fully transparent image — return their few real
+   colours rather than invented ones; the palette is honest, not padded to five.
+5. **Decode.** `decodeToPixels` uses `createImageBitmap` + `OffscreenCanvas`, pre-sizes in one
+   aspect-preserving draw (never upscales) and funnels every failure into `PaletteExtractionError`:
+   `"decode-failed"` for bytes no browser decoder accepts, `"unsupported"` for an environment without
+   the APIs. No image library, no network, and no dependency added (`package.json` and lock are
+   untouched from `bf12bb0`).
+
+**Consequences.** The suite runs pure in jsdom with no browser-runner dependency; the browser edge is
+proven by the offline Chromium probe with real canvas-rendered PNGs (dominant hue, grayscale,
+transparent, corrupted, 512² pre-size). Roles and contrast stay with `theme.ts` in E2-S6 — E2-S4 ships
+the scored palette only, as recorded on issue #23. Changing the default algorithm or the bonus curve
+later is a new ADR, not a silent edit.
+
+**Evidence.** `reports/verify-e2-s4-20261016.md` — environment probe, the 44-test colour suite
+(100 repo-wide), the timing/quality JSON, and the Chromium probe JSON.
+
+---
+
+## ADR-019 — Typography: Playfair Display + Inter Variable, latin subsets, 148.2 kB
+
+**Date**: 2026-10-16 · **Status**: Accepted
+
+**Context.** ADR-005 chose the baseline pair and deferred final confirmation to E2-S5, with two hard
+constraints: everything self-hosted (no CDN, no runtime request), and added font payload under
+~200 KB. DESIGN-SYSTEM §4.4 fixes the rest: display weights 400/500 only; UI weights 300/400/500;
+no raw `font-family` in components; **latin subsets only**. The §4.2 import snippet predated the
+packages, so E2-S5 measured every candidate reading before adopting one (full numbers in the
+report).
+
+**Decision.**
+
+1. **The pair stands: Playfair Display (display) + Inter Variable (UI).** The consulted references
+   (DESIGN-REFERENCES §6) back both halves: Typewolf notes Playfair's delicate, high-contrast
+   strokes hinder readability at small sizes — it is a titles-only face by nature; Inter's neutral
+   grotesque is the text face. Butterick: bold/italic as little as possible — hence two display
+   weights, no italics shipped.
+2. **Playfair ships as its packaged latin entrypoints** — `latin-400.css` + `latin-500.css`,
+   imported from `main.tsx` before `global.css`. Each face brings a woff2 and a legacy woff:
+   21,856 + 26,900 B (400) and 23,048 + 28,100 B (500) = 99,904 B.
+3. **Inter Variable ships as its packaged latin woff2 behind one hand-written `@font-face`**
+   (`global.css`, block 2): the package exposes no per-subset CSS (all seven subsets ride in every
+   entrypoint; `wght.css` alone weighs 218,512 B of woff2), and one 48,256 B variable file carries
+   the entire 100–900 axis — every UI weight §4.4 allows, including 300, in a single download. The
+   static alternative (Inter latin faces) costs 109,916 B for two weights and 164,844 B for three,
+   in as many files.
+4. **Measured payload, shipped**: 148,160 B (148.2 kB) of font assets in `dist/` — 74% of the
+   budget; the stylesheet grew 480 B (8,697 → 9,177 B) — the three `@font-face` rules, the
+   `.font-display` utility, the theme variables and the `body` declarations; the entry chunk keeps
+   its 283.41 kB (its hash moves once versus E2-S4 with the renamed lazy chunks). Rejected
+   readings: §4.2-literal all-subsets = 453,384 B
+   (453.4 kB); variable Inter all-subsets + Playfair latin = 318,416 B (318.4 kB); all-static latin
+   = 209,820 B (209.8 kB — over budget read either as 200 kB or 200 KiB).
+5. **Wiring.** The families are declared once in `@theme static` in `global.css` — values are
+   static, so they live in the theme layer where the utilities compile from the same declaration;
+   `static` makes emission unconditional by construction (measured in review: byte-identical
+   output with and without the keyword on the pinned Tailwind — it stays as intent). `body` reads
+   `var(--font-ui)` + `--tracking-ui`; the three placeholder `h1`s carry `font-display`. No
+   component declares a raw `font-family`.
+6. **Probe-verified on the built app** (offline Chromium, `--dump-dom`): the `h1` computes
+   `"Playfair Display", Georgia, "Times New Roman", serif` at weight 400 with −0.015em tracking;
+   body and UI paragraphs compute the Inter Variable stack with +0.01em; every declared face loads
+   (Playfair 400/500; Inter Variable answers both 300 and 700 from the one file); zero external
+   requests, zero console errors.
+
+**Consequences.** The legacy `woff` twins (55,000 B) ride inside the packaged Playfair entrypoints
+— accepted, because hand-writing those `@font-face`s would buy 55.0 kB but cost the upstream
+import; the budget does not require it. The Inter `@font-face` points at a packaged, hashed path,
+so a package update that renames files breaks the build loudly, never at runtime. Adding a display
+weight or an italic is one import + a line here; adding a non-latin subset breaks §4.4 and needs a
+new ADR. Two headless-probe discoveries are recorded in the report for reuse: `--dump-dom` snapshots
+the app at `load`, and it never paints — so probe pages must land on a routable URL and trigger
+faces with `document.fonts.load()`.
+
+**Evidence.** `reports/verify-e2-s5-20261016.md` — payload measurements, build output, the Chromium
+probe JSON, the gate log, and the probe-technique findings.
+
+---
+
+## ADR-020 — The theme layer: role mapping in OKLCh, contrast by construction, one glass fallback
+
+**Date**: 2026-10-16 · **Status**: Accepted
+
+**Context.** DESIGN-SYSTEM §2.1/§2.2 fix the role vocabulary (`background`, `surface`, `glass`,
+`hairline`, `text`, `muted`, `accent`, `accentContrast`) and the hard rule: text ≥ 4.5:1 on the
+background *and* on glass-over-background, neutral fallback on extraction failure, no colour literal
+outside the theme layer. E2-S4 ships scored palettes (hex + OKLCh + weight); E2-S3 shipped the
+neutral stylesheet with five measured contrast pairs. What was open: the exact palette→token
+mapping, how contrast is *guaranteed* rather than spot-checked, how a theme reaches the DOM, and
+what "the theme layer" means for the hex-literal rule. §2.3 (per-view application) is deferred to
+E3+ by the backlog, so E2-S6 ships the layer, its fallback, the material and the visual check page —
+one slice each.
+
+**Decision.**
+
+1. **Roles from OKLCh with a fixed adjustment policy.** Background: the darkest colour, l clamped
+   to [0.10, 0.18], C ≤ 0.05, hue kept (never pure black, never a washed grey). Surface: background
+   l + 0.032 capped at 0.24, C ≤ 0.06. Text: the lightest colour, C ≤ 0.02, l starts in
+   [0.86, 0.93] and rises in 0.01 steps (ceiling 0.97) until it clears **4.5:1 against the
+   background, the surface and the glass composite**. Muted: text at alpha 0.62, +0.02 steps until
+   4.5:1 on the background. Accent: max `weight × C`, ties broken lexicographically on hex.
+2. **Accent contrast is derived, not assumed.** `fitAccent` measures the accent against a neutral
+   dark base (`#0b0b0d`) and a neutral light base (`#e8e6e3`); the stronger pair wins, and when
+   neither passes the accent's lightness is stepped ±0.02 (band 0.05–0.97) toward the stronger base
+   until it does. Every accent ships as a passing pair, and `--aura-accent-contrast` is a token the
+   generator derived.
+3. **Contrast arithmetic is float sRGB, WebAIM's formulas.** `contrast.ts` composites alpha over the
+   background without byte-rounding: the math reproduces E2-S3's measured pairs exactly (text on
+   glass **16.20:1**; rounding first gives 16.17:1). All five pairs are asserted in tests.
+4. **Runtime application is nine inline custom properties on `documentElement`.** `applyTheme` /
+   `applyFallbackTheme` / `clearTheme`; `FALLBACK_THEME` mirrors the stylesheet's `:root` set value
+   for value, and a drift-guard test reads `global.css` and fails on divergence. Extraction failure
+   calls `applyFallbackTheme` (the measured E2-S3 neutral set) — an invented theme is never applied;
+   `paletteToTheme` throws on an empty palette.
+5. **The glass material gets a token fallback, not a second material.** `.glass` (`glass.css`) keeps
+   §3's recipe; `--aura-glass-solid` (`rgba(0, 0, 0, 0.72)`) is its no-`backdrop-filter` twin, swapped
+   by `@supports`. Build finding: Lightning CSS deduplicates the `-webkit-`/standard pair keeping the
+   **last** declaration — the file lists the prefix first so both survive into `dist/`.
+6. **"The theme layer" is `theme.ts` + the stylesheet's `:root` block.** That is where colour
+   literals may live; everywhere else reads `--aura-*` tokens or `text-aura-*` utilities. The audit
+   command and its empty result are recorded in DESIGN-SYSTEM §13.
+7. **A Storybook-free check page is the sitting evidence.** `/check` renders the nine tokens with
+   live values, the type styles, the glass over a palette stand-in and over the page background, and
+   the five contrast rows; `?theme=demo` applies a derived theme so the headless probe screenshots it
+   without a click (the demo palette is built through `oklchToHex` — the page itself contains no hex
+   literal).
+
+**Consequences.** §2.3 still governs where a theme is applied per view (E3+); today the layer exists,
+the fallback path works, and the check page proves both. The `:root` block and `FALLBACK_THEME` are
+two copies of one set, bridged by an automated drift guard rather than by discipline. Adding a role
+means touching `THEME_PROPERTIES`, `global.css`, the §2.2 table and the check page — the drift guard
+only covers the tokens it enumerates. The vitest runner is configured `css: true` so `?raw` imports
+return source text (the drift guard's read); that is a test-harness setting, not a build change.
+
+**Evidence.** `reports/verify-e2-s6-20261016.md` — contrast numbers, both Chromium probe JSONs
+(fallback + derived), the built-CSS inspection (`@supports` branch, both `backdrop-filter` forms),
+screenshots, and the hex-literal audit.
 
 ---
 
