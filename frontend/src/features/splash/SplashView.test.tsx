@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SplashView } from "./SplashView";
+import { queryKeys } from "../../api/queryKeys";
 import { createQueryClient } from "../../app/queryClient";
 import { oklchToHex } from "../../lib/color/oklch";
 import { FALLBACK_THEME, paletteToTheme, type AuraTheme } from "../../lib/color/theme";
@@ -165,7 +166,17 @@ describe("SplashView — the photo", () => {
     await screen.findByRole("img", { name: "A photo from your archive" });
     firstVisit.unmount();
 
+    // `staleTime: 0` alone does not give this criterion, and the request count cannot tell the two
+    // apart: a stale-but-*cached* entry still answers the returning visit, so the previous photo is
+    // painted and then swapped for the new one — the wrong photo, visibly, on the one screen whose
+    // promise is a new one. `gcTime: 0` is what removes the entry, and this is the assertion that
+    // separates the two variants: drop the constant and the entry is still here, so `waitFor` times
+    // out (measured: `data-state="ready"` with the previous visit's `blob:` src on screen).
+    await waitFor(() => expect(client.getQueryData(queryKeys.randomPhoto)).toBeUndefined());
+
     renderSplash(client);
+    expect(screen.queryByRole("img", { name: "A photo from your archive" })).toBeNull();
+    expect(screen.getByRole("main")).toHaveAttribute("data-state", "loading");
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
     expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([
       "/api/v1/photos/random",
