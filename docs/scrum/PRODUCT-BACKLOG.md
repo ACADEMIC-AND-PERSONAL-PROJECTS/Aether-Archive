@@ -69,7 +69,7 @@ serves images and exposes the `/api/v1` contract from `_docs/openapi.yml` — fu
 | E1-S7 | Dump API — create and list 6-photo dumps | p0 | 5 | 1 | Done |
 | E1-S8 | Error handling (RFC 9457) & validation | p0 | 2 | 1 | Done |
 | E1-S9 | Backend test suite | p0 | 5 | 1 | Done |
-| E1-S10 | Dev seed script & curl smoke collection | p2 | 2 | 2 | Todo |
+| E1-S10 | Dev seed script & curl smoke collection | p2 | 2 | 2 | Done |
 | E1-S11 | Dev PostgreSQL via Docker Compose | p0 | 2 | 1 | Done |
 
 ### E1-S1 — Scaffold the Spring Boot project · 3 pts · p0

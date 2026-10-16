@@ -25,7 +25,7 @@
 | 5 | E2-S4 | Dominant-colour extraction algorithm | 8 | p0 | Done | #86 |
 | 6 | E2-S5 | Fontsource typography system | 3 | p0 | Done | #88 |
 | 7 | E2-S6 | Dark Glassmorphism theme layer & GlassPanel | 5 | p0 | Done | #90 |
-| 8 | E1-S10 | Dev seed script & curl smoke collection | 2 | p2 | Todo | — |
+| 8 | E1-S10 | Dev seed script & curl smoke collection | 2 | p2 | Done | #92 |
 
 **Total: 8 stories · 33 points** (the row above the eight is a chore, not a story). The order is mostly
 the dependency chain, with two deliberate placements — E2-S4 early for risk, E1-S10 last to close:
@@ -191,3 +191,14 @@ reader can check it afterwards:
   `global.css` — now `:root`-scoped. The atomic-story claim — **1,366 total / 1,366 hand-written**,
   nothing generated — was re-checked against the diff and sustained; gates on the merge tip:
   136/136 tests. The merge is `aa7a96a`.
+- 2026-10-16 — **E1-S10's review: APPROVE WITH NOTES — the guard note (N1) fixed in `a0dbf55`
+  and re-proven; the count, ledger and size notes (N2–N4) corrected in `124f91c`.** The reviewer
+  reproduced the whole mechanism on its own throwaway pair (PostgreSQL 5434 + backend 8082):
+  29/29 checks on both archive states, every seed and dump reconciled — and found the guard's
+  string compare bypassed by `//`, `/.`, `..` and a symlinked spelling of the real directory,
+  with `HOME` trailing-slash spellings never matching the default. Both sides are now
+  canonicalised with `os.path.realpath`; a dead-port matrix (every spelling → exit 2, before
+  any HTTP call) and a fresh full re-run (29/29; 18 photos / 2 dumps / 18 files) are §10 of the
+  report. The atomic-story claim — **1,027 total / 1,027 hand-written** — was re-checked
+  against the diff and sustained; no suite gate applies (no Java or frontend file in the diff —
+  the executed scripts are the gate). The merge is `1b948c9`.
