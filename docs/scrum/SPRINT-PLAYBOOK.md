@@ -67,7 +67,7 @@ A story is `Done` only when `DEFINITION-OF-DONE.md` is fully checked with eviden
 | --- | --- | --- | --- | --- |
 | 0 | Bootstrap the repository, agent setup, process and backlog | 2026-10-15 | — | Done |
 | 1 | The archive can store and serve images and dumps on PostgreSQL through a tested local API | 2026-10-15 → 2026-10-16 | Sprint 01 — Foundation & Backend | **Released** (`sprint-01`) |
-| 2 | The React shell runs and the design system (colour extraction, typography, glass) is defined | 2026-10-16 → 2026-10-30 | Sprint 02 — Design System | In progress |
+| 2 | The React shell runs and the design system (colour extraction, typography, glass) is defined | 2026-10-16 → 2026-10-30 | Sprint 02 — Design System | **Released** (`sprint-02`) |
 | 3 | The signature entry experience exists: immersive splash, glass menu, first uploads | 2026-11-16 → 2026-11-27 | Sprint 03 — Splash & Workshop | Planned |
 | 4 | Dumps can be curated end to end (upload, order, colour, publish) with CI guarding merges | 2026-11-30 → 2026-12-11 | Sprint 04 — Workshop & CI | Planned |
 | 5 | The Time River scrolls and the background follows each dump's aura | 2026-12-14 → 2026-12-25 | Sprint 05 — Time River | Planned |
@@ -79,6 +79,7 @@ A story is `Done` only when `DEFINITION-OF-DONE.md` is fully checked with eviden
 | --- | --- | --- | --- | --- |
 | 0 | — | — | — | Bootstrap |
 | 1 | 34 | 34 | 34 | 9/9 stories; 280 backend tests, suite 45 s; security audit found no Critical/High. **+1 unplanned** delivered point: the audit's reachable SEC-03 (`jackson-core` DoS, PR #70, backlog E6-S15). Deliberately kept out of the velocity figure — a series that mixes planned and unplanned work cannot be compared across sprints — and recorded here so the throughput is still visible. |
+| 2 | 33 | 33 | 33 | 8/8 stories, 0 carry-over; 302 backend + 136 frontend tests at the close; security audit found no Critical/High/Medium (1 Low, pre-tracked as E6-S17). Hand-written size average 1,067/story — below Sprint 1's 1,245 baseline, still above the ~400 guidance. No unplanned points landed. |
 
 ## Escalation
 

@@ -202,3 +202,9 @@ reader can check it afterwards:
   report. The atomic-story claim — **1,027 total / 1,027 hand-written** — was re-checked
   against the diff and sustained; no suite gate applies (no Java or frontend file in the diff —
   the executed scripts are the gate). The merge is `1b948c9`.
+- 2026-10-16 — **Sprint closed.** Release gate `reports/security-audit-sprint02.md`: no Critical, High or
+  Medium finding; the single Low (SEC2-01, links inside `images/` followed by `/images/**`) is the
+  pre-tracked E6-S17 (#79) and blocks nothing. Full close verification on `develop`: backend 302 tests /
+  0 failures, frontend lint + 136 tests + build, and the E1-S10 scripts green against a throwaway pair
+  (29/29 on both archive states). Release: `develop` → `main`, tag `sprint-02`; retrospective:
+  `retrospectives/sprint02.md`.
