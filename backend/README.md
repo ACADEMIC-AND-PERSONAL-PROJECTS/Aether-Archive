@@ -437,9 +437,19 @@ down; moving it into the spec is a contract change and needs an ADR.
 
 `./mvnw verify` runs the whole suite; from the repository root that is
 `mvn -f backend/pom.xml -B clean verify`. It needs Docker and nothing else — a missing daemon fails the
-build loudly rather than skipping the database tests — and takes about 45–50 s on the development machine
-(280 tests, 2026-10-16). Every test that touches time injects a fixed `Clock`, so nothing in the suite
-sleeps or depends on when it ran.
+build loudly rather than skipping the database tests — and takes about 45–55 s on the development machine
+(280 tests, 2026-10-16), depending on the class order and on what else the machine is doing: a loaded one
+has been measured at 58 s. Treat 60 s as a ceiling that is close, not as headroom. Nothing in the suite
+sleeps or reads the clock: time is injected, a fixed `Clock` per test.
+
+Class order is the other half of that promise, and it is kept knowingly. Two pieces of global state are in
+play: the Logback logger tree, which the whole JVM shares and whose root level every `test`-profile context
+sets to `WARN` without restoring it, and the test databases below, where a context that names none is not
+allowed to exist. So a test that captures a log pins that logger's level itself and puts back what it found
+(`DumpServiceTest`) — a capture that trusted the level it inherited would pass or fail depending on which
+class ran first. When you touch a test that reads global state, run the suite both ways —
+`-Dsurefire.runOrder=alphabetical` and `-Dsurefire.runOrder=reversealphabetical` — because the default
+order is the one your IDE and CI are least likely to reproduce.
 
 Run it with `clean` whenever an IDE has been compiling the project. An IDE writes `target/classes` with
 its own timestamps and its own compiler, and Maven's incremental check can then treat a stale
@@ -480,11 +490,22 @@ the entities and `db/migration` fails the suite.
 
 One database per context preserves the isolation the suite had when every context had its own server: the
 flow classes delete rows and add test-only Flyway migrations, and either would otherwise reach the
-repository slices, whose assertions are about the whole archive. A context asks for its database with
-`@TestPropertySource(properties = "aether.test.database=<name>")`; a context that names none gets `test`.
+repository slices, whose assertions are about the whole archive. A context names its database with
+`@TestPropertySource(properties = "aether.test.database=<name>")`, and **naming one is required**: there is
+no default, so a context that boots a database without a name fails on the spot with a message saying what
+to add. Sharing is then always written down in both classes rather than inherited from whichever ran first
+— the four repository slices all name `repository` on purpose, and a class added to that family that reads
+no row it did not write can name it too.
+
 The container is deliberately not a Spring bean — it is started in a static initialiser and the framework
-never closes it (Testcontainers' Ryuk reaps it when the JVM exits). As a bean it would be closed by the
-first context that shuts down, and every later context would meet a dead port.
+never closes it. As a bean it would be closed by the first context that shuts down, and every later context
+would meet a dead port. Nothing else stops it either: cleanup is Testcontainers' reaper, Ryuk, which is on
+by default and removes the container when the JVM exits. That is a precondition rather than a detail — a run
+with `TESTCONTAINERS_RYUK_DISABLED=true` (or with a Ryuk that cannot reach the Docker socket, which
+Testcontainers reports as a warning and then continues past) leaves one `postgres:17-alpine` container
+running per build, and the next one starts another. Find them with `docker ps --filter
+ancestor=postgres:17-alpine` and remove them with `docker rm -f <id>`; the databases inside a container are
+worth nothing, so nothing is lost by that.
 
 Adding a test class: choose the family it belongs to and copy that family's annotations. An identical
 annotation set shares a context and a database with the classes that already carry it, which is what keeps
