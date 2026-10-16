@@ -50,7 +50,9 @@ reports/     Generated verification / analysis reports
 ## 4. Commands
 
 Backend (from `backend/`): `./mvnw spring-boot:run` · `./mvnw test` · `./mvnw verify` · `./mvnw package` (jar in `backend/target/`)
-Frontend (once scaffolded): `npm install` · `npm run dev` · `npm run test` · `npm run build` · `npm run lint`
+Frontend (from `frontend/`, Node 22.22.2 / 24.15 / 26+ — see `frontend/package.json` `engines`):
+`npm install` · `npm run dev` (dev server on :5173, LAN-bound) · `npm run test` · `npm run lint` · `npm run typecheck` ·
+`npm run format:check` · `npm run build` (static bundle in `frontend/dist/`) · `npm run preview` (serves `dist/` on :4173)
 Dev database (once scaffolded): `docker compose -f docker-compose.dev.yml up -d` · v1.0 stack: `docker compose up`
 Full check before a commit: the `verify` skill (`.claude/skills/verify/SKILL.md`).
 **Keep this section accurate** — every story that adds or renames a command updates it here.

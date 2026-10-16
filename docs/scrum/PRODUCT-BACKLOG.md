@@ -225,6 +225,9 @@ user's own images, Dark Glassmorphism tokens, local Fontsource typography — is
 *As a mobile user, I want the app to fill the screen cleanly, so that browsing feels native.*
 
 - [ ] `styles/global.css`: reset, dark base, hidden scrollbars, `100dvh`, safe-area insets, overscroll behaviour.
+- [ ] **Tailwind's content scan is scoped explicitly** (`@source`) so the built CSS depends on `src/` alone:
+      found in E2-S1's review, the default scan reaches `frontend/README.md` prose — a doc edit currently
+      changes the CSS hash, and `w-[43px]` written in a document ships a rule.
 - [ ] Typographic scale variables (`--text-*`) and spacing scale defined once.
 - [ ] `prefers-reduced-motion` guard available globally.
 - [ ] No horizontal overflow at 320/390/430 px widths; verified with screenshots.

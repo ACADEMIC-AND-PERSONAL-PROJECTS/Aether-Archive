@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+/*
+ * Scaffold baseline only. Tailwind v4 is CSS-first: design tokens are declared with
+ * `@theme` in this file (ADR-014), so `--aura-*` colour tokens and the `--font-*`
+ * typography variables land here in E2-S3 and E2-S5.
+ */
+
+:root {
+  color-scheme: dark;
+}
+
+/* Interim dark base so the placeholder is legible before the token layer exists;
+   E2-S3 replaces the literal with `--aura-bg`. */
+body {
+  background-color: #0b0b0d;
+}
