@@ -12,7 +12,8 @@ Never edit the backlog only on GitHub: change the file, then re-run this skill.
 
 **Fast path** — a reference implementation of everything below lives in
 `scripts/github/seed-backlog.py` (idempotent: it parses the backlog file, ensures labels, milestones
-and one issue per epic/story, and never deletes anything):
+and one issue per epic/story, refreshes a drifted story body, reports unscheduled stories, and never
+deletes anything):
 
 ```bash
 python3 scripts/github/seed-backlog.py --dry-run   # inspect the plan

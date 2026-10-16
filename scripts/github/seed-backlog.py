@@ -2,7 +2,8 @@
 """Mirror docs/scrum/PRODUCT-BACKLOG.md to GitHub — labels, milestones and one issue per epic/story.
 
 The backlog file is canonical; GitHub is a mirror. This script is idempotent: it matches
-existing items by exact title and never duplicates or deletes anything.
+existing items by exact title, refreshes a story issue whose body has drifted from the file,
+and never duplicates or deletes anything.
 
 Usage
     python3 scripts/github/seed-backlog.py [--dry-run]
@@ -22,10 +23,12 @@ from pathlib import Path
 
 BACKLOG = Path("docs/scrum/PRODUCT-BACKLOG.md")
 
+# Mirror of the SPRINT-PLAYBOOK.md schedule rows. A sprint's window is re-planned at its own planning,
+# so these dues move with the playbook — keep them in step (checked 2026-10-16).
 SPRINTS: dict[int, dict[str, str]] = {
-    1: {"title": "Sprint 01 — Foundation & Backend", "due": "2026-10-30T23:59:59Z"},
-    2: {"title": "Sprint 02 — Design System", "due": "2026-11-13T23:59:59Z"},
-    3: {"title": "Sprint 03 — Splash & Workshop", "due": "2026-11-27T23:59:59Z"},
+    1: {"title": "Sprint 01 — Foundation & Backend", "due": "2026-10-16T23:59:59Z"},
+    2: {"title": "Sprint 02 — Design System", "due": "2026-10-30T23:59:59Z"},
+    3: {"title": "Sprint 03 — Splash & Workshop", "due": "2026-10-30T23:59:59Z"},
     4: {"title": "Sprint 04 — Workshop & CI", "due": "2026-12-11T23:59:59Z"},
     5: {"title": "Sprint 05 — Time River", "due": "2026-12-25T23:59:59Z"},
     6: {"title": "Sprint 06 — Hardening & v1.0", "due": "2027-01-08T23:59:59Z"},
@@ -77,6 +80,14 @@ FOOTER = (
     "Re-sync with the `backlog-sync` skill._"
 )
 
+# Some rows annotate their title with the tracker they were routed to — "(… issue #79)". The
+# annotation belongs to the row, not to the mirrored issue's title, so it is stripped for matching.
+TITLE_ANNOTATION = re.compile(r"\s*\([^()]*(?:issue|PR) #\d+[^()]*\)\s*$")
+
+
+def story_title(story: dict) -> str:
+    return f"[{story['id']}] {TITLE_ANNOTATION.sub('', story['title'])}"
+
 
 def gh(*args: str, check: bool = True) -> str:
     result = subprocess.run(["gh", *args], capture_output=True, text=True)
@@ -92,7 +103,7 @@ def gh_json(*args: str) -> object:
 def parse_backlog(text: str) -> tuple[dict, dict]:
     stories: dict[str, dict] = {}
     for m in re.finditer(
-        r"^\|\s*(E\d+-S\d+)\s*\|\s*(.+?)\s*\|\s*(p\d)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*\w+\s*\|",
+        r"^\|\s*(E\d+-S\d+)\s*\|\s*(.+?)\s*\|\s*(p\d)\s*\|\s*(\d+)\s*\|\s*(\d+|—)\s*\|\s*\w+\s*\|",
         text,
         re.M,
     ):
@@ -103,10 +114,13 @@ def parse_backlog(text: str) -> tuple[dict, dict]:
             "title": title,
             "priority": priority,
             "points": int(points),
-            "sprint": int(sprint),
+            # "—" means unscheduled: parsed, but never auto-mirrored until a sprint claims it.
+            "sprint": int(sprint) if sprint.isdigit() else None,
         }
 
-    headings = list(re.finditer(r"^### (E\d+-S\d+) — (.+?) · (\d+) pts · (p\d)$", text, re.M))
+    # The story headings have drifted between "·" and "|" as the priority separator (26 used "|").
+    # Accept both so a mixed file can never silently drop a section again.
+    headings = list(re.finditer(r"^### (E\d+-S\d+) — (.+?) · (\d+) pts (?:·|\|) (p\d)$", text, re.M))
     for i, m in enumerate(headings):
         sid = m.group(1)
         end = headings[i + 1].start() if i + 1 < len(headings) else len(text)
@@ -131,15 +145,31 @@ def parse_backlog(text: str) -> tuple[dict, dict]:
 
 def story_issue_body(story: dict, epic_issue: int | None) -> str:
     body = story.get("body", "")
+    lines = body.splitlines()
+
     statement = ""
-    for line in body.splitlines():
-        line = line.strip()
-        if line.startswith("*"):
-            statement = line.strip("*").strip()
+    for i, line in enumerate(lines):
+        if line.strip().startswith("*"):
+            parts = [line.strip()]
+            while not parts[-1].endswith("*") and i + 1 < len(lines) and lines[i + 1].strip():
+                i += 1
+                parts.append(lines[i].strip())
+            statement = " ".join(parts).strip("*").strip()
             break
-    criteria = [
-        line.strip() for line in body.splitlines() if line.strip().startswith("- [ ]")
-    ]
+
+    # Join wrapped criteria: continuation lines are indented, and a criterion ends on a blank
+    # line, the next "- [ ]" item, or any non-indented line.
+    criteria: list[str] = []
+    in_criterion = False
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("- [ ]"):
+            criteria.append(stripped)
+            in_criterion = True
+        elif in_criterion and stripped and line.startswith(" "):
+            criteria[-1] += " " + stripped
+        else:
+            in_criterion = False
     parts = [
         "**Story** — " + (statement or story["title"]),
         "",
@@ -147,7 +177,7 @@ def story_issue_body(story: dict, epic_issue: int | None) -> str:
         *criteria,
         "",
         f"**Estimate** — {story['points']} points · **Priority** — {story['priority']} "
-        f"· **Sprint** — {story['sprint']}",
+        f"· **Sprint** — {story['sprint'] if story['sprint'] is not None else '—'}",
     ]
     if epic_issue:
         parts.append(f"**Epic** — #{epic_issue}")
@@ -165,14 +195,59 @@ def main() -> None:
     epics, stories = parse_backlog(BACKLOG.read_text(encoding="utf-8"))
     print(f"Repository: {repo} · parsed {len(epics)} epics, {len(stories)} stories")
 
+    existing = {
+        i["title"]: i
+        for i in gh_json(
+            "issue", "list", "--state", "all", "--limit", "500", "--json", "number,title,body"
+        )
+    }
+
+    epic_numbers: dict[str, int] = {}
+    epics_to_create: list[tuple[str, dict]] = []
+    for code, epic in epics.items():
+        title = f"[{code}] {epic['name']}"
+        if title in existing:
+            epic_numbers[code] = existing[title]["number"]
+        else:
+            epics_to_create.append((code, epic))
+
+    to_create: list[tuple[str, dict]] = []
+    to_update: list[tuple[str, dict, int]] = []
+    unscheduled_no_mirror: list[str] = []
+    unchanged = 0
+    for sid, story in stories.items():
+        title = story_title(story)
+        if title not in existing:
+            if story["sprint"] is None:
+                unscheduled_no_mirror.append(sid)
+            else:
+                to_create.append((sid, story))
+            continue
+        body = story_issue_body(story, epic_numbers.get(story["epic"]))
+        if existing[title]["body"].strip() == body.strip():
+            unchanged += 1
+        else:
+            to_update.append((sid, story, existing[title]["number"]))
+
     if dry_run:
-        print("[dry-run] would create labels:", ", ".join(name for name, _, _ in LABELS))
-        for number, sprint in SPRINTS.items():
-            print(f"[dry-run] would ensure milestone: {sprint['title']}")
-        for code, epic in epics.items():
-            print(f"[dry-run] would ensure epic issue [{code}] {epic['name']}")
-        for sid, story in stories.items():
-            print(f"[dry-run] would ensure story issue [{sid}] {story['title']} (sprint {story['sprint']})")
+        print(f"[dry-run] would ensure {len(LABELS)} labels")
+        for sprint in SPRINTS.values():
+            print(f"[dry-run] would ensure milestone: {sprint['title']} (due {sprint['due']})")
+        for code, epic in epics_to_create:
+            print(f"[dry-run] would create epic  [{code}] {epic['name']}")
+        for sid, story in to_create:
+            print(f"[dry-run] would create story {story_title(story)} (sprint {story['sprint']})")
+        for sid, story, number in to_update:
+            print(f"[dry-run] would update story {story_title(story)} (#{number}) — body differs")
+        print(
+            f"[dry-run] plan: {len(to_create)} creates, {len(to_update)} updates, "
+            f"{unchanged} unchanged, {len(epics_to_create)} epics to create"
+        )
+        if unscheduled_no_mirror:
+            print(
+                "[dry-run] unscheduled stories without a mirror issue (not created): "
+                + ", ".join(unscheduled_no_mirror)
+            )
         return
 
     # Labels -----------------------------------------------------------------
@@ -198,17 +273,8 @@ def main() -> None:
         )
 
     # Issues -----------------------------------------------------------------
-    existing = {
-        i["title"]: i["number"]
-        for i in gh_json("issue", "list", "--state", "all", "--limit", "500", "--json", "number,title")
-    }
-
-    epic_numbers: dict[str, int] = {}
-    for code, epic in epics.items():
+    for code, epic in epics_to_create:
         title = f"[{code}] {epic['name']}"
-        if title in existing:
-            epic_numbers[code] = existing[title]
-            continue
         story_lines = [
             f"- [ ] [{s['id']}] {s['title']}"
             for s in stories.values()
@@ -231,14 +297,11 @@ def main() -> None:
         print(f"created epic  {title} (#{epic_numbers[code]})")
 
     created = 0
-    for sid, story in stories.items():
-        title = f"[{sid}] {story['title']}"
-        if title in existing:
-            continue
+    for sid, story in to_create:
+        title = story_title(story)
         labels = ["type:story", AREA_BY_EPIC[story["epic"]], f"priority:{story['priority']}"]
         labels += AREA_EXTRA.get(sid, [])
-        milestone = SPRINTS[story["sprint"]]["title"]
-        url = gh(
+        args = [
             "issue",
             "create",
             "--title",
@@ -247,13 +310,34 @@ def main() -> None:
             story_issue_body(story, epic_numbers.get(story["epic"])),
             "--label",
             ",".join(labels),
-            "--milestone",
-            milestone,
-        )
+        ]
+        if story["sprint"] is not None:
+            args += ["--milestone", SPRINTS[story["sprint"]]["title"]]
+        url = gh(*args)
         created += 1
         print(f"created story {title} (#{url.rsplit('/', 1)[-1]})")
 
-    print(f"Done. {created} issues created, {len(stories) - created} already present, {len(epics)} epics ensured.")
+    updated = 0
+    for sid, story, number in to_update:
+        gh(
+            "issue",
+            "edit",
+            str(number),
+            "--body",
+            story_issue_body(story, epic_numbers.get(story["epic"])),
+        )
+        updated += 1
+        print(f"updated story {story_title(story)} (#{number})")
+
+    print(
+        f"Done. {created} created, {updated} updated, {unchanged} unchanged, "
+        f"{len(epics_to_create)} epics created."
+    )
+    if unscheduled_no_mirror:
+        print(
+            "Unscheduled stories without a mirror issue (not created): "
+            + ", ".join(unscheduled_no_mirror)
+        )
 
 
 if __name__ == "__main__":
