@@ -229,6 +229,24 @@ class ImageServingFlowTest {
                 .doesNotContain(stored.id().toString(), dataDir.toString());
     }
 
+    /**
+     * The canary by its own name, reached the plain way — the one request that asks what the location list
+     * contains. A climbing path never asks it: the framework refuses {@code ../} before any location is
+     * consulted, so a second location added beside {@code images/} would answer this request and leave the
+     * whole refusal battery green. Measured: with the data directory added as a second location, every
+     * other test in this class still passed and this URL returned the canary.
+     */
+    @Test
+    void should_not_serve_a_file_that_sits_beside_the_images_directory() throws Exception {
+        assertThat(dataDir.resolve(CANARY_NAME)).as("the canary is readable").hasContent(CANARY);
+
+        HttpResponse<String> response = rawGet(IMAGES + "/" + CANARY_NAME);
+
+        assertThat(response.statusCode()).isEqualTo(404);
+        assertThat(response.body()).as("the answer to the canary's own URL")
+                .doesNotContain(CANARY, dataDir.toString());
+    }
+
     @ParameterizedTest(name = "{0} answers {1}")
     @MethodSource("climbingPaths")
     void should_refuse_a_path_that_climbs_out_of_the_images_directory(String path, int expectedStatus)
