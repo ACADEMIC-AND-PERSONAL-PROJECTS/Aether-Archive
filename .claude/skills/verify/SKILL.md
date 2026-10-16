@@ -37,9 +37,11 @@ npm run build
 
 ## 3. Runtime smoke — when the change touches the API or a view
 
-Start the backend on a spare port with a throwaway data directory (never the real one):
+Start the dev database first (Postgres — once built in Sprint 1), then the backend on a spare port with a
+throwaway data directory (never the real one):
 
 ```bash
+docker compose -f docker-compose.dev.yml up -d   # Postgres; skip if not scaffolded yet
 AETHER_DATA_DIR="$(mktemp -d)" SERVER_PORT=18080 ./mvnw -q spring-boot:run &
 until curl -sf http://localhost:18080/api/v1/photos >/dev/null 2>&1; do sleep 1; done
 curl -s http://localhost:18080/api/v1/photos | jq 'length'

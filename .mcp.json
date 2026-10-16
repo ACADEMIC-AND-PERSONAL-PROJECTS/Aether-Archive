@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "MCP_DOCKER": {
+      "type": "stdio",
+      "command": "docker",
+      "args": ["mcp", "gateway", "run", "--profile", "research"]
+    },
+    "web-search": {
+      "type": "stdio",
+      "command": "docker",
+      "args": ["mcp", "gateway", "run", "--profile", "research"]
+    }
+  }
+}

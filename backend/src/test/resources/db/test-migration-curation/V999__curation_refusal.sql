@@ -1,0 +1,14 @@
+-- Test-only, and never part of a production database: this file lives in
+-- src/test/resources/db/test-migration-curation and is applied only by the tests that add that folder to
+-- `spring.flyway.locations`. It exists so the atomicity of a publish can be exercised against a real
+-- refusal instead of a mock: the archive's own schema allows curation, so a constraint is added that no
+-- attach can satisfy, and every `update photo set archive_item_id = …` is rejected the way PostgreSQL
+-- rejects a row one of the baseline's own checks would have refused.
+--
+-- It is a folder of its own rather than a second file in db/test-migration, whose constraint refuses
+-- every insert into `photo`: a schema where photos cannot be stored cannot publish a dump from them, and
+-- the two tests would then depend on each other's migration for no reason.
+--
+-- `not valid` keeps the constraint from scanning rows that are already there — there are none, but a
+-- migration that has to be fast and total should not depend on that.
+alter table photo add constraint ck_photo_test_curation_refusal check (archive_item_id is null) not valid;

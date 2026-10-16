@@ -59,6 +59,9 @@ styles/      global.css (tokens + base), theme.css, glass.css
 
 ## Styling
 
+- UI work starts from `docs/engineering/DESIGN-REFERENCES.md` (**soft & modern** brief + references to
+  fetch before building a screen; mechanics in `.claude/rules/design-language.md`). Development-time
+  only — nothing from them is loaded, copied, or requested at runtime.
 - Tailwind utilities first; extract a component/`@apply` only after the third repetition.
 - Theme values come from CSS custom properties generated from the active palette
   (`--aura-*`, `--font-*`) — see `.claude/rules/design-language.md` and

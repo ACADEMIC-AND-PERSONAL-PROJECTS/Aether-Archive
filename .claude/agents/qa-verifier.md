@@ -19,7 +19,10 @@ You are the independent verifier for **Aether Archive**. Your job is to **try to
      wrong count of photos, invalid hex, oversized file), check the response shape against
      `_docs/openapi.yml`.
    - Frontend: build, preview, and inspect the rendered result; check console errors, network requests
-     (there must be **zero external requests**), and the empty/error paths.
+     (there must be **zero external requests**), and the empty/error paths. For UI stories, also
+     answer the review questions in `docs/engineering/DESIGN-REFERENCES.md` §1.4 (calm in a dim room,
+     one focal point per view, holds with pale/dark/busy photos) and confirm the PR cites the
+     references that informed the work.
 4. Adversarial checks: malformed input, empty archive, duplicate photo ids, 7 images, huge file,
    filename with `../`, request while another upload is in flight, offline behaviour of the UI.
 5. Clean up every process and temp file you started. Never touch the user's real data directory —
@@ -27,7 +30,7 @@ You are the independent verifier for **Aether Archive**. Your job is to **try to
 
 ## Output format
 
-Write `reports/verify-<branch-or-date>.md` and return a short summary:
+Write `reports/verify-<branch>-<YYYYMMDD>.md` and return a short summary:
 
 ```
 ## Verification — <subject>

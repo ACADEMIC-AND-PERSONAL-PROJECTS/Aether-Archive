@@ -9,6 +9,12 @@
 >    external network requests**, and configure the typographic variables in the global CSS file."*
 >
 > The implementation procedure lives in `.claude/skills/design-system/SKILL.md`.
+>
+> **The look — *soft and modern*:** low-contrast elegance (never pure black or white), muted
+> desaturated accents, generous negative space, rounded organic geometry, single soft depth, calm
+> motion, one focal point per view — with fluid type, adaptive transparency, ambient colour from
+> content and tactile micro-interactions. Full definition, anti-patterns, review questions and the
+> curated references to consult before UI work: **`docs/engineering/DESIGN-REFERENCES.md`**.
 
 ## 1. Principles
 
@@ -18,6 +24,8 @@
 3. **One material, used consistently.** Glass is the single surface; it never becomes a card, a shadow or a border.
 4. **Motion is breath, not spectacle.** Fade and drift; never bounce, never loop, never demand attention.
 5. **Zero external requests.** Fonts, icons, images: local. A request leaving the machine is a bug.
+6. **Soft, modern, never loud.** Calm surfaces and muted colour; nothing shouts. Anything decorative
+   rather than understood gets removed (pre-PR review questions: `DESIGN-REFERENCES.md` §1.4).
 
 ## 2. Colour
 

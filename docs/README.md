@@ -12,6 +12,8 @@
 | `docs/scrum/sprints/` | One plan per sprint (`sprintNN.md`) | Yes |
 | `docs/engineering/ARCHITECTURE.md` | Components, data flow, storage layout | Yes |
 | `docs/engineering/DESIGN-SYSTEM.md` | Colour extraction, glass tokens, typography, motion | Yes |
+| `docs/engineering/DESIGN-REFERENCES.md` | "Soft & modern" brief, curated design references, tools, working method | Yes |
+| `docs/engineering/DEPLOYMENT.md` | Target container packaging: topology, services, hard requirements, verification | Yes |
 | `retrospectives/` | One retrospective per sprint (`sprintNN.md`) | Yes |
 | `reports/` | Generated verification/analysis reports (not maintained by hand) | No |
 | `.claude/` | Agent configuration — see `.claude/README.md` | Yes |

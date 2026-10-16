@@ -4,8 +4,9 @@
 > Images are the product — the interface stays almost invisible.
 
 Aether Archive runs entirely on your own machine and is designed to be opened from a phone on the
-same local network (`http://<LAN-IP>:8080`). Nothing is uploaded to the cloud, no third-party
-requests are made at runtime, and every image and record stays in a local folder you own.
+same local network — `http://<LAN-IP>:5173` in development, `http://<LAN-IP>:3000` in the containerized
+v1.0. Nothing is uploaded to the cloud, no third-party requests are made at runtime, and every image
+and record stays on your machine.
 
 ## Concept
 
@@ -20,9 +21,10 @@ requests are made at runtime, and every image and record stays in a local folder
 
 - **Frontend** — React + Vite + TypeScript, Tailwind CSS, Framer Motion, `@dnd-kit`, TanStack Query
 - **Backend** — Java 21, Spring Boot 3, Maven, REST under `/api/v1`
-- **Database** — embedded SQLite (file-based)
+- **Database** — PostgreSQL 17, running locally as a Docker container (nothing leaves your machine)
 - **Storage** — local filesystem, images served by Spring at `/images/**`
 - **Typography** — Fontsource NPM packages (self-hosted, zero external requests)
+- **Packaging** — Docker Compose at v1.0 (db + api + web); see `docs/engineering/DEPLOYMENT.md`
 
 ## Repository layout
 
@@ -42,16 +44,30 @@ Backend and frontend are scaffolded in Sprint 1 and Sprint 2 (see `docs/scrum/PR
 
 ```bash
 # 1. Environment
-cp .env.example .env        # then edit AETHER_DATA_DIR and VITE_API_BASE_URL
+cp .env.example .env        # optional; review the POSTGRES_* values, set AETHER_DATA_DIR if you want
+                            # another location than the default ~/AetherArchive_Data
 
-# 2. Backend (after Sprint 1)
+# 2. Dev database — PostgreSQL 17 container, listening on 127.0.0.1 only
+docker compose -f docker-compose.dev.yml up -d
+docker compose -f docker-compose.dev.yml ps          # wait for "healthy"
+
+# 3. Backend (scaffolded; the /api/v1 endpoints land during Sprint 1)
 cd backend && ./mvnw spring-boot:run
 
-# 3. Frontend (after Sprint 2)
-cd frontend && npm install && npm run dev -- --host   # --host exposes it to your phone
+# 4. Frontend (from Sprint 2 onwards)
+cd ../frontend && npm install && npm run dev -- --host   # --host exposes it to your phone
 ```
 
 Then open `http://<your-LAN-IP>:5173` on your phone.
+
+The dev database keeps its data in the named volume `aether_pgdata`:
+`docker compose -f docker-compose.dev.yml down` stops it and keeps everything;
+only an explicit `down -v` deletes the archive. If port 5432 is already taken by another
+PostgreSQL, set `AETHER_DB_PORT=5433` in `.env` — the compose file and the backend both read it.
+
+**v1.0 (planned, Sprint 6):** the whole stack runs as containers —
+`cp .env.example .env && docker compose up`, then open `http://<your-LAN-IP>:3000`.
+Details: `docs/engineering/DEPLOYMENT.md`.
 
 ## How this project is built
 

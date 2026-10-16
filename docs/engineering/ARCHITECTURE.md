@@ -10,17 +10,17 @@ backend and the frontend build; a phone on the same LAN opens the app in a brows
 machine: no cloud, no external request at runtime, no telemetry.
 
 ```text
-┌──────────────┐        LAN (http://192.168.x.x:8080)        ┌───────────────────────────┐
+┌──────────────┐        LAN (http://192.168.x.x:3000)        ┌───────────────────────────┐
 │   Phone      │ ──────────────────────────────────────────▶ │  Owner's machine          │
 │  (browser)   │ ◀────────────────────────────────────────── │                           │
 └──────────────┘                                             │  ┌─────────────────────┐  │
                                                              │  │ Spring Boot :8080   │  │
-   Static frontend (built bundle, served locally)  ────────▶ │  │  /api/v1   REST     │  │
+   Static frontend (dev :5173 · v1.0 :3000)        ────────▶ │  │  /api/v1   REST     │  │
                                                              │  │  /images/** files   │  │
                                                              │  └─────────┬───────────┘  │
                                                              │            │ JDBC          │
                                                              │  ┌─────────▼───────────┐  │
-                                                             │  │ SQLite  aether.db    │  │
+                                                             │  │ Postgres (Docker)    │  │
                                                              │  └─────────────────────┘  │
                                                              │  ┌─────────────────────┐  │
                                                              │  │ Data dir (files)     │  │
@@ -36,7 +36,7 @@ machine: no cloud, no external request at runtime, no telemetry.
 | **Web app** | React + Vite + TS + Tailwind + Framer Motion + `@dnd-kit` | Splash, glass menu, river, workshop; colour extraction; theme generation |
 | **API** | Spring Boot 3, Java 21 | REST `/api/v1`, validation, RFC 9457 errors, image serving |
 | **Storage service** | Java NIO | Owns the data directory: atomic writes, UUID names, path safety, (later) thumbnails |
-| **Database** | SQLite (file) + Flyway | Archive items and photos; schema migrations |
+| **Database** | PostgreSQL 17 (Docker) + Flyway | Archive items and photos; schema migrations |
 | **Agent layer** | `.claude/` | Rules, skills, hooks, subagents — how the work is performed |
 
 ## 3. Domain model (target)
@@ -76,11 +76,12 @@ Contract: `_docs/openapi.yml` (read-only, canonical).
 
 ```text
 ${AETHER_DATA_DIR}/            default ~/AetherArchive_Data  (never committed)
-├── aether.db                  SQLite database (WAL)
 ├── images/                    originals, named <uuid>.<ext>
 ├── thumbnails/                generated derivatives (E5-S3)
 └── tmp/                       staging for atomic writes; emptied on boot
 ```
+
+The database is not a file here anymore: PostgreSQL runs in a Docker volume (ADR-009).
 
 ## 6. Frontend structure (target)
 
@@ -115,18 +116,25 @@ frontend/src/
 | **Observability** | Log lines per meaningful operation; no telemetry; verification evidence lands in `reports/`. |
 | **Process** | SCRUM artefacts in-repo, one story per branch, merge commits, retro per sprint (`ADR-002`, `ADR-003`, `ADR-007`). |
 
-## 8. Deployment / runbook (v1)
+## 8. Deployment / runbook
+
+**Development (Sprints 1–5)** — database container + native toolchains:
 
 ```bash
-# Build the frontend once, then run the backend which serves the API and the images.
-cd frontend && npm ci && npm run build
-cd ../backend && ./mvnw -q package
-AETHER_DATA_DIR=~/AetherArchive_Data java -jar target/aether-archive.jar
-# Phone: http://<LAN-IP>:8080
+docker compose -f docker-compose.dev.yml up -d          # PostgreSQL 17
+cd backend && ./mvnw spring-boot:run                    # API + images on :8080
+cd frontend && npm install && npm run dev -- --host     # Vite :5173 for the phone
 ```
 
-Backup = copy the data directory (with a SQLite checkpoint). Restore = put it back. Both are scripted in
-E6-S7 and documented in E6-S6.
+**v1.0 (target, E6-S11/S12)** — the whole stack as containers, one command:
+
+```bash
+cp .env.example .env && docker compose up
+# Phone: http://<LAN-IP>:3000 (nginx serves the SPA and proxies /api + /images)
+```
+
+Backup = `pg_dump` of the database + a copy of `images/` (scripted in E6-S7, documented in E6-S6).
+Full container requirements: `docs/engineering/DEPLOYMENT.md`.
 
 ## 9. Known open decisions
 

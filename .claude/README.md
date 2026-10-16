@@ -20,9 +20,9 @@ shared, reviewable, and versioned with the code.
 │   ├── start-feature/    Branch per user story, DoR check
 │   ├── open-pr/          Push + open the PR into develop with evidence
 │   ├── merge-pr/         Review gate + merge commit + cleanup
-│   ├── finish-sprint/    Retro + release PR develop→main + tag
+│   ├── finish-sprint/    Security audit gate + retro + release PR develop→main + tag
 │   ├── backlog-sync/     Mirror docs/scrum/PRODUCT-BACKLOG.md to GitHub issues/labels/milestones
-│   ├── design-system/    Colour extraction + Dark Glassmorphism theme + Fontsource typography
+│   ├── design-system/    Reference-driven colour extraction + Dark Glassmorphism + Fontsource typography
 │   └── verify/           Project verification recipe (also runs before commits automatically)
 ├── commands/         Lightweight, human-typed slash commands
 │   ├── sprint-status.md  Where are we right now?
@@ -32,6 +32,7 @@ shared, reviewable, and versioned with the code.
 │   ├── frontend-engineer.md  React/Vite/design implementation
 │   ├── code-reviewer.md      Read-only review against DoD + conventions
 │   ├── qa-verifier.md        Runs verification, writes evidence reports
+│   ├── security-auditor.md   Web-researched security audit each sprint close (release gate)
 │   └── scrum-master.md       Backlog, sprint docs, retrospectives
 ├── hooks/            Deterministic guardrails (shell scripts wired in settings.json)
 │   ├── guard-commands.sh     Blocks rebase/force-push/direct pushes/squash merges/destructive ops
@@ -46,6 +47,15 @@ shared, reviewable, and versioned with the code.
 - `.claude/rules/*.md` load every session (or when a matching file is touched, with `paths:`).
   Keep them short and factual; procedures belong in a skill.
 - `settings.json` permissions apply after you accept the workspace trust prompt on first launch.
+- `permissions.deny` **enumerates** the secret-bearing env files (`.env`, `.env.local`, `.env.*.local`,
+  `.env.dev|development|test|prod|production|staging|bak|old|save|backup`). **A new env-file variant must be
+  added there.** Unlike `.gitignore` (which re-includes `.env.example` with `!`), the permission list cannot
+  express "every `.env.*` except `.env.example`": deny rules are evaluated first and beat any allow rule, so
+  the exemption has to be carved into the deny list itself. Keep the two lists in step when one changes.
+- Project MCP servers live in the repo-root `.mcp.json`: `MCP_DOCKER` and `web-search` (Docker MCP
+  gateway, profile `research` — Docker must be running). `enabledMcpjsonServers` in `settings.json`
+  pre-approves them (once the workspace is trusted), so no per-session approval prompt appears. They
+  are development-time tools only — the shipped app never calls them.
 - The `verify` skill is special: Claude Code's built-in commit instructions run a project skill named
   `verify` right before each commit, which is exactly what we want here.
 - `statusLine` is set in project settings; if your version ignores it there, copy the block into

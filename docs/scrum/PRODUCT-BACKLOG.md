@@ -21,43 +21,49 @@ A story is `Done` only when the Definition of Done (`DEFINITION-OF-DONE.md`) is 
 
 | Epic | Name | Sprints | Stories | Points | Goal |
 | --- | --- | --- | --- | --- | --- |
-| **E1** | Foundation & Backend | S1 | 10 | 34 | A local REST API that stores images and dumps durably, with tests. |
+| **E1** | Foundation & Backend | S1–S2 | 11 | 38 | A local REST API that stores images and dumps durably, with tests. |
 | **E2** | Frontend Foundation & Design System | S2 | 6 | 29 | A runnable React shell and the image-derived Dark Glassmorphism design system. |
 | **E3** | Immersive Splash & Glass Menu | S3 | 5 | 18 | The signature entry experience: full-bleed random photo + glass menu. |
 | **E4** | Curator's Workshop | S3–S4 | 5 | 28 | Upload, order and publish a 6-photo dump with its aura colour. |
 | **E5** | The Time River | S5 | 4 | 21 | The chronological feed with ambient per-dump background. |
-| **E6** | Quality, Delivery & Release | S4–S6 | 10 | 40 | CI, accessibility, hardening, documentation and the v1.0 release. |
+| **E6** | Quality, Delivery & Release | S4–S6 | 16 | 55 | CI, accessibility, hardening, containerization, documentation and the v1.0 release. |
 
-**Total: 40 stories · 170 points · 6 sprints (~2 weeks each, 25–34 points per sprint).**
+**Total: 47 stories · 189 points · 6 sprints (~2 weeks each, 25–34 points per sprint).**
+
+> E6-S13…S16 were added after Sprint 1 from the release security audit (`reports/security-audit-sprint01.md`).
+> They are **not** Sprint 1 stories and are not counted in its velocity: E6-S15 is `Done` because the reachable
+> finding (SEC-03) was fixed before that sprint closed, in PR #70, and the remaining 8 points await Sprint-2
+> planning — the sprint map below still sums to 181 for that reason.
 
 ```text
 Sprint 1  E1  Foundation & Backend              (34)
-Sprint 2  E2  Frontend Foundation & Design Sys  (29)
+Sprint 2  E2 + E1-S5/S10  Frontend Foundation & Design Sys  (33)
 Sprint 3  E3 + E4-S1/S2  Splash · Menu · Upload (28)
 Sprint 4  E4 + E6-S1/S2  Workshop · CI          (25)
 Sprint 5  E5 + E6-S3/S4  Time River · A11y      (27)
-Sprint 6  E6  Hardening · Polish · v1.0         (26)
+Sprint 6  E6  Hardening · Polish · v1.0         (34)
 ```
 
 ---
 
 ## E1 — Foundation & Backend
 
-**Goal:** a Spring Boot application that owns the local data directory, persists items in SQLite, serves
-images and exposes the `/api/v1` contract from `_docs/openapi.yml` — fully tested, no external calls.
+**Goal:** a Spring Boot application that owns the local data directory, persists items in PostgreSQL,
+serves images and exposes the `/api/v1` contract from `_docs/openapi.yml` — fully tested, no external calls.
 
 | ID | Story | P | Pts | Sprint | Status |
 | --- | --- | --- | --- | --- | --- |
-| E1-S1 | Scaffold the Spring Boot project | p0 | 3 | 1 | Todo |
-| E1-S2 | Configuration & local data directory | p0 | 2 | 1 | Todo |
-| E1-S3 | SQLite persistence + Flyway baseline | p0 | 5 | 1 | Todo |
-| E1-S4 | StorageService — safe local file storage | p0 | 5 | 1 | Todo |
-| E1-S5 | Serve images at `/images/**` | p0 | 2 | 1 | Todo |
-| E1-S6 | Photo API — upload, list, random | p0 | 5 | 1 | Todo |
-| E1-S7 | Dump API — create and list 6-photo dumps | p0 | 5 | 1 | Todo |
-| E1-S8 | Error handling (RFC 9457) & validation | p0 | 2 | 1 | Todo |
-| E1-S9 | Backend test suite | p0 | 5 | 1 | Todo |
-| E1-S10 | Dev seed script & curl smoke collection | p2 | 2 | 1 | Todo |
+| E1-S1 | Scaffold the Spring Boot project | p0 | 3 | 1 | Done |
+| E1-S2 | Configuration & local data directory | p0 | 2 | 1 | Done |
+| E1-S3 | PostgreSQL persistence + Flyway baseline | p0 | 5 | 1 | Done |
+| E1-S4 | StorageService — safe local file storage | p0 | 5 | 1 | Done |
+| E1-S5 | Serve images at `/images/**` | p0 | 2 | 2 | Todo |
+| E1-S6 | Photo API — upload, list, random | p0 | 5 | 1 | Done |
+| E1-S7 | Dump API — create and list 6-photo dumps | p0 | 5 | 1 | Done |
+| E1-S8 | Error handling (RFC 9457) & validation | p0 | 2 | 1 | Done |
+| E1-S9 | Backend test suite | p0 | 5 | 1 | Done |
+| E1-S10 | Dev seed script & curl smoke collection | p2 | 2 | 2 | Todo |
+| E1-S11 | Dev PostgreSQL via Docker Compose | p0 | 2 | 1 | Done |
 
 ### E1-S1 — Scaffold the Spring Boot project · 3 pts · p0
 
@@ -74,20 +80,20 @@ images and exposes the `/api/v1` contract from `_docs/openapi.yml` — fully tes
 *As the owner, I want the data directory configurable, so that my images live where I decide.*
 
 - [ ] `aether.storage.data-dir` (env `AETHER_DATA_DIR`, default `~/AetherArchive_Data`) resolved at boot.
-- [ ] Subfolders `images/`, `thumbnails/`, `tmp/` created idempotently; `aether.db` lives at the root.
+- [ ] Subfolders `images/`, `thumbnails/`, `tmp/` created idempotently (the database runs in its own container volume — ADR-009).
 - [ ] `AETHER_MAX_UPLOAD_MB` and `AETHER_CORS_ALLOWED_ORIGINS` wired; CORS restricted to configured origins.
 - [ ] Boot fails with a clear message if the directory is not writable.
 - [ ] Unit test with `@TempDir` covering creation and the failure path.
 
-### E1-S3 — SQLite persistence + Flyway baseline · 5 pts · p0
+### E1-S3 — PostgreSQL persistence + Flyway baseline · 5 pts · p0
 
-*As the owner, I want my archive stored in a local database file, so that nothing depends on a server.*
+*As the owner, I want my archive stored in a local PostgreSQL database, so that the data layer is robust and standard.*
 
-- [ ] SQLite via the Hibernate community dialect; `V1__baseline.sql` creates `archive_item` and `photo`.
-- [ ] WAL journal, `foreign_keys=ON`, `busy_timeout` set on every connection.
+- [ ] PostgreSQL 17 via Spring Data JPA + `org.postgresql:postgresql`; connection built from env (ADR-009); dev server from E1-S11.
+- [ ] Flyway `V1__baseline.sql` creates `archive_item` and `photo`; `hibernate.ddl-auto=validate` (never `update`).
 - [ ] Entities `ArchiveItem` and `Photo` per `.claude/rules/backend.md` (UUID ids, UTC `Instant`, `displayOrder`).
 - [ ] Derived-order query returns the river sorted `timestamp DESC, id` (stable).
-- [ ] `@DataJpaTest` covering relations, ordering and cascade rules.
+- [ ] `@DataJpaTest` on a real Postgres via Testcontainers (test-only dependency, justified in the PR; no pre-running database needed).
 
 ### E1-S4 — StorageService — safe local file storage · 5 pts · p0
 
@@ -107,6 +113,8 @@ images and exposes the `/api/v1` contract from `_docs/openapi.yml` — fully tes
 - [ ] `Cache-Control: public, max-age=31536000, immutable` (UUID names never change).
 - [ ] Unknown files return 404 without leaking paths; no directory listing possible.
 - [ ] Integration test fetching a stored file and a missing one.
+- [ ] Send the `Content-Type` derived from the stored extension (never the client's), add
+      `X-Content-Type-Options: nosniff`, and make directory listing impossible (audit SEC-N2).
 
 ### E1-S6 — Photo API — upload, list, random · 5 pts · p0
 
@@ -123,7 +131,8 @@ images and exposes the `/api/v1` contract from `_docs/openapi.yml` — fully tes
 *As the curator, I want to publish a 6-photo dump with its aura colour, so that months are preserved.*
 
 - [ ] `POST /api/v1/dumps` accepts `title?`, `backgroundColor` (`^#[0-9a-fA-F]{6}$`), exactly 6 distinct `photoIds`.
-- [ ] `displayOrder` is assigned 0–5 from the request order and exposed in responses.
+- [ ] `displayOrder` is assigned 0–5 from the request order; the order reaches clients as the
+      position of each photo in `Dump.photos` — the contract's `Photo` schema has no such field (ADR-011 §3).
 - [ ] Rejections: 5 or 7 ids, duplicates, unknown id, bad colour → 400/404 with precise `ProblemDetail`.
 - [ ] `GET /api/v1/dumps` returns dumps newest-first with their ordered photos.
 - [ ] Service unit tests + `@SpringBootTest` round trip.
@@ -143,7 +152,7 @@ images and exposes the `/api/v1` contract from `_docs/openapi.yml` — fully tes
 
 - [ ] Services: unit tests with `@TempDir` (storage, ordering, dump validation).
 - [ ] Controllers: `@WebMvcTest` per endpoint family, including the 400/404 paths.
-- [ ] One end-to-end `@SpringBootTest` on a temp data dir: upload 6 photos → create dump → read it back.
+- [ ] One end-to-end `@SpringBootTest` on a temp data dir (Postgres via Testcontainers): upload 6 photos → create dump → read it back.
 - [ ] Deterministic tests (injected `Clock`, no sleeps); suite runs under 60 s.
 - [ ] `./mvnw verify` green; evidence in the PR.
 
@@ -155,6 +164,17 @@ images and exposes the `/api/v1` contract from `_docs/openapi.yml` — fully tes
 - [ ] `scripts/dev/smoke.http` (or `.sh`) covers every endpoint including failure paths.
 - [ ] `AETHER_DATA_DIR` is honoured; script refuses to run against the real data dir without `--force`.
 - [ ] Documented in the backend README.
+
+### E1-S11 — Dev PostgreSQL via Docker Compose · 2 pts · p0
+
+*As a developer, I want the database started with one command locally, so that environments match.*
+
+- [ ] `docker-compose.dev.yml` at the repo root: one `db` service, `postgres:17-alpine`, port from `AETHER_DB_PORT` (default 5432), named volume `aether_pgdata`, healthcheck.
+- [ ] Credentials and database name from `.env` (`POSTGRES_*`); `.env.example` updated; nothing secret committed.
+- [ ] The service pins `postgres:17-alpine` by digest, so a mutable tag cannot change what runs
+      (audit SEC-N6).
+- [ ] `README.md` quickstart and backend README document `docker compose -f docker-compose.dev.yml up -d`.
+- [ ] `./mvnw spring-boot:run` connects to it with the documented `.env` values (smoke-tested).
 
 ---
 
@@ -415,8 +435,8 @@ opens on tap, feels tactile, and gets out of the way.
 
 ## E6 — Quality, Delivery & Release
 
-**Goal:** make the project safe to change and pleasant to own — CI, accessibility, hardening, documentation,
-and a clean v1.0.
+**Goal:** make the project safe to change and pleasant to own — CI, accessibility, hardening, containerized
+delivery, documentation, and a clean v1.0.
 
 | ID | Story | P | Pts | Sprint | Status |
 | --- | --- | --- | --- | --- | --- |
@@ -430,6 +450,12 @@ and a clean v1.0.
 | E6-S8 | Performance budget pass | p1 | 5 | 6 | Todo |
 | E6-S9 | Polish pass — motion, gestures, iOS quirks | p1 | 5 | 6 | Todo |
 | E6-S10 | v1.0 release | p0 | 3 | 6 | Todo |
+| E6-S11 | Container images (`api`, `web`) | p0 | 3 | 6 | Todo |
+| E6-S12 | One-command stack & clean-clone verification | p0 | 5 | 6 | Todo |
+| E6-S13 | Cross-site write protection (Sprint 1 audit SEC-01, issue #71) | p1 | 2 | — | Todo |
+| E6-S14 | Framework end-of-life decision & migration plan (audit SEC-02, issue #72) | p1 | 2 | — | Todo |
+| E6-S15 | Dependency patch level from the Sprint 1 audit (SEC-03, PR #70) | p1 | 1 | — | Done |
+| E6-S16 | Low-severity hardening from the Sprint 1 audit (SEC-04…10, issue #73) | p2 | 3 | — | Todo |
 
 ### E6-S1 — CI on every PR · 5 pts | p0
 
@@ -462,23 +488,25 @@ and a clean v1.0.
 
 - [ ] Upload fuzzing: malformed images, wrong magic bytes, zip bombs, 0-byte, unicode filenames.
 - [ ] Path traversal attempts on `photoId`, filenames and static serving — all inert (tests added).
-- [ ] SQLite file permissions reviewed; no secrets or absolute paths in responses; CORS verified.
+- [ ] PostgreSQL exposure reviewed (container bindings, volume and dump permissions); no secrets or absolute paths in responses; CORS verified.
 - [ ] Dependency audit (`npm audit`, `./mvnw dependency:tree`) with findings fixed or justified.
 - [ ] Report in `reports/security-*.md` with residual risk.
 
 ### E6-S6 — Documentation & runbook · 3 pts | p1
 
-- [ ] README: what/why, quickstart, phone access, troubleshooting, backup instructions.
+- [ ] README: what/why, quickstart (dev and containers), phone access, troubleshooting, backup instructions.
 - [ ] `docs/engineering/ARCHITECTURE.md` updated to the shipped reality (components, data flow, files).
-- [ ] Runbook: restore from backup, migrate data directory, rotate/repair DB.
+- [ ] Runbook: restore from backup (`pg_dump`/`psql` or scripts), migrate the data directory, rebuild containers, rotate DB credentials.
 - [ ] A new contributor can run the stack from a clean clone following only the README (verified).
 
 ### E6-S7 — Backup / export utility · 5 pts | p2
 
-- [ ] `scripts/backup.sh` produces a timestamped archive of the data dir (DB checkpointed) with a manifest.
-- [ ] `scripts/restore.sh` restores safely (refuses to overwrite a non-empty target without `--force`).
+- [ ] `scripts/backup.sh` produces a timestamped archive: `pg_dump` of the database + `images/` (and thumbnails) with a manifest.
+- [ ] `scripts/restore.sh` restores safely (`psql` + files; refuses to overwrite a non-empty target without `--force`).
 - [ ] Restore verified in CI or a documented manual test on a temp directory.
 - [ ] Documented in the runbook.
+- [ ] The runbook states that a backup must include `AETHER_DATA_DIR` as well as the database
+      (audit SEC-N5).
 
 ### E6-S8 — Performance budget pass · 5 pts | p1
 
@@ -501,6 +529,24 @@ and a clean v1.0.
 - [ ] Release PR `develop` → `main`, merged, tagged `v1.0.0` (annotated) on top of `sprint-06`.
 - [ ] Retrospective for sprint 6 written; backlog groomed for post-v1 ideas.
 
+### E6-S11 — Container images (`api`, `web`) · 3 pts | p0
+
+*As the owner, I want the application packaged as containers, so that the machine runs it without toolchains installed.*
+
+- [ ] `backend/Dockerfile`: multi-stage (Maven build → Temurin 21 JRE), non-root user, pinned base tags, `.dockerignore`.
+- [ ] `frontend/Dockerfile`: multi-stage (Node build → nginx serving the SPA and reverse-proxying `/api/**` + `/images/**` to `api`), pinned tags, `.dockerignore`.
+- [ ] Runtime makes zero external requests; no secrets baked into any image layer.
+- [ ] Healthchecks defined for `db` and `api` (consumed by E6-S12).
+
+### E6-S12 — One-command stack & clean-clone verification · 5 pts | p0
+
+*As the owner, I want `docker compose up` to run the whole stack, so that v1.0 is one command on any machine.*
+
+- [ ] `compose.yml`: `db` + `api` + `web`, named volume `aether_pgdata`, data-directory bind mount, env from `.env`, `web` on port 3000 (single LAN origin — no CORS at runtime).
+- [ ] From a clean clone: `cp .env.example .env && docker compose up` serves the app to the phone (evidence in the PR).
+- [ ] Backup/restore scripts (E6-S7) verified against the containerized stack.
+- [ ] `docs/engineering/DEPLOYMENT.md` moved from TARGET to shipped reality; README updated.
+
 ---
 
 ## Icebox (unscheduled, not committed)
@@ -512,3 +558,4 @@ and a clean v1.0.
 | Search / tags / favourites | Out of the personal-sanctuary scope for v1. |
 | Multi-user access | Explicitly a single-user local app; would change the security model. |
 | Automatic monthly dump suggestion | Nice, but the curation act is the point; revisit post-v1. |
+| Soft delete + explicit purge (photos, dumps) | `docs/engineering/ARCHITECTURE.md` §3 and `.claude/rules/backend.md` mandate soft deletion with a separate purge action, but `_docs/openapi.yml` defines **no delete endpoint**, so nothing in v1 can trigger it and the baseline has no deletion columns. Surfaced by the E1-S3 review; needs a spec decision (and probably an ADR) before it becomes a story — parked deliberately rather than quietly dropped. |

@@ -10,7 +10,7 @@ Statuses: `Proposed` · `Accepted` · `Superseded by ADR-NNN` · `Rejected`.
 
 | # | Date | Title | Status |
 | --- | --- | --- | --- |
-| [ADR-001](#adr-001--embedded-sqlite-as-the-database) | 2026-10-15 | Embedded SQLite as the database | Accepted |
+| [ADR-001](#adr-001--embedded-sqlite-as-the-database) | 2026-10-15 | Embedded SQLite as the database | Superseded by ADR-009 |
 | [ADR-002](#adr-002--merge-commits-only-append-only-history) | 2026-10-15 | Merge commits only, append-only history | Accepted |
 | [ADR-003](#adr-003--gitflow-lite-with-protected-main-and-develop) | 2026-10-15 | GitFlow-lite with protected `main` and `develop` | Accepted |
 | [ADR-004](#adr-004--tanstack-query-as-the-frontend-data-layer) | 2026-10-15 | TanStack Query as the frontend data layer | Accepted |
@@ -18,12 +18,17 @@ Statuses: `Proposed` · `Accepted` · `Superseded by ADR-NNN` · `Rejected`.
 | [ADR-006](#adr-006--image-derived-theme-colours-at-runtime) | 2026-10-15 | Image-derived theme colours at runtime | Accepted |
 | [ADR-007](#adr-007--scrum-artefacts-in-repository) | 2026-10-15 | Scrum artefacts in-repository | Accepted |
 | [ADR-008](#adr-008--no-spring-security-for-v1) | 2026-10-15 | No Spring Security for v1 | Accepted |
+| [ADR-009](#adr-009--postgresql-as-the-database) | 2026-10-15 | PostgreSQL as the database | Accepted |
+| [ADR-010](#adr-010--containerized-delivery-for-v10) | 2026-10-15 | Containerized delivery for v1.0 | Accepted |
+| [ADR-011](#adr-011--api-contract-clarifications-for-sprint-1) | 2026-10-15 | API contract clarifications for Sprint 1 | Accepted |
+| [ADR-012](#adr-012--storage-and-cors-constraints) | 2026-10-15 | Storage and CORS constraints | Accepted |
+| [ADR-013](#adr-013--the-error-vocabulary-is-a-declared-part-of-the-contract) | 2026-10-15 | The error vocabulary is a declared part of the contract | Accepted |
 
 ---
 
 ## ADR-001 — Embedded SQLite as the database
 
-**Date**: 2026-10-15 · **Status**: Accepted
+**Date**: 2026-10-15 · **Status**: Superseded by [ADR-009](#adr-009--postgresql-as-the-database)
 
 **Context.** The spec mandates an embedded, file-based local database (SQLite or H2). The app is
 single-user and runs on one machine; there is no server process to manage and no concurrent writers
@@ -163,6 +168,207 @@ binds to the LAN; CORS is restricted to the configured origins; actuator exposur
 **Consequences.** Anyone on the same network can reach the app — accepted for a personal LAN. If the
 app is ever exposed beyond the LAN, this ADR must be superseded first (auth + TLS), and the change
 recorded. Revisit at E6-S5.
+
+---
+
+## ADR-009 — PostgreSQL as the database
+
+**Date**: 2026-10-15 · **Status**: Accepted (supersedes [ADR-001](#adr-001--embedded-sqlite-as-the-database))
+
+**Context.** The original spec mandated an embedded, file-based database (SQLite or H2). The owner has
+since changed the requirement: the database is **PostgreSQL**, decided together with the mandate that the
+whole stack ships containerized at v1.0 (ADR-010). Docker is already part of the toolchain (MCP gateway;
+the database service below), the app stays single-user and local, and a database *server* is therefore
+acceptable as long as it runs on the owner's machine.
+
+**Decision.** Use **PostgreSQL 17** (`postgres:17-alpine`), one server for development and release. Dev
+runs it as a Docker Compose service (`docker-compose.dev.yml`, E1-S11); Spring Data JPA (plain
+`org.postgresql:postgresql`, no community dialect) reads the connection from env (`POSTGRES_*`,
+`AETHER_DB_PORT`). Schema is versioned with Flyway (`ddl-auto=validate`, never `update`). Integration
+tests use **Testcontainers** with the same image tag — no test depends on a pre-running database. The
+H2/SQLite fallback is dropped; `aether.db` no longer exists.
+
+**Consequences.** No SQLite friction (type affinity, community dialect, pragmas) — Postgres types are
+native (`uuid`, `timestamptz`). The database is **not** part of `AETHER_DATA_DIR` anymore: its data lives
+in a Docker volume, and backup becomes `pg_dump` + a copy of the images (E6-S7 updated). Docker must be
+running for backend work. The spec was updated in the same change, with the owner's explicit approval
+(2026-10-15). Embedded databases are no longer an option: any further database change needs a new ADR.
+
+---
+
+## ADR-010 — Containerized delivery for v1.0
+
+**Date**: 2026-10-15 · **Status**: Accepted
+
+**Context.** The owner's requirement: the whole application must be dockerized at the end of the project
+("at the end, dockerize everything"). Docker is already present in the toolchain (ADR-009 database
+service, MCP gateway). The app is single-user, opened from a phone on the LAN, and v1.0 should start with
+one command on a machine without Java or Node installed.
+
+**Decision.** v1.0 ships as a **Docker Compose stack** (`compose.yml`, E6-S11/S12): `db`
+(`postgres:17-alpine`), `api` (multi-stage Maven → Temurin 21 JRE running the Spring Boot jar), `web`
+(multi-stage Node build → nginx serving the built SPA and reverse-proxying `/api/**` and `/images/**`
+to `api`). Single published port: `web` on **3000** (the phone URL from the spec) — one origin, so CORS
+is configurable but unused in the containerized runtime. Database data in the named volume
+`aether_pgdata`; images in a bind mount of `AETHER_DATA_DIR`. Pinned base tags (never `:latest`),
+non-root users, healthchecks, configuration exclusively from `.env`. Development keeps native toolchains
+with only the database containerized. Full target spec: `docs/engineering/DEPLOYMENT.md`; verified from
+a clean clone in E6-S12.
+
+**Consequences.** The v1.0 runbook becomes `docker compose up`; `./mvnw`/`npm` remain the development
+path. Registry publishing, remote deployment, TLS and auth stay out of scope (ADR-008) and would need
+new ADRs.
+
+---
+
+## ADR-011 — API contract clarifications for Sprint 1
+
+**Date**: 2026-10-15 · **Status**: Accepted
+
+**Context.** Two canonical documents describe the HTTP contract and they do not agree. `_docs/openapi.yml`
+defines `/photos` (GET, POST), `/photos/random` (GET) and `/dumps` (GET, POST); the narrative
+`_docs/aether_archive_specs.md` still lists `/api/v1/archives/random`, `/archives/river`, `/archives/dump`
+and `/archives/single` — in §4.2 and again in the phase list of §5, which later frontend stories read.
+Separately, `DumpCreate.title` is listed as `required` in
+`openapi.yml`, while the domain model (`_docs/aether_archive_specs.md` §4.1: "title … nullable"), the
+backlog (E1-S7 `title?`, E4-S5 "title (optional)") and the workshop flow all treat it as optional. The
+`Photo` schema also exposes `uploadedAt` and `category`, which are not among the entity fields listed in
+`.claude/rules/backend.md`. `_docs/` is read-only, so the divergence is resolved here instead of by
+editing the specs.
+
+**Decision.**
+
+1. **`_docs/openapi.yml` is the API contract of record.** Sprint 1 implements `/api/v1/photos` (GET, POST),
+   `/api/v1/photos/random` (GET) and `/api/v1/dumps` (GET, POST). Every `/api/v1/archives/*` reference in
+   the narrative spec (§4.2 and §5) is superseded and is not implemented.
+2. **`title` is optional on `DumpCreate`** (null when absent, ≤ 80 characters when present). Accepting a
+   request *without* a title is a strict superset of the *accepted request bodies*: OpenAPI's `required`
+   list is a constraint on what clients send, and relaxing it server-side cannot break a conforming
+   client — every request OpenAPI describes still succeeds.
+3. **An upload creates an *unassigned* photo**: `archiveItem` and `displayOrder` are null until the curator
+   publishes a dump, which is when the `ArchiveItem` (`MONTHLY_DUMP`) is created and the six photos are
+   attached in order. This matches the `Photo` schema of `openapi.yml` and the workshop flow (E4-S1/S5).
+   The curation order is **expressed by the position of each photo in `Dump.photos`** — the contract's
+   `Photo` schema has no `displayOrder` field, so no such field is added to responses; `displayOrder` is
+   persisted server-side and used to build the ordered array.
+4. **`Photo` carries `createdAt` (Instant, UTC) and `category`** in addition to the fields listed in
+   `.claude/rules/backend.md`, because the contract exposes `uploadedAt` and `category` on every photo
+   response. Wire format, stated once so no implementer has to guess:
+   - `category` is serialised with the contract's **lowercase** values — `pics | anime | dump |
+     uncategorized`; the Java enum constants are `PICS | ANIME | DUMP | UNCATEGORIZED` and map to those
+     wire values explicitly (the persistence column stores the enum name).
+   - `POST /api/v1/photos` **requires** `category` and accepts all four values (E1-S6 names `pics|anime`
+     because those are the two the workshop sends); a missing or unknown value is a 400. The default
+     `UNCATEGORIZED` applies only to photos created without an explicit category by later server-side
+     flows, never to an upload omitting the field.
+   - `createdAt` is serialised as `uploadedAt` (ISO-8601 UTC) on `Photo`, and the dump's item timestamp as
+     `createdAt` on `Dump` — the Java field names differ from the JSON names by design.
+   - `Photo.url` is the **relative** static path `/images/<uuid>.<ext>` (never an absolute path, never a
+     filesystem location). Serving that path is E1-S5, in Sprint 2; Sprint 1 stores and returns the path.
+
+**Consequences.** Sprint 1 has one unambiguous contract to implement and test against, and reviewers have a
+written reason for the two readings that could otherwise look like improvisation. `ArchiveItem.type` keeps
+all three values (`SINGLE_PIC | ANIME | MONTHLY_DUMP`) even though only `MONTHLY_DUMP` is created in
+Sprint 1 — single-photo items arrive with the river feed (E5-S1). Any future change to the paths, to the
+`title` requirement, or to the on-upload assignment model re-opens this ADR; the stale `archives/*` text
+stays as it is until the owner approves a spec revision.
+
+---
+
+## ADR-012 — Storage and CORS constraints
+
+**Date**: 2026-10-15 · **Status**: Accepted
+
+**Context.** E1-S2 binds and validates the configuration before anything else runs, and the specs name
+the keys (`_docs/aether_archive_specs.md`, `.env.example`) without fixing their accepted values: the
+upload ceiling, what counts as a valid CORS entry, and how far `AETHER_DATA_DIR` may point. Without a
+record, each review round re-argues the same bounds.
+
+**Decision.**
+
+1. **Uploads**: `AETHER_MAX_UPLOAD_MB` is inclusive 1–1024; a value outside stops the boot. The ceiling
+   is a sanity bound, not a storage policy.
+2. **CORS**: `AETHER_CORS_ALLOWED_ORIGINS` is a comma-separated list of Spring origin *patterns*;
+   wildcards inside a host are supported (`http://192.168.*.*:5173`). A bare `*` and a host that is only
+   `*` (`https://*`) are rejected at boot — Spring resolves both to "every origin", which would silently
+   disable the restriction. An empty value disables cross-origin access entirely; a blank entry next to
+   another one (stray comma) is an error, never "disabled".
+3. **Data directory**: `AETHER_DATA_DIR` must be absolute, must not be the filesystem root and must not
+   be the user's home directory — the boot creates `images/`, `thumbnails/` and `tmp/` there and empties
+   `tmp/`. A symlinked data directory (e.g. `~/AetherArchive_Data -> /mnt/archive`) is supported, but
+   `tmp/`, whose contents the boot deletes, must be a real directory and not a symlink.
+
+**Consequences.** Boot fails early with an actionable message instead of writing into a location the
+operator did not mean. Wildcard CORS patterns stay usable on a LAN with a dynamic IP. A future story
+that needs a different upload ceiling, a non-pattern CORS entry or a symlinked staging directory must
+supersede this ADR first (e.g. `tmp/` on another volume would need an explicit allow-list, not silence).
+
+**Amendment — 2026-10-15 (E1-S4).** Point 3 covered only `tmp/`, the directory whose contents the boot
+deletes. For the *write* path the rule is now uniform: `images/` and `thumbnails/` may be symlinks, but a
+link whose **real** path leaves the real data directory is refused whenever the archive writes through it,
+because the files would then live outside the tree the backups copy. This is enforced per write in
+`StorageService` (every path resolved with `toRealPath()` and proved to start with the data root), not at
+boot, so an existing archive keeps starting. The upload ceiling of point 1 is also enforced twice: at the
+servlet container (`spring.servlet.multipart.max-file-size`, wired to the same `AETHER_MAX_UPLOAD_MB`) and
+in the service while streaming, so a request that under-reports its length still meets the ceiling.
+
+---
+
+## ADR-013 — The error vocabulary is a declared part of the contract
+
+**Date**: 2026-10-15 · **Status**: Accepted
+
+**Context.** E1-S8 gives every failure one RFC 9457 shape, but `_docs/openapi.yml` documents no error schema
+at all (a single bare `400` on `POST /dumps`), and the standard leaves two things open that a client
+depends on: whether each problem gets a `type` URI of its own, and whether `title` is the status phrase
+(§4.2.1 says it *should* be). The codes are what the frontend switches on, so they cannot be left to drift.
+
+**Decision.** The codes are part of the contract, listed in `backend/README.md`: the archive's own
+situations have one each — `unsupported-image-type`, `upload-too-large`, `storage-failure`,
+`validation-failure`, `invalid-parameter`, `malformed-request`, `missing-request-part`, `not-found`,
+`empty-archive`, `internal-failure`. A refusal Spring MVC raises before a controller runs (405, 406, 415, a
+missing required parameter) borrows its code from the status instead: the status name in kebab-case —
+`method-not-allowed`, `bad-request`, `unsupported-media-type` — or `request-rejected` when no `HttpStatus`
+name describes the status. A refusal the archive raises itself keeps its own `detail` and, when its problem
+detail set one, its own `code`.
+
+1. **`type` stays `about:blank` for every problem** — no per-problem type URIs. A type URI promises
+   documentation at that URI; the archive has no error-documentation site and is not getting one, and
+   sending a client to a URI that answers nothing is worse than the standard's "nothing more to say about
+   this problem". Identity lives in `code`: short, stable, in the body, switchable in a frontend.
+2. **`title` names the situation, not the status.** RFC 9457 §4.2.1 *recommends* the status phrase; we
+   depart from it deliberately, because "Validation failed", "Malformed request" and "Not found" tell a
+   reader which failure this is, while the status is already in `status` — and there is more than one 400.
+   The borrowed refusals keep the framework's phrase (`Method Not Allowed`), which is all the framework
+   says about them.
+
+**Consequences.** Renaming a code, or changing its status, is an API change that needs an ADR — not a
+refactor. A new situation adds its code to the README table in the same change; nothing needs a spec
+revision until `_docs/openapi.yml` grows an error schema, which is itself a contract change needing the
+owner's approval (`_docs/` is read-only, ADR-011). Clients switch on `code`, never on `title` or `detail`,
+which the archive may reword.
+
+**Amendment — 2026-10-16 (E1-S6).** `empty-archive` joins the vocabulary as the first code an endpoint
+raises for a *legitimate* request that has no answer: `GET /photos/random` on an archive with no photos. It
+is deliberately distinct from `not-found`, which means the client asked for something that does not exist —
+the splash screen has an empty state for one and a bug for the other. It is carried by
+`EmptyArchiveException`, which extends `ErrorResponseException` so the archive's own sentence survives the
+refusal path unchanged.
+
+**Amendment — 2026-10-16 (E1-S7).** `concurrent-modification` joins the vocabulary as its first *conflict*
+code, answered with **409**. `DumpService.create` attaches six photos in one transaction, and `Photo`
+carries a `@Version` (E1-S7) precisely because a publish and another write can want the same row: Spring's
+`ConcurrencyFailureException` family — `ObjectOptimisticLockingFailureException` when the row's version
+moved on, `PessimisticLockingFailureException` when a lock could not be taken — is raised while the
+transaction is still open, so the write that lost the race rolls back whole and **the archive is intact**.
+That is what decides the status: a `500` would report a server that is fine and send the owner looking for a
+bug, and a `400` would blame a request that was perfectly valid — it was merely overtaken. The client's
+repair is neither "fix the body" nor "report a bug" but "read the row again and retry", which is what 409
+means and what the `detail` says. One code covers both mechanisms, because the client cannot tell them
+apart and has nothing different to do about either; the framework's own message names the entity and the
+row, so it is logged for the operator and never answered. It is the vocabulary's first code of its status;
+should a future conflict ever demand a different answer from the client, it gets its own code and its own
+amendment rather than a widened meaning for this one.
 
 ---
 

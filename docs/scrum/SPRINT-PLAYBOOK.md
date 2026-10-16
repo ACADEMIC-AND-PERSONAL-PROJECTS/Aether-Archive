@@ -9,12 +9,13 @@ How this project is run. Short, explicit, and meant to be obeyed by both the hum
 | Product Owner | **The user** | Vision, priority calls, acceptance, access to the machine |
 | Scrum Master | Agent (`scrum-master` subagent) | Backlog, sprint docs, milestones, retrospectives |
 | Dev team | Agent (`backend-engineer`, `frontend-engineer` subagents) | Implementation, tests, PRs |
-| Reviewers | Agent (`code-reviewer`, `qa-verifier` subagents) | Independent review, verification evidence |
+| Reviewers | Agent (`code-reviewer`, `qa-verifier`, `security-auditor` subagents) | Independent review, verification evidence, sprint security audit |
 
 ## Cadence
 
 - **Sprint length**: 2 weeks (adjustable; recorded in the sprint doc).
-- **Capacity**: ~25–30 points per sprint for agent-driven work. Never plan above 30 to protect against defects and interruptions.
+- **Capacity**: ~25–34 points per sprint for agent-driven work (see the sprint map in the backlog).
+  Never plan above 34; excess p2 stories roll to the next sprint.
 - **Sprint goal**: exactly one sentence, outcome-shaped ("The archive can store and serve images"), never a list.
 - **Cadence of commits**: many, per logical unit (`.claude/rules/git-workflow.md`).
 
@@ -27,6 +28,7 @@ How this project is run. Short, explicit, and meant to be obeyed by both the hum
 | Daily stand-up | On request | `/standup` (read-only digest) |
 | Sprint review | End of sprint | Release PR description + summary to the user |
 | Retrospective | End of sprint | `/finish-sprint` → `retrospectives/sprintNN.md` |
+| Security audit | End of sprint, before the release PR | `security-auditor` subagent → `reports/security-audit-sprintNN.md`; Critical/High blocks the release |
 | Backlog sync | Whenever the file changes | `/backlog-sync` |
 
 ## Branch & release policy
@@ -64,19 +66,19 @@ A story is `Done` only when `DEFINITION-OF-DONE.md` is fully checked with eviden
 | Sprint | Goal | Dates | Milestone | Status |
 | --- | --- | --- | --- | --- |
 | 0 | Bootstrap the repository, agent setup, process and backlog | 2026-10-15 | — | Done |
-| 1 | The archive can store and serve images and dumps through a tested local API | TBD | Sprint 01 — Foundation & Backend | Planned |
-| 2 | The React shell runs and the design system (colour extraction, typography, glass) is defined | TBD | Sprint 02 — Design System | Planned |
-| 3 | The signature entry experience exists: immersive splash, glass menu, first uploads | TBD | Sprint 03 — Splash & Workshop | Planned |
-| 4 | Dumps can be curated end to end (upload, order, colour, publish) with CI guarding merges | TBD | Sprint 04 — Workshop & CI | Planned |
-| 5 | The Time River scrolls and the background follows each dump's aura | TBD | Sprint 05 — Time River | Planned |
-| 6 | The app is polished, documented and released as v1.0 | TBD | Sprint 06 — Hardening & v1.0 | Planned |
+| 1 | The archive can store and serve images and dumps on PostgreSQL through a tested local API | 2026-10-15 → 2026-10-16 | Sprint 01 — Foundation & Backend | **Released** (`sprint-01`) |
+| 2 | The React shell runs and the design system (colour extraction, typography, glass) is defined | 2026-11-02 → 2026-11-13 | Sprint 02 — Design System | Planned |
+| 3 | The signature entry experience exists: immersive splash, glass menu, first uploads | 2026-11-16 → 2026-11-27 | Sprint 03 — Splash & Workshop | Planned |
+| 4 | Dumps can be curated end to end (upload, order, colour, publish) with CI guarding merges | 2026-11-30 → 2026-12-11 | Sprint 04 — Workshop & CI | Planned |
+| 5 | The Time River scrolls and the background follows each dump's aura | 2026-12-14 → 2026-12-25 | Sprint 05 — Time River | Planned |
+| 6 | The app is polished, containerized, documented and released as v1.0 | 2026-12-28 → 2027-01-08 | Sprint 06 — Hardening & v1.0 | Planned |
 
 ## Velocity log
 
 | Sprint | Committed (pts) | Delivered (pts) | Velocity | Notes |
 | --- | --- | --- | --- | --- |
 | 0 | — | — | — | Bootstrap |
-| 1 | TBD | TBD | TBD | |
+| 1 | 34 | 34 | 34 | 9/9 stories; 280 backend tests, suite 45 s; security audit found no Critical/High. **+1 unplanned** delivered point: the audit's reachable SEC-03 (`jackson-core` DoS, PR #70, backlog E6-S15). Deliberately kept out of the velocity figure — a series that mixes planned and unplanned work cannot be compared across sprints — and recorded here so the throughput is still visible. |
 
 ## Escalation
 

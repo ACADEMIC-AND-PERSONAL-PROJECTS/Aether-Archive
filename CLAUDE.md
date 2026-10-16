@@ -17,6 +17,8 @@ Images are the product; the UI must be almost invisible.
 | Definition of Done / Ready | `docs/scrum/DEFINITION-OF-DONE.md`, `docs/scrum/DEFINITION-OF-READY.md` |
 | Architecture | `docs/engineering/ARCHITECTURE.md` |
 | Design system (color, glass, type) | `docs/engineering/DESIGN-SYSTEM.md` |
+| Design references (soft & modern brief, inspiration) | `docs/engineering/DESIGN-REFERENCES.md` |
+| Deployment & containers | `docs/engineering/DEPLOYMENT.md` |
 | Decision log (ADRs) | `docs/scrum/DECISION-LOG.md` |
 | Sprint plans / retrospectives | `docs/scrum/sprints/`, `retrospectives/` |
 
@@ -26,7 +28,8 @@ user approval; the specs are the contract the backlog is built from.
 ## 2. Stack (mandated — substitution requires an ADR)
 
 - **Backend**: Java 21 + Spring Boot 3, Maven (`./mvnw`), REST under `/api/v1`, RFC 9457 errors.
-- **Database**: embedded SQLite (file-based); H2 file mode is the documented fallback.
+- **Database**: PostgreSQL 17, run locally as a Docker container. Dev uses `docker-compose.dev.yml`;
+  v1.0 ships the whole stack containerized (`docs/engineering/DEPLOYMENT.md`, ADR-009/010).
 - **Storage**: local filesystem only. Database + images never leave this machine.
 - **Frontend**: React + Vite + TypeScript, Tailwind CSS, Framer Motion, `@dnd-kit`, TanStack Query.
 - **Typography**: Fontsource NPM packages only. Zero external network requests at runtime.
@@ -46,8 +49,9 @@ reports/     Generated verification / analysis reports
 
 ## 4. Commands
 
-Backend (once scaffolded): `./mvnw spring-boot:run` · `./mvnw test` · `./mvnw verify`
+Backend (from `backend/`): `./mvnw spring-boot:run` · `./mvnw test` · `./mvnw verify` · `./mvnw package` (jar in `backend/target/`)
 Frontend (once scaffolded): `npm install` · `npm run dev` · `npm run test` · `npm run build` · `npm run lint`
+Dev database (once scaffolded): `docker compose -f docker-compose.dev.yml up -d` · v1.0 stack: `docker compose up`
 Full check before a commit: the `verify` skill (`.claude/skills/verify/SKILL.md`).
 **Keep this section accurate** — every story that adds or renames a command updates it here.
 
@@ -63,8 +67,8 @@ Branch model: `main` (released) ← `develop` (integration) ← `feature/*` (one
 - Before opening a PR: run `/verify` and paste the evidence into the PR.
 - Open the PR into `develop` with `gh pr create --base develop`, then review it (`/review-pr` or the
   `code-reviewer` subagent) and merge with **`gh pr merge <n> --merge`** (merge commit).
-- At the end of a sprint: `/finish-sprint` → release PR `develop` → `main`, tag `sprint-NN`, then write
-  `retrospectives/sprintNN.md` (see `retrospectives/TEMPLATE.md`).
+- At the end of a sprint: `/finish-sprint` → security audit gate, retrospective, release PR
+  `develop` → `main`, tag `sprint-NN` (see `retrospectives/TEMPLATE.md`).
 
 ### Hard rules (hooks enforce several of these — do not try to bypass them)
 
@@ -82,7 +86,8 @@ Branch model: `main` (released) ← `develop` (integration) ← `feature/*` (one
 
 - **Plan before multi-file work**: use plan mode, then implement. One story = one plan = one branch.
 - **Use subagents to protect the main context** (`backend-engineer`, `frontend-engineer`, `qa-verifier`,
-  `scrum-master`) for exploration, implementation, or verification that would flood the conversation.
+  `security-auditor`, `scrum-master`) for exploration, implementation, verification or security
+  auditing that would flood the conversation.
 - **Keep context healthy**: `/clear` between unrelated tasks, `/compact` when a long task must continue;
   prefer `/rewind` over piling corrections on a failed attempt.
 - **Tests and docs are part of the story**, not a follow-up: a story is done only when the DoD checklist

@@ -5,6 +5,8 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
+.metals/
+.bloop/
 
 # ── Secrets & personal agent config ───────────────────────────────────────────
 .env
@@ -14,7 +16,7 @@ CLAUDE.local.md
 .claude/settings.local.json
 .claude/tmp/
 
-# ── Local data (images, SQLite database) — never committed ────────────────────
+# ── Local data (images, database dumps) — never committed ─────────────────────
 AetherArchive_Data/
 data/
 
@@ -24,7 +26,6 @@ backend/target/
 *.log
 hs_err_pid*
 .mvn/timing.properties
-!backend/.mvn/wrapper/maven-wrapper.jar
 
 # ── Node / Vite ───────────────────────────────────────────────────────────────
 frontend/node_modules/
