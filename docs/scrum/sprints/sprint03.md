@@ -21,8 +21,8 @@
 | # | ID | Story | Points | Priority | Status | PR |
 | --- | --- | --- | --- | --- | --- | --- |
 | 0 | S03-C1 | *chore*: land the Sprint-2 working changes in `.claude/` (number provenance, guard canonicalisation, adversarial review control) | — | — | Done | #97 |
-| 1a | E3-S1A | Immersive splash — the photo, its tone, the quiet states (criteria 1, 2, 5) | 3 | p0 | Todo | — |
-| 1b | E3-S1B | Immersive splash — the tap intent, the pull-to-refresh, the per-visit photo (criteria 3, 4) | 2 | p0 | Todo | — |
+| 1a | E3-S1A | Immersive splash — the photo, its tone, the quiet states (criteria 1, 2, 5) | 3 | p0 | Done | #100 |
+| 1b | E3-S1B | Immersive splash — the tap intent, the pull-to-refresh, the per-visit photo (criteria 3, 4) | 2 | p0 | Done | #101 |
 | 2 | E3-S2 | Glass menu overlay | 5 | p0 | Todo | — |
 | 3 | E3-S3 | Route transitions & motion system | 3 | p0 | Todo | — |
 | 4 | E3-S4 | Quiet loading / empty / error states | 2 | p1 | Todo | — |
@@ -62,13 +62,22 @@ acceptance criteria). The claim was withdrawn and the story re-cut on the review
 (criteria 1, 2, 5 — the photo, its tone, the quiet states, 3 pts) then **E3-S1B** (criteria 3, 4 — the tap
 intent, the pull, the per-visit photo, 2 pts) from an updated `develop`. Points are unchanged at 5.
 
-Two things this records honestly rather than tidily. **The split did not solve the size problem**: E3-S1A is
-1,367 changed lines on its own, still over both budgets, because the view, the pipeline and their test files
-are shared by both halves — the review's own estimate of ~950 for slice A was optimistic. And **a 5-point
-story producing a four-figure diff is a planning signal**, not a compliance detail: this codebase's
-documentation density (a third of new source lines are comments carrying decisions and probe results) means
-a story-sized *feature* no longer fits a size budget written for leaner code. Both numbers go to the
-retrospective; that is the change this sprint should evaluate, not the split mechanics.
+Both slices merged (E3-S1A `2d8af90`, E3-S1B `79859c4`), so the numbers are final rather than projected, and
+they are the reason this note exists. **The split did not solve the size problem — it made the story 51%
+larger.** 1,367 + 929 = **2,296 total changed lines for one 5-point story** (1,516 for the unsliced branch;
+no generated file is in either diff, so total and hand-written are the same number here). The review's own
+classification, re-run at the merged tips rather than at the tip it first measured: **prose 194 → 766
+(+572), non-prose 1,322 → 1,530 (+208)** — **73% of the split's extra 780 lines is re-stated prose**,
+because each slice writes its own verify report, its own README rows and its own pass over the ADR. One
+further cut was available, by the reviewer's estimate (the cache policy alone, ~250 lines with its prose),
+and would still not have reached ~400.
+
+So the split bought reviewability — three passes found a claim that did not survive, then rebuilt it into
+one that did, then an untested half of the behaviour the slice exists to deliver — at 780 lines of extra
+writing. **That trade, not the split mechanics, is what this sprint should evaluate**: either this
+codebase's documentation density (a third of new source lines are comments carrying decisions and probe
+results) has outgrown a budget written for leaner code, or "one story" needs to mean a smaller feature than
+it currently does. Both readings are defensible and neither is settled by two green PRs.
 
 ## Definition of Ready check
 
@@ -167,3 +176,17 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   REQUEST CHANGES → APPROVE WITH NITS, at a cost of 89 changed lines and two review rounds. Worth recording
   because the shape generalises — a rule, a spec or a report that describes behaviour nobody executed is the
   defect this project keeps finding, and it is cheapest to catch when the document is the diff.
+- 2026-10-16 — **E3-S1A merged (`2d8af90`, PR #100) after APPROVE WITH NITS; the merge closed #99 unmerged.**
+  The exception claim was withdrawn and re-cut into the two-slice shape described above, and the review
+  judged the new claim by testing *both* possible cuts rather than the one the PR named — the cut that would
+  have failed was the one not argued. Two defects of mine came out of that round and are why the second
+  review's wording is shorter than the first: a size figure measured one commit early, and the README's
+  Playwright sentence reported as corrected when it was byte-identical to `develop` — a relay I had not
+  measured. The rule the sprint already has covers both; the discipline of *running* it is what was missing.
+- 2026-10-16 — **E3-S1B merged (`79859c4`, PR #101) after REQUEST CHANGES**, and it closes the story.
+  The reviewer chose its own mutant rather than re-running one of the four the author ran — delete `gcTime`
+  alone, keep `staleTime: 0` — and **all 172 tests stayed green** while four documents called that constant
+  the load-bearing half of the per-visit policy. The behaviour was right; the test counted requests, which
+  cannot separate "stale" from "gone". The freshness test now asserts the cache is empty on the returning
+  visit, and the mutant fails it. Third distinct defect in three passes on one story, and all three were
+  found by executing something rather than reading it.
