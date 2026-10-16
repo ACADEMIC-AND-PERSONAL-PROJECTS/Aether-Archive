@@ -80,8 +80,8 @@ reader can check it afterwards:
    | **Hand-written average per story** | **1,245** |
 
    The per-file exclusion is named so any reader can reproduce the number. Against that baseline, this
-   sprint's first story (E2-S1, hand-written **691**) is 55% of the Sprint 1 average — below it, while still
-   above the ~400 rule: both statements are true and the retro carries both.
+   sprint's first story (E2-S1, hand-written **838** at the branch tip) is 67% of the Sprint 1 average —
+   below it, while still above the ~400 rule: both statements are true and the retro carries both.
 3. **Working agreements live in the repository.** Staged commits, the probe rule and the concurrent-agent
    staging rule go into `.claude/agents/*.md` and `.claude/rules/git-workflow.md` in the first (chore) PR of
    the sprint, so a fresh session can follow them by grep alone — no dependence on a session that has ended.
@@ -144,6 +144,6 @@ reader can check it afterwards:
   patched here where it would be re-derived by the next person. ADR-014 gained the reproducible size reading
   (6.14 kB / 2.01 kB gzip) and a clause naming the default scan scope.
 - 2026-10-16 — The same review caught a **stale number in E2-S1's own report and PR body**: the size figures
-  described the tree one commit early (5,715 total / 691 hand-written at head, not 5,595 / 571). Fixed in the
+  described the tree one commit early (5,715 total / 691 hand-written, not 5,595 / 571); the tip measures 5,862 / 838. Fixed in the
   PR body and the report. The lesson is smaller than the mistake: a size is a measurement of the final commit,
   and taking it before the last commit lands is the same class of error as an unexecuted assumption.
