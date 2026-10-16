@@ -30,7 +30,7 @@ Statuses: `Proposed` · `Accepted` · `Superseded by ADR-NNN` · `Rejected`.
 | [ADR-018](#adr-018--the-clustering-algorithm-and-the-pipelines-open-readings) | 2026-10-16 | The clustering algorithm and the pipeline's open readings | Accepted |
 | [ADR-019](#adr-019--typography-playfair-display--inter-variable-latin-subsets-1482-kb) | 2026-10-16 | Typography: Playfair Display + Inter Variable, latin subsets, 148.2 kB | Accepted |
 | [ADR-020](#adr-020--the-theme-layer-role-mapping-in-oklch-contrast-by-construction-one-glass-fallback) | 2026-10-16 | The theme layer: role mapping in OKLCh, contrast by construction, one glass fallback | Accepted |
-| [ADR-021](#adr-021--the-splash-hero-a-photo-per-visit-read-once-and-what-the-placeholder-can-be) | 2026-10-16 | The splash hero: a photo per visit, read once, and what the placeholder can be | Accepted |
+| [ADR-021](#adr-021--the-splash-hero-the-bytes-are-read-once-and-what-the-placeholder-can-be) | 2026-10-16 | The splash hero: the bytes are read once, and what the placeholder can be | Accepted |
 
 ---
 
@@ -740,35 +740,30 @@ screenshots, and the hex-literal audit.
 
 ---
 
-## ADR-021 — The splash hero: a photo per visit, read once, and what the placeholder can be
+## ADR-021 — The splash hero: the bytes are read once, and what the placeholder can be
 
 **Date**: 2026-10-16 · **Status**: Accepted
 
 **Context.** E3-S1 is the entry screen: one random photo, full-bleed, decoded before it is revealed, with
 the archive's own tone standing in until then. The specs fix the endpoint (`GET /photos/random`, `Photo`),
 the material (ADR-020's tokens) and the rule that a theme is applied per view (DESIGN-SYSTEM §2.3). What
-they leave open is what this screen does about four things: the cache policy of an endpoint whose whole
-point is a different answer each time, whether the photo crosses the network once or twice, what the
-placeholder can be *before* the bytes exist, and whether the pull gesture may move. The app-wide 30 s
-`staleTime` (ADR-004's client) is right for the feed and wrong here, so this is a decision about one
-query, not about the policy.
+they leave open is what this screen does about three things: whether the photo crosses the network once or
+twice, what the placeholder can be *before* the bytes exist, and how the browser's own edges get under test.
+Two further decisions this story made — the cache policy of an endpoint whose whole point is a different
+answer each time, and whether the pull gesture may move — are **not** in the branch this record ships with:
+the story was split for review, and they land with its follow-up slice. They are kept at the end of this
+record, labelled, so that slice restores them rather than rediscovering them.
 
 **Decision.**
 
-1. **`/photos/random` is per-visit state, not cached state.** `staleTime: 0` **and** `gcTime: 0`, set on
-   this query alone (`api/photos.ts`). Measured across an unmount and a remount inside one client:
-   defaults → 1 request, the policy → 2. `staleTime` alone is not enough: a stale entry is still painted
-   first, so a returning visit would show the previous photo and swap it — the wrong photo, visibly, on
-   the one screen whose promise is a new one. Cost: dev's `StrictMode` double-mounts, so a dev visit
-   issues two requests; the built bundle was measured at exactly one per visit.
-2. **The photo is read once per visit.** `fetch` the bytes → `Blob` → object URL for the `<img>`, with the
+1. **The photo is read once per visit.** `fetch` the bytes → `Blob` → object URL for the `<img>`, with the
    palette derived from *those* bytes; `decode()` resolves before `src` is handed to the view, and the
    URL's release is a hand-off the view calls after the swap or on unmount. The alternative was measured
    before rejecting it: `/images/**` answers `immutable` for a year, so an `<img src>` plus a second
    extraction fetch would be answered from the browser cache. The reason to keep one read is that a tone
    derived from the bytes on screen cannot describe a different file, and that there is never a window
    with two reads of the same photo in flight — not round-trip cost.
-3. **The placeholder is the photo's own tone, and its window is the decode.** Nothing can know a photo's
+2. **The placeholder is the photo's own tone, and its window is the decode.** Nothing can know a photo's
    colour before its bytes exist, so the tone lands when they do (~0.3 s before `ready` in the probe) and
    the stylesheet's neutral set covers the transfer. Two options were considered for covering the
    transfer as well — (a) remember the last tone and start the next visit in it, (b) a stored per-photo
@@ -776,35 +771,54 @@ query, not about the policy.
    archive's ambient colour across visits", (b) needs a field `_docs/openapi.yml` does not have
    (`Photo` is id, url, category, uploadedAt) and therefore a spec change *and* an ADR of its own.
    The neutral `#0b0b0d` is the answer until one of them exists.
-4. **The pull gesture is silent, and its motion belongs to E3-S3.** Pulling down past a threshold asks for
+3. **The browser's edges are an injected seam, and the browser's own guarantee is probed in a browser.**
+   `lib/image/hero.ts` takes `HeroEnvironment` (bytes, decode, tone); jsdom 30.1.3 has no
+   `HTMLImageElement.decode`, no image events and no canvas, so `prepareHero`'s ordering and error policy
+   run for real against three fakes. `app/App.test.tsx` holds the real environment to two tests of its
+   own: one answers the photo's bytes with a **string** body, so the failure really happens at the missing
+   `decode` — a jsdom `Blob` as a `Response` body rejects earlier, at `Response.blob()` — and one installs
+   a decoder the test controls, which is the only place in the suite where the awaited `decode()` runs.
+   "Decoded before reveal" is a browser fact and is measured there: `state=ready` with a `blob:` src and
+   `naturalWidth` 1200 at the first sampled frame.
+
+**Deferred to the follow-up slice (E3-S1B) — decided, but not in this branch.**
+
+1. **`/photos/random` is per-visit state, not cached state.** `staleTime: 0` **and** `gcTime: 0`, set on
+   this query alone (`api/photos.ts`). Measured across an unmount and a remount inside one client:
+   defaults → 1 request, the policy → 2. `staleTime` alone is not enough: a stale entry is still painted
+   first, so a returning visit would show the previous photo and swap it — the wrong photo, visibly, on
+   the one screen whose promise is a new one. Cost: dev's `StrictMode` double-mounts, so a dev visit
+   issues two requests; the built bundle was measured at exactly one per visit. Until the slice lands,
+   `useRandomPhoto` runs on the app-wide default and its doc comment says so.
+2. **The pull gesture is silent, and its motion belongs to E3-S3.** Pulling down past a threshold asks for
    another photo; nothing moves and nothing is drawn. The finger-following transform and the cross-fade
    are motion, motion tokens and the `prefers-reduced-motion` switch are E3-S3's story, and `matchMedia`
-   does not exist in the test environment — a transform shipped here would be the one part of the gesture
+   does not exist in the test environment — a transform shipped there would be the one part of the gesture
    nothing verifies. The gesture surface carries `touch-pan-x touch-pinch-zoom`: measured in Chromium with
    a synthesised touch drag on the built bundle, the default `touch-action: auto` made the browser claim
    the drag as a scroll and cancel the pointer stream (`pointerdown → pointermove → pointercancel`, no
    re-roll) — a dead gesture on a phone with a green unit suite, since jsdom never claims a gesture. The
-   narrower `touch-action: none` would also work and was rejected because it takes pinch-zoom away.
-5. **The browser's edges are an injected seam, and the browser's own guarantee is probed in a browser.**
-   `lib/image/hero.ts` takes `HeroEnvironment` (bytes, decode, tone); jsdom 30.1.3 has no
-   `HTMLImageElement.decode`, no image events and no canvas, so `prepareHero`'s ordering and error policy
-   run for real against three fakes, and the un-mocked path keeps one test that pins what a browser
-   without a decoder shows (the quiet `error` state). "Decoded before reveal" is a browser fact and is
-   measured there: `state=ready` with a `blob:` src and `naturalWidth` 1200 at the first sampled frame.
+   narrower `touch-action: none` would also work and was rejected because it takes pinch-zoom away. The
+   tap target the pull has to coexist with, and the glass menu it opens, are **E3-S2**'s.
 
-**Consequences.** The splash is the only query that ignores the app-wide cache policy; a second one that
-wants per-visit semantics should say so the same way, in `api/`, with the measurement beside it. The
-`gcTime: 0` means a visit always starts from an empty cache — a spinner-free screen that is *never*
-instant on a return, which is the intended trade. `--aura-bg` is invisible whenever a photo covers the
-viewport, so the tone's visible lifetime is the loading window only; a future story that wants ambient
-colour behind a partly-visible photo (the River, E4+) inherits that finding. The gesture has no visual
-feedback until E3-S3: a user who pulls and sees nothing move has only the new photo as confirmation. The
-forward references this story leaves open are named in the view's own doc comment: the glass overlay,
-focus trap and backdrop tap are **E3-S2**, the quiet states' words are **E3-S4**, motion is **E3-S3**.
+**Consequences.** The splash's hero is one code path for one photo: the pixels the palette describes are the
+pixels on screen, and there is never a window with two reads of the same photo in flight. `--aura-bg` is
+invisible whenever a photo covers the viewport, so the tone's visible lifetime is the loading window only; a
+future story that wants ambient colour behind a partly-visible photo (the River, E4+) inherits that finding.
+The injected seam means the pipeline's ordering is testable without a decoder, while the one guarantee jsdom
+cannot make — that the pixels really are decoded before the reveal — is only ever claimed from a browser
+probe. Two consequences arrive with E3-S1B: the splash becomes the only query that ignores the app-wide
+cache policy (a second one that wants per-visit semantics should say so the same way, in `api/`, with the
+measurement beside it), and its `gcTime: 0` makes a visit start from an empty cache — a spinner-free screen
+that is *never* instant on a return, which is the intended trade. The gesture gets no visual feedback until
+E3-S3: a user who pulls and sees nothing move has only the new photo as confirmation. The forward references
+this story leaves open are named in the view's own doc comment: the tap target and the glass overlay, focus
+trap and backdrop tap are **E3-S2**, the quiet states' words are **E3-S4**, motion is **E3-S3**.
 
-**Evidence.** `reports/e3s1-splash-390.png`; `frontend/README.md`, "The splash hero — measured (E3-S1)"
-(freshness counts, the cache headers, the held-request timeline, the touch-action trace, the production
-resource list) and its "Test environment" table (the jsdom image/input probes).
+**Evidence.** `reports/e3s1-splash-390.png` (the built bundle, 390×844); `reports/verify-e3-s1a-20261016.md`;
+`frontend/README.md`, "The splash hero — measured (E3-S1A)" (the cache headers behind the single read, the
+held-request timeline, the production resource list) and its "Test environment" table (the jsdom probes,
+including what a `Response` body does and how the missing `decode` is installed by hand).
 
 ---
 

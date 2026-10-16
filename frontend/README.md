@@ -113,11 +113,11 @@ frontend/
 ├── tsconfig.node.json    vite.config.ts — Node types
 └── src/
     ├── app/              App shell: routes, providers, query client, fallback + tests (E2-S2)
-    ├── features/         splash/ — the immersive hero (E3-S1); river/ workshop/ placeholders (E2-S2); menu/ in E3
+    ├── features/         splash/ — the immersive hero (E3-S1A); river/ workshop/ placeholders (E2-S2); menu/ in E3
     ├── components/       README.md only — GlassPanel and shared primitives (E2-S6)
-    ├── lib/              README.md per folder (color/ image/ gesture/ motion/) — pure TS, no React
-    ├── api/              typed client, query keys, retry policy, photo queries + tests (E2-S2, E3-S1)
-    ├── hooks/            useHeroImage + usePullToRefresh (E3-S1) — reusable hooks
+    ├── lib/              README.md per folder (color/ image/ motion/) — pure TS, no React
+    ├── api/              typed client, query keys, retry policy, photo queries + tests (E2-S2, E3-S1A)
+    ├── hooks/            useHeroImage (E3-S1A) — reusable hooks
     ├── types/            wire types mirroring _docs/openapi.yml (E2-S2)
     ├── styles/           global.css — the `@theme` token layer lives here
     └── test/setup.ts     jest-dom matchers + RTL cleanup
@@ -151,22 +151,25 @@ frontend/
 `document.createElement("canvas").getContext("2d")` and friends, run inside the E2-S1 test process
 (jsdom 30.1.3) and, for comparison, inside the system Chromium:
 
-| Probe                                      | jsdom 30.1.3 (Vitest)                                                                                                                   | Chromium 152 (headless)                                                                                        |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `canvas.getContext("2d")`                  | **`null`** + `Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package`                      | `CanvasRenderingContext2D`                                                                                     |
-| `ctx.getImageData(0,0,4,4)`                | n/a (no context)                                                                                                                        | `ImageData`, 64 bytes                                                                                          |
-| `new OffscreenCanvas(1,1)`                 | **`ReferenceError: OffscreenCanvas is not defined`**                                                                                    | works, `getContext("2d")` returns an object                                                                    |
-| `typeof createImageBitmap`                 | `undefined`                                                                                                                             | `function`                                                                                                     |
-| `typeof ImageData`                         | `undefined`                                                                                                                             | `function` (a canvas probe constructed one)                                                                    |
-| `typeof Image`                             | `function`                                                                                                                              | not probed                                                                                                     |
-| `typeof matchMedia`                        | **`undefined`**                                                                                                                         | `function` — `matchMedia("(prefers-reduced-motion: reduce)").matches` → `false`, `(…: no-preference)` → `true` |
-| `typeof requestAnimationFrame`             | `function`                                                                                                                              | not probed                                                                                                     |
-| `typeof HTMLImageElement.prototype.decode` | **`undefined`** — `await img.decode()` rejects `TypeError: img.decode is not a function`, on a data URL and on an unreachable one alike | decodes; the reveal waits for it (E3-S1)                                                                       |
-| `img` pointed at a data URL                | fires **neither** `load` nor `error` (100 ms watched); `complete` goes `true` → `false`; `naturalWidth` stays `0`                       | loads                                                                                                          |
-| `URL.createObjectURL(blob)`                | `function` → `blob:nodedata:<uuid>`, assignable to `img.src`, revocable — the one image-adjacent API jsdom fakes                        | `blob:http://…/<uuid>`; `naturalWidth` 1200 measured on E3-S1's hero                                           |
-| `new TouchEvent(…)`                        | **`ReferenceError: Touch is not defined`** (neither `TouchEvent` nor `Touch` exists)                                                    | not needed — the gesture uses pointer events                                                                   |
-| Input events reaching React                | `fireEvent.touchStart` **and** `fireEvent.pointerDown/Move/Up/Cancel` all arrive with `clientY` intact                                  | real `Input.dispatchMouseEvent` at (195, 400) hits the full-screen `BUTTON`; real `Escape` closes the menu     |
-| unstubbed `fetch("/api/v1/…")`             | rejects `TypeError: Failed to parse URL from /api/v1/photos/random` — _not_ a network attempt                                           | real request                                                                                                   |
+| Probe                                      | jsdom 30.1.3 (Vitest)                                                                                                                                                                       | Chromium 152 (headless)                                                                                        |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `canvas.getContext("2d")`                  | **`null`** + `Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package`                                                                          | `CanvasRenderingContext2D`                                                                                     |
+| `ctx.getImageData(0,0,4,4)`                | n/a (no context)                                                                                                                                                                            | `ImageData`, 64 bytes                                                                                          |
+| `new OffscreenCanvas(1,1)`                 | **`ReferenceError: OffscreenCanvas is not defined`**                                                                                                                                        | works, `getContext("2d")` returns an object                                                                    |
+| `typeof createImageBitmap`                 | `undefined`                                                                                                                                                                                 | `function`                                                                                                     |
+| `typeof ImageData`                         | `undefined`                                                                                                                                                                                 | `function` (a canvas probe constructed one)                                                                    |
+| `typeof Image`                             | `function`                                                                                                                                                                                  | not probed                                                                                                     |
+| `typeof matchMedia`                        | **`undefined`**                                                                                                                                                                             | `function` — `matchMedia("(prefers-reduced-motion: reduce)").matches` → `false`, `(…: no-preference)` → `true` |
+| `typeof requestAnimationFrame`             | `function`                                                                                                                                                                                  | not probed                                                                                                     |
+| `typeof HTMLImageElement.prototype.decode` | **`undefined`** — `await img.decode()` rejects `TypeError: img.decode is not a function`, on a data URL and on an unreachable one alike                                                     | decodes; the reveal waits for it (E3-S1A)                                                                      |
+| `img` pointed at a data URL                | fires **neither** `load` nor `error` (100 ms watched); `complete` goes `true` → `false`; `naturalWidth` stays `0`                                                                           | loads                                                                                                          |
+| `URL.createObjectURL(blob)`                | `function` → `blob:nodedata:<uuid>`, assignable to `img.src`, revocable — the one image-adjacent API jsdom fakes                                                                            | `blob:http://…/<uuid>`; `naturalWidth` 1200 measured on E3-S1A's hero                                          |
+| `new TouchEvent(…)`                        | **`ReferenceError: Touch is not defined`** (neither `TouchEvent` nor `Touch` exists)                                                                                                        | not probed in this slice                                                                                       |
+| Input events reaching React                | `fireEvent.touchStart` **and** `fireEvent.pointerDown/Move/Up/Cancel` all arrive with `clientY` intact                                                                                      | not probed in this slice (E3-S1B measures real input against its tap target)                                   |
+| unstubbed `fetch("/api/v1/…")`             | rejects `TypeError: Failed to parse URL from /api/v1/photos/random` — _not_ a network attempt                                                                                               | real request                                                                                                   |
+| `new Response(blob).blob()`                | **rejects `TypeError: object.stream is not a function`** — a jsdom `Blob` is not a `BodyInit` the Node `Response` accepts                                                                   | n/a                                                                                                            |
+| `new Response("…").blob()`                 | a real `Blob`, whose object URL assigns to `img.src`; the difference decides whether an image test reaches the decode at all                                                                | n/a                                                                                                            |
+| `HTMLImageElement.prototype.decode`        | absent, but **installable**: `Object.defineProperty(…, { configurable: true, writable: true })`, removable with `Reflect.deleteProperty` — how `app/App.test.tsx` runs the real decode step | real                                                                                                           |
 
 Consequences for E2-S4 (its ADR decides, this is the evidence): the colour pipeline cannot be exercised
 through a real canvas in jsdom. The options are to test the pure functions over `ImageData`-shaped plain
@@ -176,9 +179,12 @@ also matters for the `prefers-reduced-motion` hooks in E2-S6: there the query ha
 Chromium answers it for real (headless reports no reduced-motion preference unless asked otherwise).
 E3-S1's `lib/image/hero.ts` took the third option for the image pipeline: the byte fetch, the decode and
 the tone are an injected `HeroEnvironment`, so `prepareHero`'s ordering and its error policy are the
-shipped code under test while the three browser edges are fakes. The un-mocked path keeps one test of its
-own (`app/App.test.tsx`: the real environment rejects here for want of `decode`, and the splash lands in
-its quiet `error` state, which is what a browser without a decoder would show too).
+shipped code under test while the three browser edges are fakes. Two tests keep the real environment honest
+(`app/App.test.tsx`): one answers the photo's bytes with a **string** body, so the failure really happens at
+the missing `decode` — with a jsdom `Blob` as the body, `Response.blob()` rejects first
+(`object.stream is not a function`, probed) and the test would have proved nothing about the decode it
+names — and one installs a decoder the test controls, which is the only place in the suite where the
+awaited `decode()` runs.
 
 ## Screenshots — mechanism chosen in E2-S1, **no dependency**
 
@@ -203,30 +209,18 @@ virtual time does not advance while the bytes are in flight, so the budget expir
 and every capture is the empty placeholder. What works, with no dependency: Chromium's own DevTools
 protocol over Node 22's built-in `WebSocket` (`--remote-debugging-port`, `Page.navigate`, wait on the wall
 clock, `Page.captureScreenshot`, `Runtime.evaluate` for the DOM facts at the moment of the capture). The
-probe scripts live outside the repository; the capture they produced is `reports/e3s1-splash-390.png`, and
-its DOM facts were `state=ready`, `imgSrc=blob:http://localhost:5173/<uuid>`, `naturalWidth=1200`,
-`--aura-bg=#001421`, `viewport=[390,844]`.
+probe scripts live outside the repository; the capture they produced is `reports/e3s1-splash-390.png`, taken
+against the **built** bundle served with `/api/**` and `/images/**` proxied the way the container's nginx
+does. Its DOM facts were `state=ready`, `imgSrc=blob:http://127.0.0.1:4180/<uuid>`, `naturalWidth=1200`,
+`--aura-bg=#001421`, `viewport=[390,844]`, `text="Aether Archive"`, `tapTarget=null`. The photo in it is a
+generated 1200×1800 PNG, because the development data directory is a placeholder that does not resolve —
+the archive it shows is not a real one.
 
-## The splash hero — measured (E3-S1)
+## The splash hero — measured (E3-S1A)
 
-Four questions E3-S1 could not answer by reading the code, each measured against a running archive
+Three questions this slice could not answer by reading the code, each measured against a running archive
 (backend on `:8097`, throwaway data directory **and** throwaway database `aether_e3s1_hero`, one uploaded
 1200×1800 PNG). Probe files were deleted afterwards; every number below is copied from the command output.
-
-**Fresh per visit, without re-reading what was just read.** `GET /photos/random` answers differently on
-purpose, so the app-wide 30 s `staleTime` is wrong for it. Counted requests across an unmount and a
-remount inside one query client:
-
-| Policy                                     | After one visit | After leaving and coming back                                  |
-| ------------------------------------------ | --------------- | -------------------------------------------------------------- |
-| `createQueryClient()` defaults (30 s)      | 1               | **1** — the cached photo, which is the bug the criterion names |
-| the splash's (`staleTime: 0`, `gcTime: 0`) | 1               | **2**                                                          |
-
-`gcTime: 0` is the half that is easy to miss: a stale-but-cached entry is still _painted_ first, and the
-splash's whole promise is that the photo on screen belongs to this visit. Cost, stated: dev's `StrictMode`
-double-mounts, so a dev visit issues two requests — the built bundle issues exactly one
-(`performance.getEntriesByType("resource")`, two visits: **1 `/api/v1/photos/random` + 1 `/images/<uuid>.png`
-each**, seven resources in total, **0 off-origin**).
 
 **The photo's bytes are read once.** `lib/image/hero.ts` fetches the bytes, decodes them through a blob
 URL and derives the palette from _those_ bytes. The cache headers make the alternative cheap rather than
@@ -254,32 +248,18 @@ from black; covering the transfer as well would need the tone to come from somew
 (a remembered tone, or a per-photo field — neither is in `_docs/openapi.yml`; raised as an open question in
 ADR-021 rather than invented here).
 
-**The tap target is really on top of the photo.** jsdom cannot answer this — it has no hit testing — so it
-was measured with real input events in Chromium: `document.elementFromPoint(195, 400).tagName === "BUTTON"`
-with the photo painted, a real `Input.dispatchMouseEvent` press/release at that point flipped
-`aria-expanded` `false → true`, and a real `Escape` key event flipped it back.
+**One request per visit, nothing off this origin, on the built bundle.** The page's own account of what it
+fetched (`performance.getEntriesByType("resource")`), after two loads of `dist/` through the proxy:
+**1 `/api/v1/photos/random` + 1 `/images/<uuid>.png` per visit**, seven resources in total, **0 requests off
+this origin**. Re-measured at this slice's tip: `assets/index-*.js`, `assets/index-*.css`,
+`assets/SplashView-*.js`, `assets/theme-*.js`, `assets/inter-*.woff2` and the two above. A reload resets the
+query cache, so this count holds whatever the cache policy is; the policy is about a _return_ inside one
+running app, and that is E3-S1B's.
 
-**The pull gesture does not survive the browser's default `touch-action` — and jsdom cannot say so.** The
-test suite dispatches pointer events, which assumes the very thing worth checking: that a finger produces
-them, and that the browser lets the whole gesture through. Chromium, driven with a synthesised touch drag
-(`Input.dispatchTouchEvent`) on the **built** bundle, answered both, and the first answer was a defect:
-
-```text
-touch-action: auto           (as first written)
-  → pointerdown@300 pointermove@320 pointercancel@0    requests: 1 → 1   (no re-roll)
-touch-action: pan-x pinch-zoom
-  → pointerdown@300 pointermove@320 … pointermove@460 pointerup@460   requests: 1 → 2
-```
-
-The browser claimed the vertical drag for scrolling after the first move and cancelled the pointer stream,
-so pull-to-refresh was dead on a phone while 24 unit tests were green. `touch-pan-x touch-pinch-zoom`
-(Tailwind v4 composes the property from `--tw-pan-x`/`--tw-pan-y`/`--tw-pinch-zoom`, so two standard
-utilities emit `touch-action: var(--tw-pan-x,) var(--tw-pan-y,) var(--tw-pinch-zoom,)` — checked in
-`dist/`) fixes it and keeps pinch-zoom, which `touch-action: none` would have taken away. The class is
-pinned by a test in `SplashView.test.tsx`; the _effect_ is only provable in a browser, which is what the
-trace above is. Note also that Chromium fired **no `click`** after this drag — the hook's click
-suppression is still needed for drags a browser would treat as a tap, and it is the tests that cover that
-half.
+**Not in this slice.** The per-visit cache policy (`staleTime: 0` + `gcTime: 0`), the tap target and the
+pull-to-refresh gesture — including the measurement that caught a real browser claiming the drag as a scroll
+until `touch-action` was narrowed — belong to **E3-S1B**, the follow-up slice of this story. ADR-021 keeps
+those decisions and their numbers so that slice restores them instead of rediscovering them.
 
 ## Zero external requests — measured on the built bundle
 
@@ -308,4 +288,4 @@ safe-area insets, ≥ 44 px targets); theme colours from the extracted palette (
 component; fonts only via Fontsource NPM packages; **a request leaving the machine is a bug**.
 
 Rules: `.claude/rules/frontend.md` · design language: `.claude/rules/design-language.md` · decisions of
-these stories: `docs/scrum/DECISION-LOG.md` ADR-014 and ADR-015 (E2-S1), ADR-016 (E2-S2), ADR-021 (E3-S1).
+these stories: `docs/scrum/DECISION-LOG.md` ADR-014 and ADR-015 (E2-S1), ADR-016 (E2-S2), ADR-021 (E3-S1A).
