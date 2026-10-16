@@ -239,6 +239,20 @@ public class ApiExceptionHandler {
         return validationFailure(violations, request);
     }
 
+    /**
+     * A dump request the service refused, with the fields it refused and why. The rules behind it are the
+     * ones no annotation can state — six <em>different</em> photos, each of them in the archive, none
+     * curated into another item yet — and the client repairs them the way it repairs a rejected body:
+     * by correcting the fields named. It therefore answers with the same 400, the same code, the same
+     * detail and the same {@code errors} shape, rather than inventing a second vocabulary for the same
+     * mistake.
+     */
+    @ExceptionHandler(DumpValidationException.class)
+    ResponseEntity<ProblemDetail> handleDumpValidation(DumpValidationException ex,
+            HttpServletRequest request) {
+        return validationFailure(ex.violations(), request);
+    }
+
     @ExceptionHandler(HttpMessageNotReadableException.class)
     ResponseEntity<ProblemDetail> handleUnreadableBody(HttpServletRequest request) {
         // The framework's message names the converters and value classes it tried ("Cannot deserialize
