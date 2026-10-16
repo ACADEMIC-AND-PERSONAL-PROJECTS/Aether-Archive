@@ -12,6 +12,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -38,6 +39,7 @@ import com.aetherarchive.dto.PhotoResponse;
 import com.aetherarchive.repository.PhotoRepository;
 import com.aetherarchive.support.ImageFixtures;
 import com.aetherarchive.support.PostgresTestConfiguration;
+import com.aetherarchive.support.TempDataDirectory;
 
 /**
  * The critical flow of the photo API, end to end: an upload posted to a real Tomcat, the bytes in the
@@ -65,8 +67,15 @@ class PhotoApiFlowTest {
 
     @DynamicPropertySource
     static void dataDirectory(DynamicPropertyRegistry registry) throws IOException {
-        dataDir = Files.createTempDirectory("aether-archive-e1-s6-flow-");
+        dataDir = TempDataDirectory.create("aether-archive-e1-s6-flow-");
         registry.add("aether.storage.data-dir", dataDir::toString);
+    }
+
+    @AfterAll
+    static void removeDataDirectory() throws IOException {
+        // The archive's own writing, and the images of the rows the empty-archive test clears: they go with
+        // the directory when the class is done, so a run leaves nothing of this class behind.
+        TempDataDirectory.remove(dataDir);
     }
 
     @Autowired
@@ -122,6 +131,30 @@ class PhotoApiFlowTest {
         // Newest first: whatever other tests left in this container's archive, the instants never rise.
         List<Instant> stamps = feed.stream().map(PhotoResponse::uploadedAt).toList();
         assertThat(stamps).isSortedAccordingTo(Comparator.reverseOrder());
+    }
+
+    @Test
+    void should_answer_404_with_the_empty_archive_code_when_no_photo_has_been_archived_yet() {
+        // The one test that needs an empty archive. It empties the table itself, so the order of these
+        // methods makes no difference: every other test here uploads what it then asserts on, and this one
+        // leaves the count at zero. The files of the rows it clears stay in this class's own data directory
+        // until it is removed, and no assertion looks at that directory.
+        photos.deleteAll();
+
+        ResponseEntity<Map<String, Object>> response = restTemplate.exchange(PHOTOS + "/random",
+                HttpMethod.GET, null, new ParameterizedTypeReference<>() {
+                });
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
+        assertThat(response.getBody())
+                .containsEntry("status", 404)
+                .containsEntry("title", "Not Found")
+                .containsEntry("instance", PHOTOS + "/random")
+                .containsEntry("code", "empty-archive");
+        assertThat((String) response.getBody().get("detail")).contains("No photo has been archived yet");
+        // No field was rejected — this is a state of the archive, not a complaint about the request.
+        assertThat(response.getBody()).doesNotContainKey("errors");
     }
 
     @Test

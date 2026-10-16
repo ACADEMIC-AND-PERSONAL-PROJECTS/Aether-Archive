@@ -21,6 +21,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -46,6 +47,7 @@ import com.aetherarchive.service.StorageInitializer;
 import com.aetherarchive.service.StorageService;
 import com.aetherarchive.support.ArchiveFixtures;
 import com.aetherarchive.support.ImageFixtures;
+import com.aetherarchive.support.TempDataDirectory;
 
 /**
  * The photo API at the HTTP boundary: the status and the exact body of every outcome the contract
@@ -78,8 +80,14 @@ class PhotoControllerTest {
 
     @DynamicPropertySource
     static void dataDirectory(DynamicPropertyRegistry registry) throws IOException {
-        dataDir = Files.createTempDirectory("aether-archive-e1-s6-web-");
+        dataDir = TempDataDirectory.create("aether-archive-e1-s6-web-");
         registry.add("aether.storage.data-dir", dataDir::toString);
+    }
+
+    @AfterAll
+    static void removeDataDirectory() throws IOException {
+        // The uploads of the slice are the only thing in there, and nothing outside this class reads them.
+        TempDataDirectory.remove(dataDir);
     }
 
     @Autowired
