@@ -154,3 +154,8 @@ reader can check it afterwards:
   Sprint 1's retrospective had settled the practice, the rule did not yet carry it. The clause is now written
   there (condition: production/tests/docs split, claimed by name in the PR, judged in review), and E2-S1 and
   E2-S2 claim it under that clause rather than under an unwritten understanding.
+- 2026-10-16 — **E2-S2's size claim was judged in review: sustained.** Under the atomic-story clause, the
+  claim by name — both numbers and the slice-failure argument, in the PR body and
+  `reports/verify-e2-s2-20261016.md` §7 — was re-checked against the diff, mutations included, and held;
+  the branch merges whole. This line is the clause's last step for E2-S2: the sprint notes record the
+  outcome.
