@@ -33,7 +33,9 @@ A story is `Done` only when the Definition of Done (`DEFINITION-OF-DONE.md`) is 
 > E6-S13…S16 were added after Sprint 1 from the release security audit (`reports/security-audit-sprint01.md`).
 > They are **not** Sprint 1 stories and are not counted in its velocity: E6-S15 is `Done` because the reachable
 > finding (SEC-03) was fixed before that sprint closed, in PR #70, and the remaining 8 points await Sprint-2
-> planning — the sprint map below still sums to 181 for that reason.
+> planning. **Sprint 2 planning has since decided they stay unassigned** (they are E6-S13/E6-S14 and
+> do not enter that sprint implicitly), so the sprint map still sums to 181. The 8 points are unscheduled
+> work awaiting a deliberate decision, not a backlog error.
 
 ```text
 Sprint 1  E1  Foundation & Backend              (34)
@@ -199,6 +201,12 @@ user's own images, Dark Glassmorphism tokens, local Fontsource typography — is
 - [ ] Vite + React + TypeScript (strict) under `frontend/`; Tailwind CSS configured.
 - [ ] ESLint + Prettier with a `lint` script; import order and unused-import rules on.
 - [ ] Vitest + React Testing Library wired (`npm run test`), one placeholder test.
+- [ ] The **Tailwind major version** is recorded as an ADR with its reason: v3's config file and v4's CSS-first
+      theme decide how the next four stories write styles, so leaving it implicit inside a config file would
+      make four stories guess (Sprint 2 plan §Risks).
+- [ ] The **test environment's capabilities are probed and recorded** (does the runner provide a canvas?
+      which DOM implementation, and what it does not support?) and the screenshot mechanism the later UI
+      stories need is identified — both are E2-S4/E2-S3's known risks and are cheap to settle here.
 - [ ] `npm run build` outputs a static bundle; dev server reachable from the LAN (`--host`).
 - [ ] `CLAUDE.md` §Commands updated; `.editorconfig` respected.
 
