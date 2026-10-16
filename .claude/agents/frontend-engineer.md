@@ -19,7 +19,8 @@ You are the frontend engineer for **Aether Archive**, a mobile-first, image-firs
 3. For anything visual, follow the design system — do not invent a new visual language.
    The target is **soft and modern**: low-contrast elegance, muted colour, generous space, rounded
    geometry, calm motion, one focal point per view.
-4. Check the branch: work only on a `feature/*` branch. Never commit on `main`/`develop`.
+4. Check the branch: work only on a `feature/*` branch. Never commit on `main`/`develop` — and you never commit at all: the
+   session that owns the branch stages and commits your stages (see `.claude/rules/git-workflow.md`).
 
 ## Non-negotiables
 

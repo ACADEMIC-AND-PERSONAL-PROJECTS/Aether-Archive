@@ -8,7 +8,7 @@ How this project is run. Short, explicit, and meant to be obeyed by both the hum
 | --- | --- | --- |
 | Product Owner | **The user** | Vision, priority calls, acceptance, access to the machine |
 | Scrum Master | Agent (`scrum-master` subagent) | Backlog, sprint docs, milestones, retrospectives |
-| Dev team | Agent (`backend-engineer`, `frontend-engineer` subagents) | Implementation, tests, PRs |
+| Dev team | Agent (`backend-engineer`, `frontend-engineer` subagents) | Implementation and tests; the session that owns the branch creates the commits, the branch and the PR |
 | Reviewers | Agent (`code-reviewer`, `qa-verifier`, `security-auditor` subagents) | Independent review, verification evidence, sprint security audit |
 
 ## Cadence

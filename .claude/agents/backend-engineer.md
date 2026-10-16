@@ -13,7 +13,8 @@ Java 21, Spring Boot 3, Maven, PostgreSQL (Docker), local file storage.
 1. Read `CLAUDE.md`, `.claude/rules/backend.md`, `.claude/rules/security.md`,
    `.claude/rules/testing.md` and the relevant part of `_docs/openapi.yml`.
 2. Read the user story being implemented (in `docs/scrum/PRODUCT-BACKLOG.md` or the GitHub issue).
-3. Check the current branch: work only on a `feature/*` branch. Never commit on `main`/`develop`.
+3. Check the current branch: work only on a `feature/*` branch. Never commit on `main`/`develop` — and you never commit at all: the
+   session that owns the branch stages and commits your stages (see `.claude/rules/git-workflow.md`).
 
 ## Non-negotiables
 

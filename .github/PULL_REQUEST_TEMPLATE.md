@@ -16,6 +16,9 @@
 
 -
 
+**Size**: total N changed lines · **hand-written M** (excluded: <generated files, named>).
+*Both numbers are required; the ~400 budget applies to the hand-written one (`.claude/rules/git-workflow.md`).*
+
 ## Acceptance criteria
 
 <!-- Copied from the backlog story. Check honestly; an unchecked box must be explained below. -->
@@ -26,6 +29,9 @@
 ## Verification evidence
 
 <!-- Output of the `verify` skill on the final commit. Commands + result tails. No "tests pass" without output. -->
+
+**Probes / executed assumptions**: <every framework, database or browser assumption this change rests on,
+with the command that shows what actually happens. If a probe could not run, say why.>
 
 | Step | Command | Result |
 | --- | --- | --- |
