@@ -6,16 +6,16 @@ tokens E2-S3. Structure targets `docs/engineering/ARCHITECTURE.md` §6, styling 
 
 ## Commands (from `frontend/`)
 
-| Command                                   | What it does                                                                                                                                                  |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm install`                             | Installs the pinned toolchain (Node 22.12+ LTS — the floor Vite 8 and Vitest 5 share — npm ≥ 10). Network needed here only.                                   |
-| `npm run dev`                             | Vite dev server on **:5173**, bound to every interface (`server.host`), so the phone can open `http://<LAN-IP>:5173/`. `npm run dev -- --host` is equivalent. |
-| `npm run test`                            | Vitest, single run (CI mode). `npm run test:watch` for the watch mode.                                                                                        |
-| `npm run lint`                            | ESLint 10 flat config, `--max-warnings 0`.                                                                                                                    |
-| `npm run format` / `npm run format:check` | Prettier (config in `.prettierrc.json`, 100 columns, LF, final newline — matching `.editorconfig`).                                                           |
-| `npm run typecheck`                       | `tsc -b` over both projects (app + node-side config).                                                                                                         |
-| `npm run build`                           | `tsc -b && vite build` → static bundle in `dist/` (no source maps).                                                                                           |
-| `npm run preview`                         | Serves the built `dist/` on **:4173**, also LAN-bound.                                                                                                        |
+| Command                                   | What it does                                                                                                                                                                                                                                                    |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm install`                             | Installs the pinned toolchain. Node in the range **`^22.22.2 \|\| ^24.15.0 \|\| >=26`** — `jsdom` 30.1.3 is the strictest dependency (Vite 8 and Vitest 5 accept ≥ 22.12, which still allows 23.x/25.x that jsdom rejects). npm ≥ 10. Network needed here only. |
+| `npm run dev`                             | Vite dev server on **:5173**, bound to every interface (`server.host`), so the phone can open `http://<LAN-IP>:5173/`. `npm run dev -- --host` is equivalent.                                                                                                   |
+| `npm run test`                            | Vitest, single run (CI mode). `npm run test:watch` for the watch mode.                                                                                                                                                                                          |
+| `npm run lint`                            | ESLint 10 flat config, `--max-warnings 0`.                                                                                                                                                                                                                      |
+| `npm run format` / `npm run format:check` | Prettier (config in `.prettierrc.json`, 100 columns, LF, final newline — matching `.editorconfig`).                                                                                                                                                             |
+| `npm run typecheck`                       | `tsc -b` over both projects (app + node-side config).                                                                                                                                                                                                           |
+| `npm run build`                           | `tsc -b && vite build` → static bundle in `dist/` (no source maps).                                                                                                                                                                                             |
+| `npm run preview`                         | Serves the built `dist/` on **:4173**, also LAN-bound.                                                                                                                                                                                                          |
 
 ## Pinned stack
 
@@ -55,12 +55,12 @@ frontend/
 ├── tsconfig.node.json    vite.config.ts — Node types
 └── src/
     ├── app/              App shell (E2-S2 replaces the placeholder) + its test
-    ├── features/         splash/ menu/ river/ workshop/
-    ├── components/       GlassPanel and shared primitives
-    ├── lib/color image motion   pure TypeScript, no React imports
-    ├── api/              typed client + query keys (E2-S2)
-    ├── hooks/            reusable hooks
-    ├── types/            mirrors _docs/openapi.yml
+    ├── features/         README.md only — splash/ menu/ river/ workshop/ arrive in E2-S2+
+    ├── components/       README.md only — GlassPanel and shared primitives (E2-S6)
+    ├── lib/              README.md per folder (color/ image/ motion/) — pure TS, no React
+    ├── api/              README.md only — typed client + query keys (E2-S2)
+    ├── hooks/            README.md only — reusable hooks
+    ├── types/            README.md only — mirrors _docs/openapi.yml
     ├── styles/           global.css — the `@theme` token layer lives here
     └── test/setup.ts     jest-dom matchers + RTL cleanup
 ```
@@ -76,27 +76,39 @@ frontend/
 - **Vitest** runs with `globals: false` (explicit `import { describe, it, expect } from "vitest"`); the setup
   file registers RTL's cleanup because the RTL auto-cleanup needs a global `afterEach`.
 
+### Known gaps this scaffold leaves open
+
+- **`tsconfig.node.json` includes only `vite.config.ts`.** A future `vitest.workspace.ts` or
+  `playwright.config.ts` would sit outside `tsc -b` until it is added to that project's `include`.
+- **Lint is type-unaware on purpose** (no `projectService`; `tsc -b` owns type errors and ESLint stays
+  fast). Rules that need types therefore do not run — `no-floating-promises` and `no-misused-promises`
+  among them. When E2-S2 adds the async API client, enabling type-aware linting is the option; measure
+  the lint-time cost before switching the whole config.
+- **Tailwind v4 scans this file**: its automatic source detection walks the project root, so README prose
+  generates utilities (the word "static" shipped `.static{position:static}`). Scoping is E2-S3's — ADR-014.
+
 ## Test environment — measured 2026-10-16, not assumed
 
 `document.createElement("canvas").getContext("2d")` and friends, run inside the E2-S1 test process
 (jsdom 30.1.3) and, for comparison, inside the system Chromium:
 
-| Probe                          | jsdom 30.1.3 (Vitest)                                                                                              | Chromium 152 (headless)                     |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------- |
-| `canvas.getContext("2d")`      | **`null`** + `Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package` | `CanvasRenderingContext2D`                  |
-| `ctx.getImageData(0,0,4,4)`    | n/a (no context)                                                                                                   | `ImageData`, 64 bytes                       |
-| `new OffscreenCanvas(1,1)`     | **`ReferenceError: OffscreenCanvas is not defined`**                                                               | works, `getContext("2d")` returns an object |
-| `typeof createImageBitmap`     | `undefined`                                                                                                        | `function`                                  |
-| `typeof ImageData`             | `undefined`                                                                                                        | —                                           |
-| `typeof Image`                 | `function`                                                                                                         | —                                           |
-| `typeof matchMedia`            | **`undefined`**                                                                                                    | —                                           |
-| `typeof requestAnimationFrame` | `function`                                                                                                         | —                                           |
+| Probe                          | jsdom 30.1.3 (Vitest)                                                                                              | Chromium 152 (headless)                                                                                        |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| `canvas.getContext("2d")`      | **`null`** + `Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package` | `CanvasRenderingContext2D`                                                                                     |
+| `ctx.getImageData(0,0,4,4)`    | n/a (no context)                                                                                                   | `ImageData`, 64 bytes                                                                                          |
+| `new OffscreenCanvas(1,1)`     | **`ReferenceError: OffscreenCanvas is not defined`**                                                               | works, `getContext("2d")` returns an object                                                                    |
+| `typeof createImageBitmap`     | `undefined`                                                                                                        | `function`                                                                                                     |
+| `typeof ImageData`             | `undefined`                                                                                                        | `function` (a canvas probe constructed one)                                                                    |
+| `typeof Image`                 | `function`                                                                                                         | not probed                                                                                                     |
+| `typeof matchMedia`            | **`undefined`**                                                                                                    | `function` — `matchMedia("(prefers-reduced-motion: reduce)").matches` → `false`, `(…: no-preference)` → `true` |
+| `typeof requestAnimationFrame` | `function`                                                                                                         | not probed                                                                                                     |
 
 Consequences for E2-S4 (its ADR decides, this is the evidence): the colour pipeline cannot be exercised
 through a real canvas in jsdom. The options are to test the pure functions over `ImageData`-shaped plain
 objects, to add a canvas implementation (the `canvas` npm package is a native build; a browser-mode runner
 is a second test runtime), or to keep the decode step behind an injected port. `matchMedia` being absent
-also matters for the `prefers-reduced-motion` hooks in E2-S6.
+also matters for the `prefers-reduced-motion` hooks in E2-S6: there the query has to be stubbed, whereas
+Chromium answers it for real (headless reports no reduced-motion preference unless asked otherwise).
 
 ## Screenshots — mechanism chosen in E2-S1, **no dependency**
 
@@ -125,12 +137,15 @@ grep -rohE 'https?://[a-zA-Z0-9.-]+' dist/ | sort | uniq -c | sort -rn
 ```
 
 No `url(https://…)`, `@import` of a remote sheet, `<link href="https://…">`, `<script src="https://…">` or
-`fetch("https://…")` exists in `dist/`, no source maps are emitted, and no font file is shipped. Loading the
-built page in headless Chromium with external DNS blocked issues exactly four requests, all same-origin:
-`/`, `/assets/index-*.js`, `/assets/index-*.css` and Chromium's own `/favicon.ico` probe. The page renders
-byte-identically with external DNS blocked, and a control run of `about:blank` under the same flags makes
-the same browser-background requests to Google endpoints — which is how they were attributed to Chromium and
-not to the app.
+`fetch("https://…")` exists in `dist/`, no source maps are emitted, and no font file is shipped.
+
+Loading the built page in headless Chromium with every non-loopback host mapped to `NOTFOUND` produced **six
+URLs — three same-origin, three browser-level**: `/`, `/assets/index-*.js` and `/assets/index-*.css` from the
+page, plus requests to `clients2.google.com`, `accounts.google.com` and `www.google.com` that
+`--disable-background-networking` does not suppress. Attribution is by control, not by assumption: a run of
+`about:blank` under the same flags emits exactly those same three Google URLs, and the page renders
+byte-identically with that traffic blocked. `index.html` carries `<link rel="icon" href="data:," />`, so the
+browser's `/favicon.ico` probe no longer appears — before that line it did, and the run showed seven URLs.
 
 ## Non-negotiables
 

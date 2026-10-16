@@ -386,8 +386,8 @@ colour is read from CSS custom properties applied at runtime (`--aura-*`, DESIGN
 from `--font-*` (§4.3), and "a hex literal outside the theme layer is a review blocker" (§2.2). Two facts
 were measured, not assumed: `tailwindcss@4.3.3` is current and `@tailwindcss/vite@4.3.3` declares
 `peerDependencies: { vite: "^5.2.0 || ^6 || ^7 || ^8" }`, so the plugin fits the Vite 8.3.4 the same story
-pins; and the built page emits 6.11 kB of CSS (2.00 kB gzip) for the placeholder, i.e. the plugin only
-ships what is used.
+pins; and **6.14 kB of CSS (2.01 kB gzip)** is what the placeholder page ships, i.e. the plugin only emits
+utilities it finds in use.
 
 **Decision.** Tailwind **v4.3.3** as a **CSS-first** install: the `@tailwindcss/vite` plugin in
 `frontend/vite.config.ts`, `@import "tailwindcss";` at the top of `frontend/src/styles/global.css`, and
@@ -404,14 +404,23 @@ ships what is used.
 **Consequences.** To add a utility one declares a theme variable — no JS config file exists to edit, and a
 token invented inside a component is a review failure by construction. `@theme` must stay top-level (not
 nested in a selector or media query), and only *used* theme variables reach the bundle unless a block is
-marked `@theme static`. Two questions this ADR deliberately leaves open for E2-S3: whether to wipe
-Tailwind's default palette (`@theme { --color-*: initial; }`) so a raw palette colour like `bg-red-500`
-cannot compile at all, and whether to add `prettier-plugin-tailwindcss` for class sorting (a dependency
-needs a story that asks for it). The scaffold's placeholder in `src/app/App.tsx` uses default palette
-utilities precisely because the token layer does not exist yet; E2-S3 replaces them.
+marked `@theme static`. **v4's source detection has no scope by default:** it scans the whole project root
+(ignoring only what `.gitignore` excludes), and that includes documentation — the word "static" in a
+sentence in `frontend/README.md` emitted `.static{position:static}` into the stylesheet, confirmed by
+removing the word and rebuilding (0 occurrences, then 1 again). Documentation prose therefore ships
+utilities: a documentation-only edit that adds or removes such a word changes the stylesheet and its content
+hash with no component change, so a rebuilt CSS hash after a README edit is expected rather than a bug.
+Scoping the scan (`@source` / `source(none)`) is E2-S3's. Two
+further questions this ADR deliberately leaves open for E2-S3: whether to wipe Tailwind's default palette
+(`@theme { --color-*: initial; }`) so a raw palette colour like `bg-red-500` cannot compile at all, and
+whether to add `prettier-plugin-tailwindcss` for class sorting (a dependency needs a story that asks for
+it). The scaffold's placeholder in `src/app/App.tsx` uses default palette utilities precisely because the
+token layer does not exist yet; E2-S3 replaces them.
 
-**Evidence (E2-S1).** `npm run build` → `dist/assets/index-*.css 6.11 kB │ gzip: 2.00 kB`; `npm run lint`,
-`npm run test` (2 tests) and `tsc -b` green with the v4 setup in place.
+**Evidence (E2-S1).** Final `npm run build` before the story was closed → `dist/index.html 0.59 kB`,
+`dist/assets/index-*.css 6.14 kB │ gzip: 2.01 kB`, `index-*.js 219.96 kB │ gzip: 68.80 kB`; `npm run lint`,
+`npm run test` (2 tests), `npm run format:check` and `tsc -b` green with the v4 setup in place, and
+`npm ci` audits **0 vulnerabilities** across 270 packages.
 
 ---
 
