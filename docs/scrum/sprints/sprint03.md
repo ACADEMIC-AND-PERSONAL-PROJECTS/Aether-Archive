@@ -20,7 +20,7 @@
 
 | # | ID | Story | Points | Priority | Status | PR |
 | --- | --- | --- | --- | --- | --- | --- |
-| 0 | S03-C1 | *chore*: land the Sprint-2 working changes in `.claude/` (number provenance, guard canonicalisation, adversarial review control) | — | — | Todo | — |
+| 0 | S03-C1 | *chore*: land the Sprint-2 working changes in `.claude/` (number provenance, guard canonicalisation, adversarial review control) | — | — | Done | #97 |
 | 1 | E3-S1 | Immersive splash view | 5 | p0 | Todo | — |
 | 2 | E3-S2 | Glass menu overlay | 5 | p0 | Todo | — |
 | 3 | E3-S3 | Route transitions & motion system | 3 | p0 | Todo | — |
@@ -132,3 +132,19 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   `@tanstack/react-query` is already a dependency, so E4-S1's query invalidation adds no package; the
   carried security items (#71, #72, #73, #79) are kept out by name, with the decision recorded in
   `docs/scrum/PRODUCT-BACKLOG.md`.
+- 2026-10-16 — **S03-C1 (#97) landed, and its own review is the evidence that change 3 works.** Commit
+  `477574c` added a guard rule whose words were: **"Canonicalise before comparing — both sides"
+  (`Path.toRealPath()`, `os.path.realpath`); a string or prefix comparison is not a guard.** The review
+  compiled a probe against `target/classes`, called `StorageService.requireInside` with the adversarial
+  matrix *that same PR* prescribes, and the rule lost: the guard normalises the candidate lexically, and
+  `toRealPath()` on a not-yet-existing upload target throws `NoSuchFileException`. So the standard indicted
+  correct, reviewed code — a claim about a mechanism that nobody had executed, which is change 3's class of
+  defect rather than change 1's (change 1 is numbers, and it would not have caught this). The fixes:
+  `11d8cd5` states the invariant and names the rule's one open exception (E6-S17 / #79, `p1`); `8306c72`
+  closes the three gaps the new rules left open (the text-only control, the merge-pr gate, the ADR-012
+  description); `e390242` names the API, the directory and the untested cell after a second round found
+  three clauses true only under their author's reading (`Files.move` vs an `open`-style write, link
+  *position*, "pinned by tests" asserted about a suite with no such test). Merged as `da5d9e8` after
+  REQUEST CHANGES → APPROVE WITH NITS, at a cost of 89 changed lines and two review rounds. Worth recording
+  because the shape generalises — a rule, a spec or a report that describes behaviour nobody executed is the
+  defect this project keeps finding, and it is cheapest to catch when the document is the diff.
