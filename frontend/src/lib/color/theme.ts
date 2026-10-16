@@ -132,8 +132,9 @@ export function contrastReport(theme: AuraTheme): ContrastReport {
  * The accent and its guaranteed text colour (§2.2). The source is the palette's highest
  * `weight × C` colour; when neither neutral base clears 4.5:1 against it, its OKLCh lightness
  * steps toward the base currently reading stronger — dark text wants a lighter accent, light
- * text a darker one — while hue and chroma stay put. The band edges read ≈ 15–17:1, so the
- * step loop always returns; the trailing return is the boundary the type checker needs.
+ * text a darker one — while hue and chroma stay put. The band edges clear 4.5:1 across the
+ * chroma range — worst measured reading 5.93:1 (review brute-force) — so the step loop always
+ * returns; the trailing return is the boundary the type checker needs.
  */
 function fitAccent(source: PaletteColor): { accent: string; accentContrast: string } {
   const againstDark = (hex: string): number => contrastRatio(hexToRgb(hex), hexToRgb(DARK_BASE));
