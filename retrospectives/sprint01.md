@@ -2,7 +2,8 @@
 
 - **Dates**: 2026-10-15 → 2026-10-16 (the two-week box was not needed; the sprint closed in two working days)
 - **Goal**: The archive can store and serve images and dumps on PostgreSQL through a tested local API
-- **Outcome**: **Achieved** — with one acceptance criterion explicitly deferred to Sprint 2 (see below)
+- **Outcome**: **Achieved** — with two acceptance criteria deferred at merge and both closed inside the
+  sprint (see below); nothing was carried to Sprint 2
 - **Sprint plan**: `docs/scrum/sprints/sprint01.md`
 - **Release**: release PR `develop` → `main`, tagged `sprint-01`
 - **Board**: milestone "Sprint 01 — Foundation & Backend"
@@ -16,10 +17,10 @@
 | Points committed / delivered | 34 / 34 |
 | Velocity (delivered points) | 34 |
 | PRs merged | 13 — 9 stories, 4 process (sprint plan, agent-permission fix, status catch-up, dependency patch) |
-| Test classes / tests (backend) | 25 classes · 280 tests, 0 failures, suite 45 s |
+| Test classes / tests (backend) | 26 classes · 280 tests, 0 failures, suite 45 s |
 | Average story PR size (changed lines) | 1,300 (9 PRs, 11,689 lines — see "What did not") |
-| Independent reviews | 10 — every one returned findings; 3 blocking |
-| Defects caught before merge | 3 blocking + ~50 smaller findings, all fixed on their branch |
+| Independent reviews | every PR merged in the sprint (13 before this close PR); each verdict posted as a comment. 4 blocking findings — 3 in production code, 1 in the test suite |
+| Defects caught before merge | 4 blocking + ~70 smaller findings, all fixed on their branch |
 | Carry-over stories | 0 |
 | New decisions | ADR-011 (contract clarifications), ADR-012 (storage & CORS constraints + amendment), ADR-013 (error vocabulary + 2 amendments) |
 
@@ -71,9 +72,9 @@ from the start and stayed there.
   `Files.list` follows a symlinked directory; `saveAndFlush` on an assigned-id entity returns a *different*
   managed instance, so a version test measured nothing. Each was discovered by execution, after being written
   down as fact.
-- **PRs were far larger than the project's own guidance** — story PRs averaged ~1,300 changed lines against a
-  "~400/500" rule. Three reviewers independently flagged it and proposed the same carve-outs; the rule as
-  written was never met once.
+- **PRs were far larger than the project's own guidance** — story PRs averaged 1,300 changed lines against a
+  "~400/500" rule, and **five** reviews flagged it (E1-S1, S3, S4, S8, S6). Only one story met the rule:
+  E1-S11 at 253 lines. Every reviewer who raised it proposed the same carve-outs.
 - **Commit granularity improved only after being criticised.** E1-S1 arrived as one commit for the whole
   story; by E1-S4 the briefs asked for staged work and the branch carried four logical units. The instruction
   lived in session prompts, not in the repository, so it would not survive a new session.

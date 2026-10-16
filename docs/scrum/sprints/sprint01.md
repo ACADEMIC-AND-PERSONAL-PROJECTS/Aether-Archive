@@ -23,7 +23,7 @@
 | E1-S2 | Configuration & local data directory | 2 | p0 | Done | #62 |
 | E1-S3 | PostgreSQL persistence + Flyway baseline | 5 | p0 | Done | #63 |
 | E1-S4 | StorageService — safe local file storage | 5 | p0 | Done | #64 |
-| E1-S8 | Error handling (RFC 9457) & validation | 2 | p0 | Todo | — |
+| E1-S8 | Error handling (RFC 9457) & validation | 2 | p0 | Done | #66 |
 | E1-S6 | Photo API — upload, list, random | 5 | p0 | Done | #67 |
 | E1-S7 | Dump API — create and list 6-photo dumps | 5 | p0 | Done | #68 |
 | E1-S9 | Backend test suite | 5 | p0 | Done | #69 |
@@ -79,8 +79,7 @@ consolidation story and is treated as a technical enabler.
   branch → implement → `verify` with raw evidence → PR → independent `code-reviewer` → findings fixed by new
   commits → merge commit → issue closed with the merge sha. Statuses and PR links are in the table above.
   Two stories closed with one acceptance criterion deferred, each recorded in its PR and completed rather
-  than forgotten: E1-S4's "oversized files rejected with a `ProblemDetail`" belongs to E1-S8 (still open, and
-  its own AC names the size limit), and E1-S11's "`./mvnw spring-boot:run` connects to the dev database" was
+  than forgotten: E1-S4's "oversized files rejected with a `ProblemDetail`" belongs to E1-S8 (delivered in #66, whose own AC names the size limit), and E1-S11's "`./mvnw spring-boot:run` connects to the dev database" was
   closed by E1-S3's dev-database run (`reports/verify-e1-s3-20261015.md` §2).
 - 2026-10-15 — **Findings that would otherwise have shipped** — caught by the independent review, unless
   noted: a **symlinked `tmp/` made the boot delete the link target's contents** (E1-S2, proven by execution
@@ -110,7 +109,8 @@ consolidation story and is treated as a technical enabler.
   **reachable** DoS (`jackson-core` 2.21.4, `POST /api/v1/dumps`) was fixed before the release (#70). The three
   Mediums and seven Lows are tracked as issues #71 (cross-site state-changing requests — the CSRF stand-in
   ADR-008 defers), #72 (the Spring Boot 3.5.x OSS line is past EOL: a mandated-stack decision for the owner)
-  and #73 (the Low-severity hardening pass).
+  and #73 (the Low-severity hardening pass). SEC-03 was fixed before the release (#70, backlog E6-S15), so
+  **two** Mediums remain open, not three.
 - 2026-10-16 — Two reviews of the last story found the suite was **order-dependent** — it passed only because
   surefire ordered classes favourably, so the story's own determinism claim was wrong. Fixed and proven under
   two class orders (`alphabetical`, `reversealphabetical`). A claim of reliability that a re-run cannot

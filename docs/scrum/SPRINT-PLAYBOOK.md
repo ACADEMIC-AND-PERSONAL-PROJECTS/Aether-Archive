@@ -78,7 +78,7 @@ A story is `Done` only when `DEFINITION-OF-DONE.md` is fully checked with eviden
 | Sprint | Committed (pts) | Delivered (pts) | Velocity | Notes |
 | --- | --- | --- | --- | --- |
 | 0 | — | — | — | Bootstrap |
-| 1 | 34 | 34 | 34 | 9/9 stories; 280 backend tests, suite 45 s; security audit found no Critical/High. One unplanned fix landed before the release (SEC-03, jackson-core DoS, PR #70) and is not counted in the committed points. |
+| 1 | 34 | 34 | 34 | 9/9 stories; 280 backend tests, suite 45 s; security audit found no Critical/High. **+1 unplanned** delivered point: the audit's reachable SEC-03 (`jackson-core` DoS, PR #70, backlog E6-S15). Deliberately kept out of the velocity figure — a series that mixes planned and unplanned work cannot be compared across sprints — and recorded here so the throughput is still visible. |
 
 ## Escalation
 

@@ -409,5 +409,6 @@ landed afterwards:
 | E1-S9 (#69) | test code only | `git diff --stat <base>..<head> -- backend/src/main` is **empty**; no `src/main/resources` or `pom.xml` change either. The audit's production-code findings stand unchanged. |
 | #70 | `backend/pom.xml`, one property: `jackson-bom.version` 2.21.4 → 2.21.7 | This is the fix for the audit's own **SEC-03**. Independently reviewed: the override applies to all seven Jackson artefacts (annotations stays at the BOM's own 2.21), 2.21.7 returns **0 advisories** in OSV, the fix version is real and same-family, and 280 tests pass with it. No new surface. |
 
-Release verdict stands: **no Critical or High findings; the release is not blocked.** The Mediums and Lows are
-tracked as issues #71, #72, #73.
+Release verdict stands: **no Critical or High findings; the release is not blocked.** Of the three Mediums,
+**SEC-03 is fixed** by #70 (backlog E6-S15); the **two remaining** (SEC-01, SEC-02) and the seven Lows are
+tracked as issues #71, #72 and #73.

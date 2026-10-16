@@ -30,8 +30,10 @@ A story is `Done` only when the Definition of Done (`DEFINITION-OF-DONE.md`) is 
 
 **Total: 47 stories · 189 points · 6 sprints (~2 weeks each, 25–34 points per sprint).**
 
-> E6-S13…S16 were added after Sprint 1 from the release security audit (`reports/security-audit-sprint01.md`);
-> E6-S15 is `Done` because the reachable finding (SEC-03) was fixed before that sprint closed, in PR #70.
+> E6-S13…S16 were added after Sprint 1 from the release security audit (`reports/security-audit-sprint01.md`).
+> They are **not** Sprint 1 stories and are not counted in its velocity: E6-S15 is `Done` because the reachable
+> finding (SEC-03) was fixed before that sprint closed, in PR #70, and the remaining 8 points await Sprint-2
+> planning — the sprint map below still sums to 181 for that reason.
 
 ```text
 Sprint 1  E1  Foundation & Backend              (34)
@@ -58,7 +60,7 @@ serves images and exposes the `/api/v1` contract from `_docs/openapi.yml` — fu
 | E1-S5 | Serve images at `/images/**` | p0 | 2 | 2 | Todo |
 | E1-S6 | Photo API — upload, list, random | p0 | 5 | 1 | Done |
 | E1-S7 | Dump API — create and list 6-photo dumps | p0 | 5 | 1 | Done |
-| E1-S8 | Error handling (RFC 9457) & validation | p0 | 2 | 1 | Todo |
+| E1-S8 | Error handling (RFC 9457) & validation | p0 | 2 | 1 | Done |
 | E1-S9 | Backend test suite | p0 | 5 | 1 | Done |
 | E1-S10 | Dev seed script & curl smoke collection | p2 | 2 | 2 | Todo |
 | E1-S11 | Dev PostgreSQL via Docker Compose | p0 | 2 | 1 | Done |
@@ -111,6 +113,8 @@ serves images and exposes the `/api/v1` contract from `_docs/openapi.yml` — fu
 - [ ] `Cache-Control: public, max-age=31536000, immutable` (UUID names never change).
 - [ ] Unknown files return 404 without leaking paths; no directory listing possible.
 - [ ] Integration test fetching a stored file and a missing one.
+- [ ] Send the `Content-Type` derived from the stored extension (never the client's), add
+      `X-Content-Type-Options: nosniff`, and make directory listing impossible (audit SEC-N2).
 
 ### E1-S6 — Photo API — upload, list, random · 5 pts · p0
 
@@ -127,7 +131,8 @@ serves images and exposes the `/api/v1` contract from `_docs/openapi.yml` — fu
 *As the curator, I want to publish a 6-photo dump with its aura colour, so that months are preserved.*
 
 - [ ] `POST /api/v1/dumps` accepts `title?`, `backgroundColor` (`^#[0-9a-fA-F]{6}$`), exactly 6 distinct `photoIds`.
-- [ ] `displayOrder` is assigned 0–5 from the request order and exposed in responses.
+- [ ] `displayOrder` is assigned 0–5 from the request order; the order reaches clients as the
+      position of each photo in `Dump.photos` — the contract's `Photo` schema has no such field (ADR-011 §3).
 - [ ] Rejections: 5 or 7 ids, duplicates, unknown id, bad colour → 400/404 with precise `ProblemDetail`.
 - [ ] `GET /api/v1/dumps` returns dumps newest-first with their ordered photos.
 - [ ] Service unit tests + `@SpringBootTest` round trip.
@@ -166,6 +171,8 @@ serves images and exposes the `/api/v1` contract from `_docs/openapi.yml` — fu
 
 - [ ] `docker-compose.dev.yml` at the repo root: one `db` service, `postgres:17-alpine`, port from `AETHER_DB_PORT` (default 5432), named volume `aether_pgdata`, healthcheck.
 - [ ] Credentials and database name from `.env` (`POSTGRES_*`); `.env.example` updated; nothing secret committed.
+- [ ] The service pins `postgres:17-alpine` by digest, so a mutable tag cannot change what runs
+      (audit SEC-N6).
 - [ ] `README.md` quickstart and backend README document `docker compose -f docker-compose.dev.yml up -d`.
 - [ ] `./mvnw spring-boot:run` connects to it with the documented `.env` values (smoke-tested).
 
@@ -445,10 +452,10 @@ delivery, documentation, and a clean v1.0.
 | E6-S10 | v1.0 release | p0 | 3 | 6 | Todo |
 | E6-S11 | Container images (`api`, `web`) | p0 | 3 | 6 | Todo |
 | E6-S12 | One-command stack & clean-clone verification | p0 | 5 | 6 | Todo |
-| E6-S13 | Cross-site write protection (Sprint 1 audit SEC-01) | p1 | 2 | — | Todo |
-| E6-S14 | Framework end-of-life decision & migration plan (audit SEC-02) | p1 | 2 | — | Todo |
-| E6-S15 | Dependency patch level from the Sprint 1 audit (SEC-03) | p1 | 1 | 1 | Done |
-| E6-S16 | Low-severity hardening from the Sprint 1 audit (SEC-04…10) | p2 | 3 | — | Todo |
+| E6-S13 | Cross-site write protection (Sprint 1 audit SEC-01, issue #71) | p1 | 2 | — | Todo |
+| E6-S14 | Framework end-of-life decision & migration plan (audit SEC-02, issue #72) | p1 | 2 | — | Todo |
+| E6-S15 | Dependency patch level from the Sprint 1 audit (SEC-03, PR #70) | p1 | 1 | — | Done |
+| E6-S16 | Low-severity hardening from the Sprint 1 audit (SEC-04…10, issue #73) | p2 | 3 | — | Todo |
 
 ### E6-S1 — CI on every PR · 5 pts | p0
 
@@ -498,6 +505,8 @@ delivery, documentation, and a clean v1.0.
 - [ ] `scripts/restore.sh` restores safely (`psql` + files; refuses to overwrite a non-empty target without `--force`).
 - [ ] Restore verified in CI or a documented manual test on a temp directory.
 - [ ] Documented in the runbook.
+- [ ] The runbook states that a backup must include `AETHER_DATA_DIR` as well as the database
+      (audit SEC-N5).
 
 ### E6-S8 — Performance budget pass · 5 pts | p1
 
