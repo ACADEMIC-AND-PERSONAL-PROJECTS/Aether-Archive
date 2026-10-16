@@ -26,6 +26,7 @@ Statuses: `Proposed` · `Accepted` · `Superseded by ADR-NNN` · `Rejected`.
 | [ADR-014](#adr-014--tailwind-css-v4-configured-css-first) | 2026-10-16 | Tailwind CSS v4, configured CSS-first | Accepted |
 | [ADR-015](#adr-015--typescript-603-while-the-lint-stack-cannot-parse-7) | 2026-10-16 | TypeScript 6.0.3 while the lint stack cannot parse 7 | Accepted |
 | [ADR-016](#adr-016--the-frontend-reaches-the-api-on-its-own-origin) | 2026-10-16 | The frontend reaches the API on its own origin | Accepted |
+| [ADR-017](#adr-017--the-css-foundation-declared-inputs-runtime-only-colour-one-definition-per-scale) | 2026-10-16 | The CSS foundation: declared inputs, runtime-only colour, one definition per scale | Accepted |
 
 ---
 
@@ -493,6 +494,52 @@ phone, and photos render from the origin that served the page. A deployment that
 SPA and the API on different origins must also rewrite `Photo.url` and open CORS — that is a new ADR,
 not a config tweak. `npm run preview` serves the built bundle without the dev proxy; previewing against
 a real API is the container's job.
+
+---
+
+## ADR-017 — The CSS foundation: declared inputs, runtime-only colour, one definition per scale
+
+**Date**: 2026-10-16 · **Status**: Accepted
+
+**Context.** ADR-014 chose Tailwind v4 CSS-first and deliberately left three questions to E2-S3: the
+scan scope (`@source` / `source(none)`), whether to empty the default palette, and the shape of the
+`--aura-*` token layer. The first answer was forced by a measurement: with automatic detection,
+`frontend/README.md` was a build input — a sentence containing `w-[43px]` shipped a rule and moved the
+CSS hash (`index-p6vokHjt.css`, 6.38 kB → `index-B7cX_O_f.css`, 6.40 kB; E2-S1 review, reproduced in
+`reports/verify-e2-s3-20261016.md` before the fix).
+
+**Decision.** `frontend/src/styles/global.css` is the foundation, in four blocks:
+
+1. **Scan scope, declared.** `@import "tailwindcss" source(none);` turns discovery off; explicit
+   `@source` globs — `src/**/*.ts`, `src/**/*.tsx`, `index.html` — are the entire candidate set. The
+   entry HTML is kept because it is a build input that can carry class names, and dropping it would be
+   a silent failure waiting to happen; even markdown inside `src/` is excluded, because a document is
+   not an input. A new top-level input that can carry classes must be registered in `global.css` (the
+   frontend rule names it).
+2. **Theme.** `--color-*: initial` empties the default palette, so a raw palette colour cannot compile
+   (probe: `bg-red-500` → 0 occurrences); the `--aura-*` runtime palette is mapped with `@theme inline`
+   so utilities resolve `var(--aura-*)` at use — ADR-014's shape. The fluid `--text-*` scale (§4.3) and
+   the `--tracking-*` tokens live in `@theme` too, defined once for utilities and raw CSS alike, and
+   the default scale is emptied so an off-scale size cannot compile either (probe: `text-3xl` → 0).
+3. **Runtime tokens.** The neutral fallback palette values, the `--safe-*` insets (`env(…, 0px)`) and
+   the 4 px `--space-*` rhythm are plain custom properties on `:root`. Contrast measured (WCAG 2.x):
+   text/bg 15.79:1, muted/bg 6.40:1, accent-contrast/accent 8.46:1.
+4. **Base.** `html` carries the page colour and `overscroll-behavior: none`; `body` is a flex column
+   padded once by the safe insets with `min-height: 100dvh`; `#root` and the views fill what the insets
+   leave (`flex-1`), so no view repeats `100dvh` and insets never add scroll. Every scrollbar is
+   hidden; the reduced-motion guard freezes animations at their end state and leaves movement
+   transitions to the `motion-safe:` / `motion-reduce:` variants at the component level.
+
+**Consequences.** A document edit no longer moves the CSS hash and the build's inputs are finite and
+reviewable; colour in components can only come from the runtime palette; each scale has one definition
+serving utilities and variables. Tailwind emits `@theme` variables lazily — only used steps ship, and
+a `var(--token)` reference anywhere in compiled CSS counts as a use (probe), which is what keeps raw
+consumers like the future `glass.css` working. `prettier-plugin-tailwindcss` is **not** added: no
+story asks for the dependency, and the pin policy needs one (ADR-014's left-open question, answered).
+
+**Evidence.** `reports/verify-e2-s3-20261016.md` — scan sentinels (README/TS/HTML), palette-wipe and
+emission probes, the reduced-motion probe under `--force-prefers-reduced-motion`, and the 9-cell
+overflow measurement with screenshots at 320/390/430.
 
 ---
 

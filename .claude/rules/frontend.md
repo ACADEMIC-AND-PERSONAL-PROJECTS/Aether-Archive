@@ -66,6 +66,8 @@ styles/      global.css (tokens + base), theme.css, glass.css
 - Theme values come from CSS custom properties generated from the active palette
   (`--aura-*`, `--font-*`) — see `.claude/rules/design-language.md` and
   `docs/engineering/DESIGN-SYSTEM.md`. Never hardcode a hex value in a component.
+- The Tailwind scan is explicit (`source(none)` + `@source` in `global.css`): a new top-level input
+  that can carry class names must be registered there; documents are never scanned.
 - One glass primitive (`GlassPanel`): `backdrop-filter: blur(15px)` + `rgba(0,0,0,0.4)`; on browsers
   without `backdrop-filter` fall back to a solid tint — never leave text unreadable.
 

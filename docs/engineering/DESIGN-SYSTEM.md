@@ -71,6 +71,13 @@ Rules: contrast of `--aura-text` on `--aura-bg` and on glass ≥ **4.5:1** (≥ 
 monotonic lightness for surfaces; **neutral fallback palette** for extraction failures. A hex literal
 outside the theme layer is a review blocker.
 
+**Fallback values (the token layer's neutral set, E2-S3).** `--aura-bg #0b0b0d` · `--aura-surface
+#121215` · `--aura-glass rgba(0, 0, 0, 0.4)` · `--aura-hairline 1px solid rgba(255, 255, 255, 0.08)` ·
+`--aura-text #e8e6e3` · `--aura-muted rgba(232, 230, 227, 0.62)` · `--aura-accent #b5a98f` ·
+`--aura-accent-contrast #0b0b0d`. Contrast, measured (WCAG 2.x, E2-S3 report): text on bg **15.79:1**,
+text on surface 15.01:1, text on glass-over-bg 16.20:1, muted on bg **6.40:1**, accent-contrast on
+accent **8.46:1** — every pair ≥ 4.5:1 (§8).
+
 ### 2.3 Where colour changes
 
 - **Splash**: background = blurred dominant tone of the hero photo (instant, no flash).
@@ -201,3 +208,33 @@ import "./styles/global.css";
 - Contrast assertions in the theme generator tests (text/background pairs).
 - A visual check page (or story) rendering all tokens, glass states and type styles, screenshot in the PR.
 - Network panel check: **zero external requests** on a loaded page (also part of `verify`).
+
+## 11. The CSS foundation (E2-S3)
+
+`frontend/src/styles/global.css` is the single source for everything below (decision: ADR-017; probes
+and measurements: `reports/verify-e2-s3-20261016.md`).
+
+- **Build inputs are declared, never discovered.** `source(none)` + explicit `@source` globs — the
+  source tree's `.ts`/`.tsx` and `index.html`. A document is not a build input: editing a README no
+  longer moves the CSS hash, and prose cannot ship a rule. A new top-level input that can carry class
+  names must be registered in `global.css` (`.claude/rules/frontend.md`).
+- **Colour is the runtime palette only.** The default palette is emptied, so `bg-red-500` cannot
+  compile; utilities map to `var(--aura-*)` (inline), and the §2.2 values above are the fallback theme
+  until a dump's palette takes over (E2-S4/S6).
+- **Type and rhythm are defined once.** `--text-xs … --text-2xl` (§4.3 clamps) and `--tracking-*` live
+  in `@theme`: `text-xl` and `var(--text-xl)` are the same value, and off-scale sizes cannot compile.
+  `--space-*` is the raw-CSS spelling of the 4 px rhythm the numeric utilities already carry.
+- **Full height is defined once, at the root.** `html`/`body` carry `100dvh`; body is padded once by
+  the safe insets (`env(safe-area-inset-*, 0px)`, `border-box`); `#root` and every view fill what the
+  insets leave (`flex-1`) — no view repeats `100dvh`, and insets never add scroll.
+- **The app owns its edges.** `html` carries the background and `overscroll-behavior: none`; every
+  scroller has its scrollbar hidden.
+- **Motion degrades globally (§5).** Under `prefers-reduced-motion: reduce` animations freeze at their
+  end state (a state-communicating pulse becomes a still frame) and smooth scrolling is off;
+  transitions that move are the component's responsibility, switched with `motion-safe:` /
+  `motion-reduce:` variants.
+- **Tailwind emits `@theme` variables lazily** — only used steps ship; a `var(--token)` reference in
+  any compiled CSS counts as a use, which keeps raw-CSS consumers (`glass.css`, later) working.
+
+The full visual check page (§10) arrives with the glass material in E2-S6; E2-S3's visual evidence is
+the three-width screenshot set plus the 9-cell overflow measurement, both in the report.
