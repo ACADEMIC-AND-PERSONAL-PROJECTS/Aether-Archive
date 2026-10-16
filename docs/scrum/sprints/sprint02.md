@@ -69,8 +69,19 @@ reader can check it afterwards:
    excluded and named). The rule the retrospective settled — the ~400/500-line guidance applies to the
    *hand-written* number, and a large atomic story is split into production/tests/docs commits rather than
    into artificial stories — is stated in `.claude/rules/git-workflow.md`. Sprint 1's 1,300 was a **total**
-   average, so this sprint recomputes its hand-written baseline from the nine Sprint 1 PRs and compares like
-   with like.
+   average, so the baseline is recomputed here from the nine Sprint 1 story PRs (`gh pr view <n> --json
+   files`), and this sprint compares like with like:
+
+   | Sprint 1 story PRs | Lines |
+   | --- | --- |
+   | Total changed (#60–#64, #66–#69) | **11,689** |
+   | Generated: `mvnw` 295 · `mvnw.cmd` 189 · `maven-wrapper.properties` 4 | 488 |
+   | **Hand-written baseline** | **11,201** |
+   | **Hand-written average per story** | **1,245** |
+
+   The per-file exclusion is named so any reader can reproduce the number. Against that baseline, this
+   sprint's first story (E2-S1, hand-written **691**) is 55% of the Sprint 1 average — below it, while still
+   above the ~400 rule: both statements are true and the retro carries both.
 3. **Working agreements live in the repository.** Staged commits, the probe rule and the concurrent-agent
    staging rule go into `.claude/agents/*.md` and `.claude/rules/git-workflow.md` in the first (chore) PR of
    the sprint, so a fresh session can follow them by grep alone — no dependence on a session that has ended.
@@ -126,3 +137,13 @@ reader can check it afterwards:
 - 2026-10-16 — The sprint runs 2026-10-16 → 2026-10-30, which leaves a gap before Sprint 3's planned start
   (2026-11-16). Later rows of the playbook schedule are indicative and are re-planned at their own planning;
   the gap is deliberate slack after a sprint that closed in two days, not an oversight.
+- 2026-10-16 — **E2-S1's review found the useful thing, and it is a scope transfer rather than a defect**:
+  Tailwind v4's default content detection reaches `frontend/README.md`, so documentation prose emits
+  utilities and the built CSS hash changes when a doc is edited. `styles/global.css` belongs to E2-S3, so the
+  fix is written into **that story's acceptance criteria** (backlog first, then issue #22) instead of being
+  patched here where it would be re-derived by the next person. ADR-014 gained the reproducible size reading
+  (6.14 kB / 2.01 kB gzip) and a clause naming the default scan scope.
+- 2026-10-16 — The same review caught a **stale number in E2-S1's own report and PR body**: the size figures
+  described the tree one commit early (5,715 total / 691 hand-written at head, not 5,595 / 571). Fixed in the
+  PR body and the report. The lesson is smaller than the mistake: a size is a measurement of the final commit,
+  and taking it before the last commit lands is the same class of error as an unexecuted assumption.
