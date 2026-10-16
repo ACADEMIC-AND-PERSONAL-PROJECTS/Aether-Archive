@@ -13,6 +13,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 /**
  * A stored image, and — once curated — one of the six photos of a dump.
@@ -57,6 +58,17 @@ public class Photo {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    /**
+     * The optimistic-locking counter, handled by Hibernate: curation updates rows an upload created, so
+     * two writers could otherwise overwrite each other's work without a word — one of them would publish
+     * a dump whose photo the other had just taken. The version is written on every insert, raised on
+     * every update and compared with the row before the next one, which turns the race into a failed
+     * transaction (V3__photo_optimistic_locking.sql).
+     */
+    @Version
+    @Column(name = "version", nullable = false)
+    private long version;
+
     /** Required by JPA; application code creates photos through the constructor below. */
     protected Photo() {
     }
@@ -69,6 +81,25 @@ public class Photo {
         this.displayOrder = displayOrder;
         this.category = Objects.requireNonNull(category, "category");
         this.createdAt = Objects.requireNonNull(createdAt, "createdAt");
+    }
+
+    /**
+     * Curates this photo into a dump, at the position it is displayed in — the only change a photo
+     * ever undergoes after its upload (ADR-011).
+     *
+     * <p>{@code DumpService} calls it once per photo, in the order the request named the identifiers,
+     * which is what turns six ids into the ordered array the contract publishes. Both curation columns
+     * are set together because the baseline accepts them only together
+     * ({@code ck_photo_position_requires_item}), and the caller is responsible for handing over an
+     * unassigned photo: a photo already curated into another item is refused by the service, and this
+     * method would replace that assignment rather than complain about it.
+     *
+     * @param item the dump or single-picture item this photo becomes part of
+     * @param displayOrder its 0-based position inside that item
+     */
+    public void attachTo(ArchiveItem item, int displayOrder) {
+        this.archiveItem = Objects.requireNonNull(item, "item");
+        this.displayOrder = displayOrder;
     }
 
     public UUID getId() {
