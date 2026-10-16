@@ -108,3 +108,40 @@ export function seededNoise(seed: number, width = 64, height = 64): PixelImage {
   }
   return { data, width, height };
 }
+
+export const PHOTO_GROUND_TRUTH: ReadonlyArray<{
+  name: string;
+  rgb: readonly [number, number, number];
+  share: number;
+}> = [
+  { name: "rust", rgb: [188, 86, 52], share: 0.45 },
+  { name: "deep teal", rgb: [28, 96, 104], share: 0.3 },
+  { name: "sand", rgb: [222, 196, 150], share: 0.15 },
+  { name: "near-black", rgb: [35, 30, 28], share: 0.1 },
+];
+
+/**
+ * A jittered four-region "photo" (±12 per channel), the quality protocol's fixture: textured
+ * regions are what real photographs look like, and they are where the two clustering algorithms
+ * behave differently — measured in ADR-018.
+ */
+export function syntheticPhoto(width = 64, height = 64): PixelImage {
+  const random = mulberry32(0xf0705);
+  const data = new Uint8ClampedArray(width * height * 4);
+  const total = width * height;
+  let cursor = 0;
+  PHOTO_GROUND_TRUTH.forEach(({ rgb }, index) => {
+    const end =
+      index === PHOTO_GROUND_TRUTH.length - 1
+        ? total
+        : cursor + Math.round(total * PHOTO_GROUND_TRUTH[index]!.share);
+    for (let i = cursor; i < end; i++) {
+      data[i * 4] = rgb[0] + (random() - 0.5) * 24;
+      data[i * 4 + 1] = rgb[1] + (random() - 0.5) * 24;
+      data[i * 4 + 2] = rgb[2] + (random() - 0.5) * 24;
+      data[i * 4 + 3] = 255;
+    }
+    cursor = end;
+  });
+  return { data, width, height };
+}

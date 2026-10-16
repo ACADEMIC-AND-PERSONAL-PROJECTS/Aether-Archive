@@ -6,6 +6,7 @@ import {
   lowSaturation,
   seededNoise,
   solid,
+  syntheticPhoto,
   transparentHalf,
 } from "./__fixtures__/images";
 import { deltaEok, rgbToHex, rgbToOklab } from "./oklch";
@@ -105,5 +106,16 @@ describe("extractPalette — the §2.1 pipeline", () => {
     expect(colors).toHaveLength(1);
     expect(colors[0]!.hex).toBe(rgbToHex(120, 90, 60));
     expect(colors[0]!.weight).toBeCloseTo(1, 9);
+  });
+
+  it("keeps the dominant region's mass when a textured region splits across clusters", () => {
+    // The jittered photo's rust region covers 45% of the pixels; k-means++ splits it into
+    // several tones — that is what "dominant colours" means on a textured surface (ADR-018).
+    // Whatever the split, the region's family must keep its measured mass.
+    const { colors } = extractPalette(syntheticPhoto());
+    const rustMass = colors
+      .filter((color) => deltaBetween(color.hex, "#bc5634") < 0.1)
+      .reduce((total, color) => total + color.weight, 0);
+    expect(rustMass).toBeGreaterThanOrEqual(0.4);
   });
 });
