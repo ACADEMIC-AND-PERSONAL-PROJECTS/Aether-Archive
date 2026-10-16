@@ -66,7 +66,7 @@ A story is `Done` only when `DEFINITION-OF-DONE.md` is fully checked with eviden
 | Sprint | Goal | Dates | Milestone | Status |
 | --- | --- | --- | --- | --- |
 | 0 | Bootstrap the repository, agent setup, process and backlog | 2026-10-15 | — | Done |
-| 1 | The archive can store and serve images and dumps on PostgreSQL through a tested local API | 2026-10-15 → 2026-10-30 | Sprint 01 — Foundation & Backend | In progress |
+| 1 | The archive can store and serve images and dumps on PostgreSQL through a tested local API | 2026-10-15 → 2026-10-16 | Sprint 01 — Foundation & Backend | **Released** (`sprint-01`) |
 | 2 | The React shell runs and the design system (colour extraction, typography, glass) is defined | 2026-11-02 → 2026-11-13 | Sprint 02 — Design System | Planned |
 | 3 | The signature entry experience exists: immersive splash, glass menu, first uploads | 2026-11-16 → 2026-11-27 | Sprint 03 — Splash & Workshop | Planned |
 | 4 | Dumps can be curated end to end (upload, order, colour, publish) with CI guarding merges | 2026-11-30 → 2026-12-11 | Sprint 04 — Workshop & CI | Planned |
@@ -78,7 +78,7 @@ A story is `Done` only when `DEFINITION-OF-DONE.md` is fully checked with eviden
 | Sprint | Committed (pts) | Delivered (pts) | Velocity | Notes |
 | --- | --- | --- | --- | --- |
 | 0 | — | — | — | Bootstrap |
-| 1 | TBD | TBD | TBD | |
+| 1 | 34 | 34 | 34 | 9/9 stories; 280 backend tests, suite 45 s; security audit found no Critical/High. One unplanned fix landed before the release (SEC-03, jackson-core DoS, PR #70) and is not counted in the committed points. |
 
 ## Escalation
 

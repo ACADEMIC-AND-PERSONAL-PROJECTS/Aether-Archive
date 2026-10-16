@@ -26,9 +26,12 @@ A story is `Done` only when the Definition of Done (`DEFINITION-OF-DONE.md`) is 
 | **E3** | Immersive Splash & Glass Menu | S3 | 5 | 18 | The signature entry experience: full-bleed random photo + glass menu. |
 | **E4** | Curator's Workshop | S3–S4 | 5 | 28 | Upload, order and publish a 6-photo dump with its aura colour. |
 | **E5** | The Time River | S5 | 4 | 21 | The chronological feed with ambient per-dump background. |
-| **E6** | Quality, Delivery & Release | S4–S6 | 12 | 47 | CI, accessibility, hardening, containerization, documentation and the v1.0 release. |
+| **E6** | Quality, Delivery & Release | S4–S6 | 16 | 55 | CI, accessibility, hardening, containerization, documentation and the v1.0 release. |
 
-**Total: 43 stories · 181 points · 6 sprints (~2 weeks each, 25–34 points per sprint).**
+**Total: 47 stories · 189 points · 6 sprints (~2 weeks each, 25–34 points per sprint).**
+
+> E6-S13…S16 were added after Sprint 1 from the release security audit (`reports/security-audit-sprint01.md`);
+> E6-S15 is `Done` because the reachable finding (SEC-03) was fixed before that sprint closed, in PR #70.
 
 ```text
 Sprint 1  E1  Foundation & Backend              (34)
@@ -53,10 +56,10 @@ serves images and exposes the `/api/v1` contract from `_docs/openapi.yml` — fu
 | E1-S3 | PostgreSQL persistence + Flyway baseline | p0 | 5 | 1 | Done |
 | E1-S4 | StorageService — safe local file storage | p0 | 5 | 1 | Done |
 | E1-S5 | Serve images at `/images/**` | p0 | 2 | 2 | Todo |
-| E1-S6 | Photo API — upload, list, random | p0 | 5 | 1 | Todo |
-| E1-S7 | Dump API — create and list 6-photo dumps | p0 | 5 | 1 | Todo |
+| E1-S6 | Photo API — upload, list, random | p0 | 5 | 1 | Done |
+| E1-S7 | Dump API — create and list 6-photo dumps | p0 | 5 | 1 | Done |
 | E1-S8 | Error handling (RFC 9457) & validation | p0 | 2 | 1 | Todo |
-| E1-S9 | Backend test suite | p0 | 5 | 1 | Todo |
+| E1-S9 | Backend test suite | p0 | 5 | 1 | Done |
 | E1-S10 | Dev seed script & curl smoke collection | p2 | 2 | 2 | Todo |
 | E1-S11 | Dev PostgreSQL via Docker Compose | p0 | 2 | 1 | Done |
 
@@ -442,6 +445,10 @@ delivery, documentation, and a clean v1.0.
 | E6-S10 | v1.0 release | p0 | 3 | 6 | Todo |
 | E6-S11 | Container images (`api`, `web`) | p0 | 3 | 6 | Todo |
 | E6-S12 | One-command stack & clean-clone verification | p0 | 5 | 6 | Todo |
+| E6-S13 | Cross-site write protection (Sprint 1 audit SEC-01) | p1 | 2 | — | Todo |
+| E6-S14 | Framework end-of-life decision & migration plan (audit SEC-02) | p1 | 2 | — | Todo |
+| E6-S15 | Dependency patch level from the Sprint 1 audit (SEC-03) | p1 | 1 | 1 | Done |
+| E6-S16 | Low-severity hardening from the Sprint 1 audit (SEC-04…10) | p2 | 3 | — | Todo |
 
 ### E6-S1 — CI on every PR · 5 pts | p0
 
