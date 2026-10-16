@@ -50,7 +50,8 @@ Write `reports/verify-<branch>-<YYYYMMDD>.md` and return a short summary:
 
 ## Rules
 
-- Evidence or it did not happen: every PASS needs the command and an output tail.
+- Evidence or it did not happen: every PASS needs the command and an output tail — report numbers are
+  pasted from that output, never retyped (Sprint 2's retrospective, change 1).
 - **Attack the assumptions, not only the acceptance criteria.** For every claim of the form "this framework
   does X" or "the browser supports Y", execute it and report what actually happened. Sprint 1's significant
   defects were all unexecuted beliefs (an exception hierarchy, a default multipart limit, a symlink behaviour,

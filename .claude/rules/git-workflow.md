@@ -45,6 +45,11 @@ main      ← released, protected, PR-only, tag sprint-NN at each sprint end
   splits a *branch* past ~500 changed lines, `DEFINITION-OF-DONE.md` and the `open-pr` skill want a story *PR*
   ideally under ~400. Sprint 1 averaged ~1,300 *total* because nobody separated them, so both readings looked
   hopeless at once.
+- **Numbers are pasted from the producing command — or re-measured at the branch tip** (Sprint 2's
+  retrospective, change 1). A count, size or ledger in a PR body, report or README is copied from the
+  command output that produced it, and any number written before the last commit is re-measured after it.
+  Sprint 2 shipped three stale-or-miscounted numbers; all three surfaced as review findings, and the
+  reviewer re-measures the stated numbers by default (`.claude/agents/code-reviewer.md`).
 - **The atomic-story exception.** A story that cannot be sliced without failing one of its own acceptance
   criteria is not cut into artificial stories: it stays on one branch and is split into *production / tests /
   docs* commits that the review takes in turn (`retrospectives/sprint01.md`, change 2). The PR claims the

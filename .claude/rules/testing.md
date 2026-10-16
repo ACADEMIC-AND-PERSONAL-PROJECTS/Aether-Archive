@@ -5,6 +5,22 @@
 Every acceptance criterion of a story is either covered by an automated test or explicitly listed as
 manually verified in the PR (with the command or the device used). Untested behaviour is unfinished work.
 
+## Path guards
+
+- Code that compares filesystem paths (traversal checks, sandboxing, static serving) is tested with the
+  adversarial matrix: trailing and doubled slashes, `/.` and `..` segments, symlinks — including a
+  **directory** symlink and a **link as the leaf itself** — and environment variants (the data dir with and
+  without a trailing separator). E1-S10's first-cut guard was a string comparison that `//`, `/.`, `..` and
+  symlinks walked straight through (Sprint 2's retrospective, change 2).
+- **Run the matrix per call site, not per project.** The matrix has two kinds of cell: the ones the guard
+  must refuse, and the ones a call site accepts deliberately. A write site accepts a leaf that is a link —
+  its write replaces the link rather than following it — but the same cell at a *serving* site is a
+  traversal. So the cells a guard refuses and the cells it accepts are both pinned by tests, with the reason
+  for each accepted cell written beside it (`.claude/rules/security.md`). **This is the target, not the
+  current state**: a shipped guard whose accepted cell has no test (the write site's leaf link is one today,
+  tracked in E6-S17) gets that test with the next change to that guard, and until then the gap is named here
+  rather than assumed closed.
+
 ## Backend (Java / Spring Boot)
 
 - Frameworks: JUnit 5, Spring Boot Test, MockMvc, AssertJ. No network, no remote service dependencies —
