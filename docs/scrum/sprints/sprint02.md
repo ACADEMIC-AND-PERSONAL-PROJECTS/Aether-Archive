@@ -24,7 +24,7 @@
 | 4 | E2-S3 | Global CSS foundation | 3 | p0 | Done | #84 |
 | 5 | E2-S4 | Dominant-colour extraction algorithm | 8 | p0 | Done | #86 |
 | 6 | E2-S5 | Fontsource typography system | 3 | p0 | Done | #88 |
-| 7 | E2-S6 | Dark Glassmorphism theme layer & GlassPanel | 5 | p0 | Todo | — |
+| 7 | E2-S6 | Dark Glassmorphism theme layer & GlassPanel | 5 | p0 | Done | #90 |
 | 8 | E1-S10 | Dev seed script & curl smoke collection | 2 | p2 | Todo | — |
 
 **Total: 8 stories · 33 points** (the row above the eight is a chore, not a story). The order is mostly
@@ -181,3 +181,13 @@ reader can check it afterwards:
   counter-experiments reshaped the docs: the entry-chunk hash moves once versus E2-S4 (renamed lazy
   chunks) while its size holds at 283.41 kB, and `@theme static` is byte-identical to the default on the
   pinned Tailwind 4.3.3 — recorded as intent, not as a fix. The merge is `eae5f2d`.
+- 2026-10-16 — **E2-S6's review: APPROVE WITH NOTES — the two code notes fixed in `c0f6573` /
+  `aee1812` (the third, `Closes #25`, applied to the PR body).** The reviewer rebuilt the branch
+  byte-for-byte (the probed assets `cmp`-identical), re-measured the contrast pairs at full precision
+  (15.787 / 15.012 / 16.201 / 6.398 / 8.462 → the published 15.79 / 15.01 / 16.20 / 6.40 / 8.46;
+  byte-rounding 16.165 → the documented 16.17) and brute-forced the by-construction guarantee over
+  ~136k palettes without a failure. The notes: the accent band-edge comment claimed ≈ 15–17:1 where
+  the measured worst is 5.93:1, and the drift guard read the first regex match anywhere in
+  `global.css` — now `:root`-scoped. The atomic-story claim — **1,366 total / 1,366 hand-written**,
+  nothing generated — was re-checked against the diff and sustained; gates on the merge tip:
+  136/136 tests. The merge is `aa7a96a`.
