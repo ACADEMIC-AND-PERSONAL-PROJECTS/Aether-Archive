@@ -580,7 +580,7 @@ and the measurements come from a probe test over the shipped modules.
    tone (L = 0.12), 0.55 at the brightest (L = 0.95). §2.1 names the bonus without its curve; this
    curve stays within [0.55, 1] and so never outvotes a difference in mass.
 3. **Near-black/near-white are §2.1's lightness bounds, exactly**: `L < 0.12` and `L > 0.95` in
-   OKLab. A tone inside a bound is kept by design — a test pins `#08080a` (L ≈ 0.134) as kept.
+   OKLab. A tone inside a bound is kept by design — a test pins `#08080a` (L ≈ 0.135) as kept.
 4. **Adaptivity.** Without an explicit `k`, the pipeline starts at k = 8 and retries twice (k = 10,
    then 12, never above the pixel count) when filters and merges leave fewer than five colours.
    Degenerate inputs — a solid bitmap, one hue, a fully transparent image — return their few real
@@ -598,7 +598,7 @@ the scored palette only, as recorded on issue #23. Changing the default algorith
 later is a new ADR, not a silent edit.
 
 **Evidence.** `reports/verify-e2-s4-20261016.md` — environment probe, the 44-test colour suite
-(99 repo-wide), the timing/quality JSON, and the Chromium probe JSON.
+(100 repo-wide), the timing/quality JSON, and the Chromium probe JSON.
 
 ---
 
