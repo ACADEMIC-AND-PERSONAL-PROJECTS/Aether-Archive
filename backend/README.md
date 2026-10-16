@@ -151,14 +151,14 @@ AETHER_DATA_DIR=/tmp/aether-dev scripts/dev/smoke.sh
   `scripts/dev/sample-photos.py`, standard library only, no image dependency — cycling the four
   categories, then publishes one dump whose six photos are evenly spaced over the batch.
   `--count` (default 12, minimum 6), `--base-url` (default `http://localhost:8080`).
-- `scripts/dev/smoke.sh` covers **every endpoint including failure paths**: the reads, the six
-  upload refusals (missing file part; missing, invalid or file-part `category`; empty and
-  non-image bytes; a declared type contradicting the bytes; a JSON content type), the dump
-  refusals (malformed JSON, a colour that is not `#RRGGBB`, five ids, a repeated id, unknown
-  ids), the 404 / 405 cases, and a full write round-trip — its own six uploads, a dump of
-  them, the read-back and the stored image's bytes compared with the file that was sent. Every
-  check asserts the status, the machine-readable `code` and the problem media type; any failed
-  check exits non-zero.
+- `scripts/dev/smoke.sh` covers **every endpoint including failure paths**: the reads, the
+  nine upload refusals (missing file part; a missing, invalid or file-part `category`; text
+  bytes declared `text/plain` and declared `image/png`; an empty file; a declared type
+  contradicting the bytes; a JSON content type), the five dump refusals (malformed JSON, a
+  colour that is not `#RRGGBB`, five ids, a repeated id, unknown ids), the 404 / 405 cases,
+  and a full write round-trip — its own six uploads, a dump of them, the read-back and the
+  stored image's bytes compared with the file that was sent. Every check asserts the status,
+  the machine-readable `code` and the problem media type; any failed check exits non-zero.
 - **`AETHER_DATA_DIR` is honoured, and the real archive is guarded.** Both scripts compute the
   effective data directory as `${AETHER_DATA_DIR:-$HOME/AetherArchive_Data}` — the same
   semantics the backend binds — and refuse to run against `~/AetherArchive_Data` unless
