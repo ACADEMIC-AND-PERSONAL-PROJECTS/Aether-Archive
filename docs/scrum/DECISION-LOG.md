@@ -23,6 +23,8 @@ Statuses: `Proposed` · `Accepted` · `Superseded by ADR-NNN` · `Rejected`.
 | [ADR-011](#adr-011--api-contract-clarifications-for-sprint-1) | 2026-10-15 | API contract clarifications for Sprint 1 | Accepted |
 | [ADR-012](#adr-012--storage-and-cors-constraints) | 2026-10-15 | Storage and CORS constraints | Accepted |
 | [ADR-013](#adr-013--the-error-vocabulary-is-a-declared-part-of-the-contract) | 2026-10-15 | The error vocabulary is a declared part of the contract | Accepted |
+| [ADR-014](#adr-014--tailwind-css-v4-configured-css-first) | 2026-10-16 | Tailwind CSS v4, configured CSS-first | Accepted |
+| [ADR-015](#adr-015--typescript-603-while-the-lint-stack-cannot-parse-7) | 2026-10-16 | TypeScript 6.0.3 while the lint stack cannot parse 7 | Accepted |
 
 ---
 
@@ -369,6 +371,82 @@ apart and has nothing different to do about either; the framework's own message 
 row, so it is logged for the operator and never answered. It is the vocabulary's first code of its status;
 should a future conflict ever demand a different answer from the client, it gets its own code and its own
 amendment rather than a widened meaning for this one.
+
+---
+
+## ADR-014 — Tailwind CSS v4, configured CSS-first
+
+**Date**: 2026-10-16 · **Status**: Accepted
+
+**Context.** The stack table mandates "Tailwind CSS" without a version ([`CLAUDE.md`](../../CLAUDE.md) §2),
+and the Sprint 2 plan names the gap: v3's `tailwind.config.js` and v4's CSS-first `@theme` decide how
+E2-S3, E2-S5 and E2-S6 write every style, so an implicit choice inside a config file would make four
+stories guess (`docs/scrum/sprints/sprint02.md`, Risks). The design system constrains the answer: all
+colour is read from CSS custom properties applied at runtime (`--aura-*`, DESIGN-SYSTEM §2.2), typography
+from `--font-*` (§4.3), and "a hex literal outside the theme layer is a review blocker" (§2.2). Two facts
+were measured, not assumed: `tailwindcss@4.3.3` is current and `@tailwindcss/vite@4.3.3` declares
+`peerDependencies: { vite: "^5.2.0 || ^6 || ^7 || ^8" }`, so the plugin fits the Vite 8.3.4 the same story
+pins; and the built page emits 6.11 kB of CSS (2.00 kB gzip) for the placeholder, i.e. the plugin only
+ships what is used.
+
+**Decision.** Tailwind **v4.3.3** as a **CSS-first** install: the `@tailwindcss/vite` plugin in
+`frontend/vite.config.ts`, `@import "tailwindcss";` at the top of `frontend/src/styles/global.css`, and
+**no `tailwind.config.js` anywhere in the repository**. Design tokens are declared in CSS:
+
+- Colour and type values that change at runtime stay plain CSS custom properties on `:root`
+  (`--aura-bg`, `--aura-text`, `--font-display`, …), because the River rewrites them per view
+  (DESIGN-SYSTEM §2.3) and a theme variable declared inside `@theme` is not meant to be rewritten.
+- Tailwind utilities are generated for them through `@theme inline { --color-aura-bg: var(--aura-bg); … }`,
+  which is the v4 pattern for a token whose value is itself a variable. This is the shape E2-S3 follows for
+  the `--aura-*` set and E2-S5 for `--font-*`; the exact token names and the namespace mapping are E2-S3's
+  to fix, and it may supersede this ADR if the runtime-theming requirement is better met another way.
+
+**Consequences.** To add a utility one declares a theme variable — no JS config file exists to edit, and a
+token invented inside a component is a review failure by construction. `@theme` must stay top-level (not
+nested in a selector or media query), and only *used* theme variables reach the bundle unless a block is
+marked `@theme static`. Two questions this ADR deliberately leaves open for E2-S3: whether to wipe
+Tailwind's default palette (`@theme { --color-*: initial; }`) so a raw palette colour like `bg-red-500`
+cannot compile at all, and whether to add `prettier-plugin-tailwindcss` for class sorting (a dependency
+needs a story that asks for it). The scaffold's placeholder in `src/app/App.tsx` uses default palette
+utilities precisely because the token layer does not exist yet; E2-S3 replaces them.
+
+**Evidence (E2-S1).** `npm run build` → `dist/assets/index-*.css 6.11 kB │ gzip: 2.00 kB`; `npm run lint`,
+`npm run test` (2 tests) and `tsc -b` green with the v4 setup in place.
+
+---
+
+## ADR-015 — TypeScript 6.0.3 while the lint stack cannot parse 7
+
+**Date**: 2026-10-16 · **Status**: Accepted
+
+**Context.** E2-S1 requires linting with unused-import and import-order rules, which in this repository
+means `typescript-eslint` (no v9 line is published; `8.71.2` is `latest`). The registry's `typescript`
+`latest` is **7.0.2**, but `typescript-eslint@8.71.2`, `@typescript-eslint/parser@8.71.2` and
+`@typescript-eslint/utils@8.71.2` all declare `peerDependencies: { typescript: ">=4.8.4 <6.1.0" }`.
+Measured, not reasoned — a clean install of the pair fails:
+
+```text
+$ npm install --dry-run typescript@7.0.2 typescript-eslint@8.71.2 eslint@10.12.0
+npm error code ERESOLVE
+npm error While resolving: probe@0.0.0
+npm error Found: typescript@7.0.2
+npm error Could not resolve dependency:
+npm error peer typescript@">=4.8.4 <6.1.0" from typescript-eslint@8.71.2
+```
+
+`--legacy-peer-deps` would install a combination the linter does not support, and the security rules put
+dependency discipline above convenience.
+
+**Decision.** Pin **TypeScript 6.0.3** — the newest stable version inside the peer range — and keep the
+lint stack. Every other package in the story is at its current major (Vite 8.3.4, React 19.3.1, Vitest
+5.0.5, ESLint 10.12.0, jsdom 30.1.3).
+
+**Consequences.** The strict flags the story requires are available and proven to bite on this version
+(`noUncheckedIndexedAccess` → `TS18048: 'first' is possibly 'undefined'`; `exactOptionalPropertyTypes` →
+`TS2375`), so nothing the project needs is missing today. Upgrading to TypeScript 7 means waiting for a
+`typescript-eslint` release whose peer range accepts it, then a one-line version bump plus a fresh
+`npm run lint` / `tsc -b` / `npm run test` / `npm run build` — a story that does it records that evidence,
+and does not silently use `--legacy-peer-deps`.
 
 ---
 
