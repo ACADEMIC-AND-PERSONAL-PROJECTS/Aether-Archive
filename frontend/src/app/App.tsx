@@ -1,17 +1,39 @@
+import { lazy, Suspense } from "react";
+import { Route, Routes } from "react-router";
+
+import { RouteFallback } from "./RouteFallback";
+
 /**
- * Placeholder view — E2-S2 replaces it with the real shell (router, providers, views).
- * Its only job is to prove the toolchain renders end to end.
+ * The route table — the whole of the app's structure, and the only place a URL becomes a view.
  *
- * The colour utilities below are scaffold placeholders from Tailwind's default
- * palette; E2-S3 introduces `--aura-text` / `--aura-muted` and they go away.
+ * Three routes, one per view of the product: `/` is the splash, `/river` the feed, `/curate` the
+ * workshop. Each is a `React.lazy` chunk, so opening the splash does not download the workshop; the
+ * shared chunk holds React, the router and the query cache. The named-export form is used because the
+ * views export named components, which is the convention everywhere else in this codebase.
+ *
+ * `App` deliberately does **not** contain the router. `BrowserRouter` is mounted in `main.tsx`, so a
+ * test can render this same component under a `MemoryRouter` at any URL — the route smoke test does
+ * exactly that (`App.test.tsx`).
  */
+const SplashView = lazy(() =>
+  import("../features/splash/SplashView").then((module) => ({ default: module.SplashView })),
+);
+const RiverView = lazy(() =>
+  import("../features/river/RiverView").then((module) => ({ default: module.RiverView })),
+);
+const WorkshopView = lazy(() =>
+  import("../features/workshop/WorkshopView").then((module) => ({ default: module.WorkshopView })),
+);
+
+/** The views, rendered from the current URL. Wrap in a router; supply the query cache with `AppProviders`. */
 export function App() {
   return (
-    <main className="grid min-h-dvh place-items-center p-8 text-center">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-normal tracking-tight text-neutral-200">Aether Archive</h1>
-        <p className="text-sm text-neutral-400">Toolchain online — the shell arrives in E2-S2.</p>
-      </div>
-    </main>
+    <Suspense fallback={<RouteFallback />}>
+      <Routes>
+        <Route path="/" element={<SplashView />} />
+        <Route path="/river" element={<RiverView />} />
+        <Route path="/curate" element={<WorkshopView />} />
+      </Routes>
+    </Suspense>
   );
 }
