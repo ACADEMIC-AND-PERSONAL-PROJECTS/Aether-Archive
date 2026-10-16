@@ -16,6 +16,11 @@ manually verified in the PR (with the command or the device used). Untested beha
   - **Integration** — `@SpringBootTest` + PostgreSQL via Testcontainers (same image tag as dev) for
     persistence and the full HTTP path of critical flows (create dump, upload photo).
 - Naming: `should_<expectedBehaviour>_when_<condition>`.
+- **A test of a hostile URL must use a path-faithful client.** `TestRestTemplate` normalises the path before
+  sending it, so traversal strings arrive as something other than what the test wrote — in E1-S5 the same
+  inputs Tomcat answers `400` to came back `404` through it, i.e. the test would have asserted nothing about
+  the case it named. Use a client that sends the request line as written (`java.net.http.HttpClient` with
+  `--path-as-is` semantics), or state that the case is covered by a probe instead.
 - Deterministic: no sleeps, no time-dependent assertions (inject a `Clock`), no random without a seed.
 - Test data builders live in `backend/src/test/java/.../support/`; never reuse production fixtures.
 

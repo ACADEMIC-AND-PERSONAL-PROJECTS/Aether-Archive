@@ -26,9 +26,9 @@ A story is `Done` only when the Definition of Done (`DEFINITION-OF-DONE.md`) is 
 | **E3** | Immersive Splash & Glass Menu | S3 | 5 | 18 | The signature entry experience: full-bleed random photo + glass menu. |
 | **E4** | Curator's Workshop | S3–S4 | 5 | 28 | Upload, order and publish a 6-photo dump with its aura colour. |
 | **E5** | The Time River | S5 | 4 | 21 | The chronological feed with ambient per-dump background. |
-| **E6** | Quality, Delivery & Release | S4–S6 | 16 | 55 | CI, accessibility, hardening, containerization, documentation and the v1.0 release. |
+| **E6** | Quality, Delivery & Release | S4–S6 | 17 | 57 | CI, accessibility, hardening, containerization, documentation and the v1.0 release. |
 
-**Total: 47 stories · 189 points · 6 sprints (~2 weeks each, 25–34 points per sprint).**
+**Total: 48 stories · 191 points · 6 sprints (~2 weeks each, 25–34 points per sprint).**
 
 > E6-S13…S16 were added after Sprint 1 from the release security audit (`reports/security-audit-sprint01.md`).
 > They are **not** Sprint 1 stories and are not counted in its velocity: E6-S15 is `Done` because the reachable
@@ -36,6 +36,10 @@ A story is `Done` only when the Definition of Done (`DEFINITION-OF-DONE.md`) is 
 > planning. **Sprint 2 planning has since decided they stay unassigned** (they are E6-S13/E6-S14 and
 > do not enter that sprint implicitly), so the sprint map still sums to 181. The 8 points are unscheduled
 > work awaiting a deliberate decision, not a backlog error.
+>
+> **E6-S17** (2 pts) was added during Sprint 2 from E1-S5's static-serving probes — two behaviours no request
+> can reach but that a file placed by hand can widen, so they were routed rather than patched inside E1-S5.
+> It is unscheduled like the rest of E6-S13…S17.
 
 ```text
 Sprint 1  E1  Foundation & Backend              (34)
@@ -432,6 +436,9 @@ opens on tap, feels tactile, and gets out of the way.
 - [ ] No cumulative layout shift on a 390 px viewport (measured, number reported).
 - [ ] First viewport budget respected (LCP < 1.5 s over LAN reported in the PR).
 - [ ] Fallback for broken images without breaking layout.
+- [ ] The thumbnail URL space is decided and mapped before anything is served from it: E1-S5 maps
+      `images/` alone, so `/images/thumbnails/**` resolves *inside* the originals directory today. Whoever
+      generates derivatives names their own directory and adds its mapping rather than widening E1-S5's.
 
 ### E5-S4 — Virtualisation decision & implementation · 3 pts | p1
 
@@ -467,6 +474,7 @@ delivery, documentation, and a clean v1.0.
 | E6-S14 | Framework end-of-life decision & migration plan (audit SEC-02, issue #72) | p1 | 2 | — | Todo |
 | E6-S15 | Dependency patch level from the Sprint 1 audit (SEC-03, PR #70) | p1 | 1 | — | Done |
 | E6-S16 | Low-severity hardening from the Sprint 1 audit (SEC-04…10, issue #73) | p2 | 3 | — | Todo |
+| E6-S17 | Static-serving hardening found by E1-S5's probes (issue #79) | p2 | 2 | — | Todo |
 
 ### E6-S1 — CI on every PR · 5 pts | p0
 
@@ -557,6 +565,31 @@ delivery, documentation, and a clean v1.0.
 - [ ] From a clean clone: `cp .env.example .env && docker compose up` serves the app to the phone (evidence in the PR).
 - [ ] Backup/restore scripts (E6-S7) verified against the containerized stack.
 - [ ] `docs/engineering/DEPLOYMENT.md` moved from TARGET to shipped reality; README updated.
+
+### E6-S17 — Static-serving hardening found by E1-S5's probes · 2 pts | p2
+
+*As the owner, I want `/images/**` to serve only what the archive wrote, so that a file placed by hand cannot
+widen what the URL space exposes.*
+
+Found by E1-S5's hostile-path battery (its report), not by a request: both need an actor who can already write
+into `data-dir/images/`, which is why they are hardening rather than a defect, and why they were routed to a
+story instead of patched inside E1-S5.
+
+- [ ] **Symlinks inside `images/` are followed, including out of the data directory.** A link to a file
+      outside answers 200 with that file's bytes; Spring's containment check is textual (URL prefix), so a
+      link that resolves elsewhere passes it. Decide and record (ADR) whether serving re-checks
+      `Path.toRealPath()` under `data-dir/images` — the hook is a `PathResourceResolver` subclass on
+      `setResourceChain(true)` — or whether the guarantee is "the write path never creates a link", which is
+      already true (ADR-012).
+- [ ] **A hand-placed file whose extension the archive never writes is served under the platform's media type**
+      — `.html` as `text/html`, `.svg` as `image/svg+xml`, probe evidence in E1-S5's report — and
+      `nosniff` does not stop a browser rendering those. Deciding means choosing between the current
+      behaviour (documented), `application/octet-stream`, and `Content-Disposition: attachment` for names
+      outside the upload whitelist.
+- [ ] **Tomcat's own 400 refusals are HTML and carry no `nosniff`** (the traversal strings that never reach
+      Spring). An error-page mapping to `problem+json` would close the shape mismatch; decide whether it is
+      worth it or whether the 400 is acceptable as-is.
+- [ ] Re-run E1-S5's path battery afterwards and record the statuses that changed.
 
 ---
 
