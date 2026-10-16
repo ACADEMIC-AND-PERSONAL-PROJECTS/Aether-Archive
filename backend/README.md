@@ -162,6 +162,51 @@ Flyway's: `src/main/resources/db/migration/V*.sql` is applied at startup, and Hi
 `ddl-auto=validate` — it refuses to map an entity to a table that is not there, but it never creates or
 changes one. A new table or column means a new migration file, not an annotation change.
 
+## API
+
+Everything lives under `/api/v1` and answers JSON. The photo endpoints (E1-S6):
+
+| Method | Path | Answers |
+| --- | --- | --- |
+| `POST` | `/api/v1/photos` | `201` with the created photo; the body is `multipart/form-data` |
+| `GET` | `/api/v1/photos` | the feed: every photo, newest first |
+| `GET` | `/api/v1/photos/random` | one photo, or `404` with the `empty-archive` code when the archive holds none |
+
+The upload takes two parts: `file`, the image itself, and `category`, one of `pics`, `anime`, `dump`,
+`uncategorized` — lowercase, exactly as `_docs/openapi.yml` spells them (ADR-011). An accepted upload is
+recorded *unassigned*: the photo belongs to no archive item and has no display order until a later story
+curates it. A photo is answered as:
+
+```json
+{
+  "id": "0b40e720-3a1f-4ce0-a21c-d163454cfd94",
+  "url": "/images/0b40e720-3a1f-4ce0-a21c-d163454cfd94.png",
+  "category": "pics",
+  "uploadedAt": "2026-10-16T00:03:15.578182Z"
+}
+```
+
+`url` is relative to the API host and names the file's generated UUID under the data directory's
+`images/` folder — it is not a filesystem location and not an external address. Serving it is E1-S5
+(Sprint 2): until that resource handler lands the archive knows the name, and no endpoint serves the
+bytes. `uploadedAt` is the row's `created_at` in UTC, at the precision PostgreSQL keeps (microseconds);
+the feed and the `201` that created a photo therefore name the same instant.
+
+What an upload can answer besides the `201`:
+
+| Status | `code` | When |
+| --- | --- | --- |
+| `400` | `validation-failure` | `category` is absent, blank or not one of the four values; `errors` names the field |
+| `400` | `missing-request-part` | the request carries no `file` part |
+| `400` | `invalid-parameter` | the field arrived as a file part, as `curl -F "category=@values.txt"` posts it |
+| `413` | `upload-too-large` | the upload is over `AETHER_MAX_UPLOAD_MB`, at either ceiling |
+| `415` | `unsupported-image-type` | the bytes are not an accepted image, or the declared type contradicts them |
+
+The feed is ordered `created_at DESC, id DESC`: the id is the stability the instants alone cannot give,
+because two uploads can share one. `GET /photos/random` picks with `order by random()` over the whole
+table — a single owner curates one archive, so the cost of that scan is not worth the machinery of a
+better method.
+
 ## Uploads
 
 `StorageService.store(MultipartFile)` is the only way bytes reach the disk, and it trusts nothing about
@@ -249,10 +294,11 @@ message; `detail` is one sentence, taken from the domain exception when it has o
 | `upload-too-large` | 413 | an upload over `AETHER_MAX_UPLOAD_MB`, refused by the service or the container's ceiling |
 | `storage-failure` | 500 | the storage layer failed: an unreadable upload, an unusable data directory, a refused path |
 | `validation-failure` | 400 | a body or a method call failed its Jakarta Validation constraints; the fields are listed |
-| `invalid-parameter` | 400 | a path variable or query parameter does not parse as the type the endpoint declares |
+| `invalid-parameter` | 400 | a path variable or request parameter does not parse as the type the endpoint declares, or a field arrived as a file part |
 | `malformed-request` | 400 | the body is not JSON this endpoint can read, or a request declared multipart cannot be read as one |
 | `missing-request-part` | 400 | a multipart request arrived without a part the endpoint requires |
 | `not-found` | 404 | neither a controller nor a static resource serves the path |
+| `empty-archive` | 404 | `/photos/random` found no photo: the archive holds none yet, which the frontend shows as an empty state |
 | `internal-failure` | 500 | a bug: no handler above claimed the exception |
 
 The table is the archive's own vocabulary (ADR-013). A refusal Spring raises before a controller runs
