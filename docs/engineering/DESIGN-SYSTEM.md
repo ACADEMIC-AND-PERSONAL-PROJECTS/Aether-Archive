@@ -140,8 +140,10 @@ import "./styles/global.css";
 ### 4.3 Variables in the global stylesheet
 
 ```css
-/* The families are declared once, in the theme layer — `static` so both variables are always
-   emitted to :root, and so `font-display` / `font-ui` compile from the same declaration. */
+/* The families are declared once, in the theme layer, so the utilities compile from the same
+   declaration; `static` records that these values are fixed (emission is unconditional by
+   construction — with the pinned Tailwind the output is identical either way, measured in the
+   E2-S5 review). */
 @theme static {
   --font-display: "Playfair Display", Georgia, "Times New Roman", serif;
   --font-ui: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;

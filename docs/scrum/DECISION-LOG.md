@@ -630,14 +630,17 @@ report).
    static alternative (Inter latin faces) costs 109,916 B for two weights and 164,844 B for three,
    in as many files.
 4. **Measured payload, shipped**: 148,160 B (148.2 kB) of font assets in `dist/` — 74% of the
-   budget; the stylesheet grew 480 B (8,697 → 9,177 B) with the faces and the two utilities; the
-   entry chunk (283.41 kB) is unchanged. Rejected readings: §4.2-literal all-subsets = 453,384 B
+   budget; the stylesheet grew 480 B (8,697 → 9,177 B) — the three `@font-face` rules, the
+   `.font-display` utility, the theme variables and the `body` declarations; the entry chunk keeps
+   its 283.41 kB (its hash moves once versus E2-S4 with the renamed lazy chunks). Rejected
+   readings: §4.2-literal all-subsets = 453,384 B
    (453.4 kB); variable Inter all-subsets + Playfair latin = 318,416 B (318.4 kB); all-static latin
    = 209,820 B (209.8 kB — over budget read either as 200 kB or 200 KiB).
 5. **Wiring.** The families are declared once in `@theme static` in `global.css` — values are
-   static, so they live in the theme layer where `font-display` / `font-ui` compile from the same
-   declaration, and `static` guarantees the variables are emitted to `:root` for raw CSS. `body`
-   reads `var(--font-ui)` + `--tracking-ui`; the three placeholder `h1`s carry `font-display`. No
+   static, so they live in the theme layer where the utilities compile from the same declaration;
+   `static` makes emission unconditional by construction (measured in review: byte-identical
+   output with and without the keyword on the pinned Tailwind — it stays as intent). `body` reads
+   `var(--font-ui)` + `--tracking-ui`; the three placeholder `h1`s carry `font-display`. No
    component declares a raw `font-family`.
 6. **Probe-verified on the built app** (offline Chromium, `--dump-dom`): the `h1` computes
    `"Playfair Display", Georgia, "Times New Roman", serif` at weight 400 with −0.015em tracking;

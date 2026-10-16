@@ -80,10 +80,12 @@
  * components read it as `var(--aura-hairline)` (DESIGN-SYSTEM §2.2). */
 
 /*
- * The two faces (ADR-019). Static values — nothing rewrites them at runtime — and `static`
- * so both variables are always emitted: the `body` rule in block 5 reads `var(--font-ui)` as
- * raw CSS, which would not register as a use. `font-display` / `font-ui` are the utilities
- * components write; both resolve to these variables (DESIGN-SYSTEM §4.3).
+ * The two faces (ADR-019), declared in the theme layer so the utilities compile from the same
+ * source the variables do (DESIGN-SYSTEM §4.3). Static values: unlike the palette they are
+ * never rewritten at runtime, and `static` makes their emission unconditional by construction.
+ * With the pinned Tailwind and today's rules the output is byte-identical without the keyword
+ * (measured in the E2-S5 review) — it stays as intent, not as a fix. Components write
+ * `font-display` today; `font-ui` backs the body default in block 5.
  */
 @theme static {
   --font-display: "Playfair Display", Georgia, "Times New Roman", serif;
