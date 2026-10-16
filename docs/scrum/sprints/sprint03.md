@@ -1,15 +1,16 @@
 # Sprint 03 — The signature entry experience exists: immersive splash, glass menu, first uploads
 
 - **Dates**: 2026-10-16 → 2026-10-30 (UTC). The playbook row had carried an indicative
-  2026-11-16 → 2026-11-27 window — set at Sprint 2 planning, whose note said later rows are indicative and
-  are re-planned at their own planning. This is that planning: the sprint opens the day Sprint 2 closed and
-  the row, the milestone's `due_on` and this file now carry the real window.
+  2026-11-16 → 2026-11-27 window — carried since 2026-10-15 and left indicative at Sprint 2 planning, whose
+  note said later rows are re-planned at their own planning. This is that planning: the sprint opens the
+  day Sprint 2 closed and the row, the milestone's `due_on` and this file now carry the real window.
 - **Goal**: The signature entry experience exists: immersive splash, glass menu, first uploads.
 - **Capacity**: **28 points** committed — 7 stories, inside the 25–34 band, six points below the ceiling.
   Six points is room for one small unplanned pull, not for absorbing an overrunning 5-pointer. The order of
   sacrifice is named here so it is not improvised at the end: **E4-S2** (5 pts, p0, last in the order) is
-  the first candidate to slip to Sprint 4 — it is a `p0`, so that move is confirmed with the owner rather
-  than decided here; **E3-S4** (2 pts, `p1`, the only `p1`) is second, and decided here: the entry
+  the first candidate to slip to Sprint 4 and **E3-S4** (2 pts, `p1`, the only `p1`) is second — and since
+  the playbook's escalation clause draws no p0/p1 distinction (its only automatic roll is excess `p2` at
+  planning), either slip is confirmed with the owner when it is taken, not decided here. The entry
   experience itself does not slip.
 - **Branch base**: `develop`
 - **Milestone**: `Sprint 03 — Splash & Workshop` (already holds exactly these seven issues: #26–#32)
@@ -37,11 +38,12 @@ dependency chain, with the placements worth a sentence:
   "tap anywhere opens the menu" criterion completes when **E3-S2** lands, with the integrated path tested
   in **E3-S5**; its empty-archive criterion completes with **E3-S4**.
 - **E3-S2 next** — the menu is the tap-target the splash's first criterion names, and it is self-contained:
-  glass overlay, focus trap, keyboard path. `backdrop-filter` and the glass fallback are already proven
-  (E2-S6) — reused, not re-litigated.
-- **E3-S3 third, before the remaining animation surfaces** — S1 and S2 carry hardcoded durations by their
-  criteria; E3-S3 centralises the motion tokens before the upload flows add more, and route transitions
-  span every view.
+  glass overlay, focus trap, keyboard path. `backdrop-filter` and the glass fallback were proven from the
+  shipped CSS in E2-S6 (the `@supports` branch itself is not forceable headless — E2-S6 records that
+  boundary) — reused, not re-litigated.
+- **E3-S3 third, before the remaining animation surfaces** — E3-S2 pins its own numbers by criterion
+  (fade + 12–16 px translate, 300–600 ms); E3-S3 centralises the motion tokens before the upload flows
+  add more, and route transitions span every view.
 - **E3-S4 fourth** — the quiet states are cross-cutting (loading/empty/error); they close E3-S1's
   empty-archive criterion, and the upload flows consume their feedback patterns.
 - **E3-S5 fifth** — by definition it tests the real S1–S4 code; running it earlier would test placeholders.
@@ -51,7 +53,8 @@ dependency chain, with the placements worth a sentence:
 
 ## Definition of Ready check
 
-All seven pass: each has a value statement and testable criteria, none exceeds 8 points, priorities match
+All seven pass: each has a value statement and testable criteria (the issue mirror is re-synced from the
+file at planning — see Notes), none exceeds 8 points, priorities match
 the goal, dependencies are `Done` or named in the order above, the contract exists (`/photos/random` and
 the upload path in `_docs/openapi.yml`; `docs/engineering/DESIGN-SYSTEM.md` + `.claude/rules/design-language.md`
 cover the visuals), and every story is verifiable locally (browser probes + screenshots; no external
@@ -75,15 +78,17 @@ in `.claude/` in S03-C1; the practice is checked in every story:
 
 ## Risks & assumptions
 
-- **Pull-to-refresh is a touch gesture.** The splash claims it, and the Chromium probe mechanism
-  (established in E2-S3/S6) has not driven a pull gesture yet. E3-S1 probes it; if device emulation cannot
-  produce the gesture, the criterion is proven by the manual 390 px pass that E3-S5 documents anyway.
-- **E3-S3's criterion asks for screenshots/recording, and only screenshots exist as a mechanism so far**
-  (E2-S3/S6 captures). E3-S3 probes video capture in the same Playwright/Chromium setup; if it cannot,
-  the review gets the screenshots plus an explicit note — never a silent substitution.
+- **Pull-to-refresh is a touch gesture, and nothing has driven a gesture yet.** The established probe
+  mechanism is the system Chromium CLI's `--screenshot` (E2-S1 §5; used by E2-S3/S6) — screenshots only;
+  Playwright is the documented but unused upgrade path. E3-S1 probes what can drive the gesture; if
+  nothing can, the criterion is proven by the manual 390 px pass that E3-S5 documents anyway.
+- **E3-S3's criterion asks for screenshots/recording, and only screenshots have a mechanism** (the
+  Chromium CLI's `--screenshot`; E2-S1 §5 → E2-S3/S6). Video capture is a new scripted mechanism whose
+  dependency decision — and its justification — lives in that PR, not here. If it cannot record, the
+  review gets the screenshots plus an explicit note — never a silent substitution.
 - **Axe is not in the dependency set.** E3-S5's criterion says "Axe (or equivalent)". If a checker is
-  added, it is a test-only dependency, justified in that PR like any other (the E2-S4 browser-mode
-  precedent).
+  added, it is a test-only dependency justified in that PR — the precedent is E1-S3's Testcontainers;
+  E2-S4 is the precedent for probing first and adding nothing when the system tooling covers it.
 - **The canvas is absent in jsdom (ADR-018), and E4-S2 downscales through a canvas.** The tests target the
   pure decision function; the downscale itself is browser code, verified by probe.
 - **Zero external requests remains the sprint's hard constraint** — new views, motion and the upload flows
@@ -114,7 +119,15 @@ in `.claude/` in S03-C1; the practice is checked in every story:
 - 2026-10-16 — Sprint opened. Dates re-planned from the indicative November window to
   2026-10-16 → 2026-10-30 (Sprint 2's plan said later rows are re-planned at their own planning; the owner
   opened this sprint the day Sprint 2 closed). The playbook row and the milestone `due_on` are updated.
-  The milestone already held exactly these seven issues, so no issue churn was needed.
+- 2026-10-16 — The milestone already held exactly these seven issues — but the planning fact-check found
+  the mirror was not the file: the seeder parsed only the `·` heading form and 26 backlog headings used
+  `|`, so #26 carried E3-S1…S5's criteria concatenated and #27–#32 had empty criteria — the same defect
+  reached 20 issues beyond this sprint (#33–#49, #56, #57, #79) and 8 older mirrors had drifted from their
+  sections. Fixed at planning: the 26 headings were normalised; `scripts/github/seed-backlog.py` now
+  reads both heading forms, refreshes a drifted body instead of skipping it, joins wrapped criteria, and
+  reports unscheduled stories instead of silently dropping them; the mirror was re-synced — 35 updated
+  (including 8 older drifts, e.g. E1-S5's missing SEC-N2 criterion), 9 already correct, 0 created. Spot
+  checks: #26/#27/#32/#79 re-measured against their file sections — 5/5, 5/5, 5/5, 4/4 criteria.
 - 2026-10-16 — Planning checks, executed: `/photos/random` is in the contract (E1-S6) and implemented;
   `@tanstack/react-query` is already a dependency, so E4-S1's query invalidation adds no package; the
   carried security items (#71, #72, #73, #79) are kept out by name, with the decision recorded in
