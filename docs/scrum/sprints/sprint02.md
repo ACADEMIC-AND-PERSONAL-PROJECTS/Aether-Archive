@@ -23,7 +23,7 @@
 | 3 | E2-S2 | App shell, routing & typed API client | 5 | p0 | Done | #81 |
 | 4 | E2-S3 | Global CSS foundation | 3 | p0 | Done | #84 |
 | 5 | E2-S4 | Dominant-colour extraction algorithm | 8 | p0 | Done | #86 |
-| 6 | E2-S5 | Fontsource typography system | 3 | p0 | Todo | — |
+| 6 | E2-S5 | Fontsource typography system | 3 | p0 | Done | #88 |
 | 7 | E2-S6 | Dark Glassmorphism theme layer & GlassPanel | 5 | p0 | Todo | — |
 | 8 | E1-S10 | Dev seed script & curl smoke collection | 2 | p2 | Todo | — |
 
@@ -173,3 +173,11 @@ reader can check it afterwards:
   cited boundary test real (`#08080a`, L ≈ 0.1354). The atomic-story claim — **1,828 total / 1,828
   hand-written**, nothing generated — was re-checked against the diff and sustained; final gates on the
   merge tip: 100/100 tests. The merge is `2ad0c17`.
+- 2026-10-16 — **E2-S5's review: APPROVE WITH NITS on the first pass, plain APPROVE on
+  re-verification — all three nits wording-only, fixed in `f08ddba`.** The reviewer rebuilt the branch
+  (all ten assets plus `index.html` `cmp`-identical to the shipped `dist/`), re-derived every payload
+  figure from the packages, re-ran the offline Chromium probe (h1 Playfair 400 at −0.642 px; body Inter
+  +0.16 px; three faces `loaded`; zero external requests) and re-ran the gates (100/100 tests). Two
+  counter-experiments reshaped the docs: the entry-chunk hash moves once versus E2-S4 (renamed lazy
+  chunks) while its size holds at 283.41 kB, and `@theme static` is byte-identical to the default on the
+  pinned Tailwind 4.3.3 — recorded as intent, not as a fix. The merge is `eae5f2d`.
