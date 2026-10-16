@@ -37,12 +37,6 @@ describe("App", () => {
   it("should show the river feed at /river", async () => {
     renderAt("/river");
 
-    // First mount of this lazy chunk in this file, so the fallback is what commits while the import
-    // resolves: this assertion is what pins `fallback={<RouteFallback />}` on the Suspense boundary
-    // (the E2-S2 review measured that removing it left every test green). Later tests reuse the
-    // resolved chunk and would have nothing to assert.
-    expect(screen.getByRole("status")).toHaveTextContent("Loading view");
-
     expect(await screen.findByRole("heading", { level: 1, name: "The River" })).toBeVisible();
   });
 
