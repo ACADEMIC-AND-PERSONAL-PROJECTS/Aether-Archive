@@ -103,12 +103,14 @@ describe("paletteToTheme", () => {
 });
 
 describe("FALLBACK_THEME", () => {
-  /* The stylesheet's own token block, raw (comments stripped so a mention in prose cannot
-   * satisfy the regex). This is the drift guard between theme.ts and global.css. */
-  const stylesheet = globalCss.replace(/\/\*[\s\S]*?\*\//g, "");
+  /* The stylesheet's `:root` block, raw — comments stripped so a mention in prose cannot
+   * satisfy the regex, block-scoped so a declaration anywhere else in the file cannot either.
+   * This is the drift guard between theme.ts and global.css. */
+  const rootBlock =
+    /:root\s*\{([\s\S]*?)\}/.exec(globalCss.replace(/\/\*[\s\S]*?\*\//g, ""))?.[1] ?? "";
 
   const rootValue = (property: string): string => {
-    const value = new RegExp(`${property}\\s*:\\s*([^;]+);`).exec(stylesheet)?.[1];
+    const value = new RegExp(`${property}\\s*:\\s*([^;]+);`).exec(rootBlock)?.[1];
     if (value === undefined) {
       throw new Error(`Missing ${property} in global.css`);
     }
