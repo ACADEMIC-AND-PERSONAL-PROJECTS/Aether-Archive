@@ -577,7 +577,9 @@ the first report had not: **with `images/` itself a symlink to a directory outsi
 succeeds, its write-probe is written through the link, reads follow it — and uploads are refused.** The actor
 there is an operator, not an attacker: a `cp -a`/`rsync -a`/tarball restore, or a manual link into a synced
 folder. Nothing here is reachable by a request — 46 hostile paths, a hostile client filename and encoded
-separators were all refused — so it stays hardening rather than a defect.
+separators were all refused — so it stays hardening rather than a defect. The Sprint-2 release audit
+re-confirmed exactly this classification (SEC2-01, Low, not release-blocking —
+`reports/security-audit-sprint02.md`).
 
 **Priority is `p1`, not `p2`, and not the `p0` that `.claude/rules/security.md` reserves for
 "something looks exploitable":** the rule's p0 assumes a request can reach it, and none can. `p1` records that

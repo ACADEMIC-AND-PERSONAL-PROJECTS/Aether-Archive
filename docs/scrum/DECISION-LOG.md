@@ -28,6 +28,8 @@ Statuses: `Proposed` · `Accepted` · `Superseded by ADR-NNN` · `Rejected`.
 | [ADR-016](#adr-016--the-frontend-reaches-the-api-on-its-own-origin) | 2026-10-16 | The frontend reaches the API on its own origin | Accepted |
 | [ADR-017](#adr-017--the-css-foundation-declared-inputs-runtime-only-colour-one-definition-per-scale) | 2026-10-16 | The CSS foundation: declared inputs, runtime-only colour, one definition per scale | Accepted |
 | [ADR-018](#adr-018--the-clustering-algorithm-and-the-pipelines-open-readings) | 2026-10-16 | The clustering algorithm and the pipeline's open readings | Accepted |
+| [ADR-019](#adr-019--typography-playfair-display--inter-variable-latin-subsets-1482-kb) | 2026-10-16 | Typography: Playfair Display + Inter Variable, latin subsets, 148.2 kB | Accepted |
+| [ADR-020](#adr-020--the-theme-layer-role-mapping-in-oklch-contrast-by-construction-one-glass-fallback) | 2026-10-16 | The theme layer: role mapping in OKLCh, contrast by construction, one glass fallback | Accepted |
 
 ---
 
