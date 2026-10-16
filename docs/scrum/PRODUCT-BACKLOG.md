@@ -298,6 +298,14 @@ opens on tap, feels tactile, and gets out of the way.
 - [ ] Fresh random photo per visit; pull-to-refresh re-rolls without reloading the app shell.
 - [ ] Empty archive → quiet empty state from E3-S4, never a crash.
 
+> **Delivered in two slices (Sprint 3), split at review.** **E3-S1A** (3 pts) carries criteria 1, 2 and 5 —
+> the photo, its tone, the quiet states; **E3-S1B** (2 pts) carries criteria 3 and 4 — the tap intent, the
+> pull, the per-visit photo — cut from an updated `develop` after A merges. The story was first delivered
+> whole at 1,516 hand-written lines claiming the atomic-story exception; the claim did not survive review
+> (it argued a slice would leave the view non-interactive while the overlay is E3-S2 and the whole story
+> does not open a menu either), so it was withdrawn and the story re-cut. Points unchanged.
+> Details: `docs/scrum/sprints/sprint03.md`, "E3-S1 was split at review".
+
 ### E3-S2 — Glass menu overlay · 5 pts · p0
 
 *As the curator, I want a discreet menu, so that navigation is available but never shouts.*
@@ -326,6 +334,11 @@ opens on tap, feels tactile, and gets out of the way.
 - [ ] Empty archive = one quiet sentence in display serif on the dark base.
 - [ ] API error = discreet glass notice with a retry affordance; no raw messages, no alerts.
 - [ ] All three states rendered in tests.
+- [ ] **`error` does not always mean an empty screen.** Since E3-S1A, `data-state="error"` is also what a
+      *failed replacement* reports while the previous photo stays painted (deliberately: unmounting a
+      good picture for a placeholder would break the splash's own promise). So the notice needs its own
+      scrim over the photo, or a separate signal, rather than the assumption that error implies bare
+      background — found by E3-S1A's review.
 
 ### E3-S5 — View tests & accessibility pass · 3 pts · p0
 

@@ -21,7 +21,8 @@
 | # | ID | Story | Points | Priority | Status | PR |
 | --- | --- | --- | --- | --- | --- | --- |
 | 0 | S03-C1 | *chore*: land the Sprint-2 working changes in `.claude/` (number provenance, guard canonicalisation, adversarial review control) | — | — | Done | #97 |
-| 1 | E3-S1 | Immersive splash view | 5 | p0 | Todo | — |
+| 1a | E3-S1A | Immersive splash — the photo, its tone, the quiet states (criteria 1, 2, 5) | 3 | p0 | Todo | — |
+| 1b | E3-S1B | Immersive splash — the tap intent, the pull-to-refresh, the per-visit photo (criteria 3, 4) | 2 | p0 | Todo | — |
 | 2 | E3-S2 | Glass menu overlay | 5 | p0 | Todo | — |
 | 3 | E3-S3 | Route transitions & motion system | 3 | p0 | Todo | — |
 | 4 | E3-S4 | Quiet loading / empty / error states | 2 | p1 | Todo | — |
@@ -29,7 +30,8 @@
 | 6 | E4-S1 | Single photo upload | 5 | p0 | Todo | — |
 | 7 | E4-S2 | Multi-select (≤ 6) & client-side downscale | 5 | p0 | Todo | — |
 
-**Total: 7 stories · 28 points** (the row above the seven is a chore, not a story). The order is the
+**Total: 8 slices · 28 points** (the row above them is a chore, not a story; E3-S1A and E3-S1B are one
+5-point story, split — see the note at the end of this section). The order is the
 dependency chain, with the placements worth a sentence:
 
 - **E3-S1 first** — the sprint's goal made visible: the app opens on a full-bleed random photo and nothing
@@ -50,6 +52,23 @@ dependency chain, with the placements worth a sentence:
 - **E4-S1 then E4-S2** — the upload pipeline lands once (picker → validate → upload → invalidate);
   the multi-select story builds directly on it. The cap and the downscale decision are pure functions,
   which is also how they are tested (jsdom has no canvas — ADR-018).
+
+**E3-S1 was split at review, and the split is the interesting part.** The story landed 1,516 hand-written
+lines — the largest diff here — claiming the atomic-story exception. The reviewer took the claim apart with
+the rule's own test: I argued a slice would leave "a view that is not interactive", but the overlay is
+E3-S2 and **the unsliced story does not open a menu either**, so the slice failed nothing the whole did not
+also fail (`CLAUDE.md` §5's exception is for a story that cannot be sliced without failing one of its own
+acceptance criteria). The claim was withdrawn and the story re-cut on the reviewer's own line: **E3-S1A**
+(criteria 1, 2, 5 — the photo, its tone, the quiet states, 3 pts) then **E3-S1B** (criteria 3, 4 — the tap
+intent, the pull, the per-visit photo, 2 pts) from an updated `develop`. Points are unchanged at 5.
+
+Two things this records honestly rather than tidily. **The split did not solve the size problem**: E3-S1A is
+1,367 changed lines on its own, still over both budgets, because the view, the pipeline and their test files
+are shared by both halves — the review's own estimate of ~950 for slice A was optimistic. And **a 5-point
+story producing a four-figure diff is a planning signal**, not a compliance detail: this codebase's
+documentation density (a third of new source lines are comments carrying decisions and probe results) means
+a story-sized *feature* no longer fits a size budget written for leaner code. Both numbers go to the
+retrospective; that is the change this sprint should evaluate, not the split mechanics.
 
 ## Definition of Ready check
 
