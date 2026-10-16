@@ -41,6 +41,11 @@ A story is `Done` only when the Definition of Done (`DEFINITION-OF-DONE.md`) is 
 > request can reach but that a file placed by hand, a restore, or a sync can widen, so they were routed
 > rather than patched inside E1-S5. Its `p1` is argued in the story: the security rule's `p0` assumes a
 > request can reach the finding, and none can. It is unscheduled like the rest of E6-S13…S17.
+>
+> **Sprint 3 planning (2026-10-16) keeps them out by name.** The sprint commits 28 of its 25–34 band to
+> the entry experience and the first uploads (E3 + E4-S1/S2) and carries no hardening goal; #71, #72, #73
+> and #79/E6-S17 stay unscheduled, awaiting an explicit owner decision (`docs/scrum/sprints/sprint03.md`,
+> §Out of scope).
 
 ```text
 Sprint 1  E1  Foundation & Backend              (34)
