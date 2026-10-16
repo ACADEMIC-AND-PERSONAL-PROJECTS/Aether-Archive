@@ -61,8 +61,11 @@ if [ "$COUNT" -lt 6 ]; then
 fi
 
 DATA_DIR="${AETHER_DATA_DIR:-$HOME/AetherArchive_Data}"
-DATA_DIR="${DATA_DIR%/}"
 REAL_DIR="${HOME%/}/AetherArchive_Data"
+# Canonicalise both sides before comparing: a doubled or trailing slash, `/.`, `..` or a
+# symlink must not spell the real archive in a way this guard fails to recognise.
+DATA_DIR="$(python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$DATA_DIR")"
+REAL_DIR="$(python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$REAL_DIR")"
 if [ "$DATA_DIR" = "$REAL_DIR" ] && [ "$FORCE" -ne 1 ]; then
   cat >&2 <<EOF
 seed.sh: refusing to seed the real data directory ($DATA_DIR).

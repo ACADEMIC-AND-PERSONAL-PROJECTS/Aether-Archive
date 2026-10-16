@@ -12,10 +12,11 @@
 #
 #   GET  /api/v1/photos        200, on an empty archive as well as a seeded one
 #   GET  /api/v1/photos/random 200 when the feed holds a photo, `404 empty-archive` when not
-#   POST /api/v1/photos        201 for six samples cycling the four categories — and the six
-#                              refusals: no file part, no category, a category that is not
-#                              one of the four, a category sent as a file part, text bytes, an
-#                              empty file, and a declared type contradicting the bytes
+#   POST /api/v1/photos        201 for six samples cycling the four categories — and nine
+#                              upload refusals: no file part; a missing, invalid or file-part
+#                              category; text bytes (declared text/plain and declared
+#                              image/png); an empty file; a declared type contradicting the
+#                              bytes; a JSON content type
 #   POST /api/v1/dumps         201 for the six uploads, its photos echoing the requested
 #                              order — and the five refusals: malformed JSON, a colour that is
 #                              not #RRGGBB, five ids, a repeated id, ids that do not exist
@@ -56,8 +57,11 @@ done
 BASE_URL="${BASE_URL%/}"
 
 DATA_DIR="${AETHER_DATA_DIR:-$HOME/AetherArchive_Data}"
-DATA_DIR="${DATA_DIR%/}"
 REAL_DIR="${HOME%/}/AetherArchive_Data"
+# Canonicalise both sides before comparing: a doubled or trailing slash, `/.`, `..` or a
+# symlink must not spell the real archive in a way this guard fails to recognise.
+DATA_DIR="$(python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$DATA_DIR")"
+REAL_DIR="$(python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$REAL_DIR")"
 if [ "$DATA_DIR" = "$REAL_DIR" ] && [ "$FORCE" -ne 1 ]; then
   cat >&2 <<EOF
 smoke.sh: refusing to run against the real data directory ($DATA_DIR) — this run uploads.
