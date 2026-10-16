@@ -334,6 +334,11 @@ opens on tap, feels tactile, and gets out of the way.
 - [ ] Empty archive = one quiet sentence in display serif on the dark base.
 - [ ] API error = discreet glass notice with a retry affordance; no raw messages, no alerts.
 - [ ] All three states rendered in tests.
+- [ ] **`error` does not always mean an empty screen.** Since E3-S1A, `data-state="error"` is also what a
+      *failed replacement* reports while the previous photo stays painted (deliberately: unmounting a
+      good picture for a placeholder would break the splash's own promise). So the notice needs its own
+      scrim over the photo, or a separate signal, rather than the assumption that error implies bare
+      background — found by E3-S1A's review.
 
 ### E3-S5 — View tests & accessibility pass · 3 pts · p0
 

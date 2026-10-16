@@ -63,7 +63,7 @@ acceptance criteria). The claim was withdrawn and the story re-cut on the review
 intent, the pull, the per-visit photo, 2 pts) from an updated `develop`. Points are unchanged at 5.
 
 Two things this records honestly rather than tidily. **The split did not solve the size problem**: E3-S1A is
-1,311 changed lines on its own, still over both budgets, because the view, the pipeline and their test files
+1,367 changed lines on its own, still over both budgets, because the view, the pipeline and their test files
 are shared by both halves — the review's own estimate of ~950 for slice A was optimistic. And **a 5-point
 story producing a four-figure diff is a planning signal**, not a compliance detail: this codebase's
 documentation density (a third of new source lines are comments carrying decisions and probe results) means

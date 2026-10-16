@@ -199,9 +199,11 @@ chromium-browser --headless --disable-gpu --no-sandbox --hide-scrollbars \
 ```
 
 `--window-size=320,800` and `=430,800` produced the same captures (PNG headers measured: 320×800, 390×844,
-430×800). `--virtual-time-budget` replaces "sleep and hope". If a later story needs scripted interaction,
-element-level captures or DOM assertions, the upgrade path is `playwright` as a dev dependency using the
-already-populated `~/.cache/ms-playwright` — justified in that story's PR, not installed here.
+430×800). `--virtual-time-budget` replaces "sleep and hope" **for a page that is already painted** — the
+correction below is where that stops being true. For element-level captures and DOM facts there is no
+dependency to add: CDP over Node's built-in `WebSocket` does both (measured, E3-S1). `playwright` as a dev
+dependency using the already-populated `~/.cache/ms-playwright` remains the upgrade path for scripted
+multi-step interaction — justified in the PR of the story that needs it, not installed here.
 
 **E3-S1 correction, measured:** the command above does _not_ capture a page that reveals content after a
 streamed image. With the 1.4 MB hero, `--virtual-time-budget=60000` still dumped `data-state="loading"`:

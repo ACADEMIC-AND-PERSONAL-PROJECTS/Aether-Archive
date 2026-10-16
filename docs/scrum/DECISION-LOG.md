@@ -794,7 +794,8 @@ record, labelled, so that slice restores them rather than rediscovering them.
    another photo; nothing moves and nothing is drawn. The finger-following transform and the cross-fade
    are motion, motion tokens and the `prefers-reduced-motion` switch are E3-S3's story, and `matchMedia`
    does not exist in the test environment — a transform shipped there would be the one part of the gesture
-   nothing verifies. The gesture surface carries `touch-pan-x touch-pinch-zoom`: measured in Chromium with
+   nothing verifies. The gesture surface **will carry** `touch-pan-x touch-pinch-zoom` — decided here, in
+   the slice that lands it: measured in Chromium with
    a synthesised touch drag on the built bundle, the default `touch-action: auto` made the browser claim
    the drag as a scroll and cancel the pointer stream (`pointerdown → pointermove → pointercancel`, no
    re-roll) — a dead gesture on a phone with a green unit suite, since jsdom never claims a gesture. The
