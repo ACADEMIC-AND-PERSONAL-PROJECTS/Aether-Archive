@@ -262,6 +262,11 @@ carrying a stable `code` (`unsupported-image-type`, `upload-too-large`, `storage
 `ApiExceptionHandler` turns into an RFC 9457 problem detail (see *Errors*). No message contains a
 filesystem path — the operator finds paths in the log.
 
+A flow that stores bytes and cannot finish removes them again: `StorageService.delete(StoredFile)` rebuilds
+the file's name from its identifier and validated extension, proves the target stays inside `images/` and
+removes it idempotently, so a retry cannot fail on work already done. An upload calls it when the row cannot
+be saved (the `500` in *API*), which is what keeps an accepted upload from leaving an image no API can reach.
+
 ## Errors
 
 Every failure leaves as an RFC 9457 problem detail in `application/problem+json`, produced by one

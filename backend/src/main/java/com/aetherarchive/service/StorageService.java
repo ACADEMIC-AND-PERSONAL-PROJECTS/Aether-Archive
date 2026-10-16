@@ -125,11 +125,14 @@ public class StorageService {
      * directory but the row that would have described them is not, and an image no API can reach is a
      * file the owner would have to find and delete by hand.
      *
-     * <p>The name is rebuilt here from the identifier and the <em>validated</em> extension of
-     * {@link StoredFile}, never from the relative path: the two agree — {@link #store} writes them from
-     * the same values — and rebuilding leaves nothing of a caller's string in the path. The destination
-     * is then resolved and proved to stay inside {@code images/} before anything is deleted, the same
-     * containment check the write path makes, because deletion follows a symlink just as a write does.
+     * <p>The destination is rebuilt from the identifier and the <em>validated</em> extension of
+     * {@link StoredFile}, never from the relative path — the two agree, because {@link #store} writes them
+     * from the same values, and rebuilding leaves nothing of a caller's string in the name. It is then
+     * resolved and proved to stay inside {@code images/} before anything is removed, because that extension
+     * does come from the caller: a crafted one must not name a file outside the data directory. The guard
+     * is what keeps the deletion inside the archive's own directory either way —
+     * {@link Files#deleteIfExists} does not follow the name's last component, so a link standing where the
+     * file should be is removed as a link rather than through it.
      *
      * <p>Idempotent: removing a file that is already gone is not a failure, so a retry after a partial
      * compensation cannot fail on the work it already did.
