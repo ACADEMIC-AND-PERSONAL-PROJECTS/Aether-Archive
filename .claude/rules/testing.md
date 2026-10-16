@@ -9,9 +9,14 @@ manually verified in the PR (with the command or the device used). Untested beha
 
 - Code that compares filesystem paths (traversal checks, sandboxing, static serving) is tested with the
   adversarial matrix: trailing and doubled slashes, `/.` and `..` segments, symlinks — including a
-  **directory** symlink — and environment variants (the data dir with and without a trailing separator).
-  E1-S10's first-cut guard was a string comparison that `//`, `/.`, `..` and symlinks walked straight
-  through (Sprint 2's retrospective, change 2).
+  **directory** symlink and a **link as the leaf itself** — and environment variants (the data dir with and
+  without a trailing separator). E1-S10's first-cut guard was a string comparison that `//`, `/.`, `..` and
+  symlinks walked straight through (Sprint 2's retrospective, change 2).
+- **Run the matrix per call site, not per project.** The matrix has two kinds of cell: the ones the guard
+  must refuse, and the ones a call site accepts deliberately. A write site accepts a leaf that is a link —
+  its write replaces the link rather than following it — but the same cell at a *serving* site is a
+  traversal. So the cells a guard refuses and the cells it accepts are both pinned by tests, with the reason
+  for each accepted cell written beside it (`.claude/rules/security.md`).
 
 ## Backend (Java / Spring Boot)
 
