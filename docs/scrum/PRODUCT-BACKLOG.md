@@ -402,21 +402,32 @@ opens on tap, feels tactile, and gets out of the way.
 
 | ID | Story | P | Pts | Sprint | Status |
 | --- | --- | --- | --- | --- | --- |
-| E4-S1 | Single photo upload | p0 | 5 | 3 | Todo |
+| E4-S1A | Single photo upload — the picker and the validation (criterion 1) | p0 | 2 | 3 | In review | |
+| E4-S1B | Single photo upload — send, progress, cancel, retry, invalidation (criteria 2–4) | p0 | 3 | 3 | Todo | |
 | E4-S2 | Multi-select (≤ 6) & client-side downscale | p0 | 5 | 3 | Todo |
 | E4-S3 | Drag-and-drop ordering | p0 | 8 | 4 | Todo |
 | E4-S4 | Aura colour picker with palette suggestions | p0 | 5 | 4 | Todo |
 | E4-S5 | Publish dump with optimistic UI | p0 | 5 | 4 | Todo |
 
-### E4-S1 — Single photo upload · 5 pts · p0
+### E4-S1 — Single photo upload · 5 pts · p0 · **split at review into E4-S1A (2) + E4-S1B (3)**
 
 *As the curator, I want to add one photo at a time, so that my archive grows gradually.*
 
-- [ ] Native file picker (accept images only), client-side type/size validation before upload.
-- [ ] Upload progress indicator (glass, quiet); cancel supported where feasible.
-- [ ] Failures surface a retry; the file stays selected; no silent loss.
-- [ ] Success updates the archive without a page reload (query invalidation).
-- [ ] Tests: validation rejects, error retry path, success invalidation.
+> **Split during Sprint 3, in two slices, after the #113 review rejected the story's atomic-story claim
+> on its own arithmetic** (1,434 hand-written lines, production alone 711; the review found it had priced
+> two slices under the branch threshold and then argued from the summed production, and that the suite
+> was not hermetic against `VITE_MAX_UPLOAD_MB`). **E4-S1A** (2 pts, PR #114) carries criterion 1 — the
+> picker and the validation; measured **776 hand-written** at its tip, and its exception is claimed on a
+> **measured state cut** at **555**, still over the ~500 branch threshold, so no cut reaches the budget.
+> **E4-S1B** (3 pts) carries criteria 2–4 — send with progress and cancel, then retry and invalidation;
+> it closes #31. Points are unchanged; the sprint record (`docs/scrum/sprints/sprint03.md`, notes) carries
+> the measurements.
+
+- [ ] **(A)** Native file picker (accept images only), client-side type/size validation before upload.
+- [ ] **(B)** Upload progress indicator (glass, quiet); cancel supported where feasible.
+- [ ] **(B)** Failures surface a retry; the file stays selected; no silent loss.
+- [ ] **(B)** Success updates the archive without a page reload (query invalidation).
+- [ ] **(A/B)** Tests: validation rejects, error retry path, success invalidation.
 
 ### E4-S2 — Multi-select (≤ 6) & client-side downscale · 5 pts · p0
 
@@ -540,6 +551,7 @@ delivery, documentation, and a clean v1.0.
 | E6-S16 | Low-severity hardening from the Sprint 1 audit (SEC-04…10, issue #73) | p2 | 3 | — | Todo |
 | E6-S17 | Static-serving hardening found by E1-S5's probes (issue #79) | p1 | 2 | — | Todo |
 | E6-S18 | Colour-token parsing robustness (issue #103) | p2 | 2 | — | Todo |
+| E6-S19 | Upload-validation hardening from E4-S1A's review | p2 | 1 | — | Todo |
 
 ### E6-S1 — CI on every PR · 5 pts · p0
 
@@ -697,6 +709,22 @@ catch it, because jsdom never runs the minifier. Any story that measures contras
       strings the helper already knew.
 - [ ] The check page or a future runtime check that reads a computed token has a test proving it survives
       the minified form.
+
+### E6-S19 — Upload-validation hardening · 1 pt · p2
+
+*As a maintainer, I want the client's upload vocabulary and limit parser to fail closed against the server's,
+so that a drift between the two languages is caught by a check rather than by a user.*
+
+Carried from E4-S1A's review (PR #114): the client's six media types in `lib/upload/validation.ts` are a
+hand-maintained copy of `backend/.../ImageFormat.java`; the review's Java probe found 0 disagreements, but
+adding a format on the server side would fail no frontend test. Separately, `parseMaxUploadMb` uses
+`Number()`, which accepts `1e2`, `0x10` and `7.0` — values Spring's `int` binder rejects — so a client key
+set to one of those can be *less* strict than the server (a wasted round trip, not a boundary breach).
+
+- [ ] A cross-language vocabulary guard: a mirror comment in `ImageFormat.java` naming the TS mirror, or a
+      test that reads the Java source — adding a format on either side must fail a check on the other.
+- [ ] `parseMaxUploadMb` accepts only plain decimal integers (`/^\d+$/`), matching Spring's binder, with
+      tests for `1e2`, `0x10`, `7.0`, signs and whitespace.
 
 ---
 

@@ -681,6 +681,83 @@ JS/CSS chunks, the Inter face, `/api/v1/photos/random` and `/images/photo.png`; 
   same insert-with-text pattern this story replaced on the splash. It is outside the two screens this
   pass covers and is unchanged; it needs the same decision in the story that owns the route shell.
 
+## The photo picker — measured (E4-S1A)
+
+This slice ships the picker and the client-side refusal only: it sends nothing. The server contract
+below was measured against a running archive because the validation vocabulary is derived from it;
+the later upload slices consume the same responses.
+
+| Request                                                | Status | `code`                   |
+| ------------------------------------------------------ | ------ | ------------------------ |
+| png / jpeg / gif, declared as themselves               | 201    | —                        |
+| webp declared `image/webp`, avif declared `image/avif` | 201    | —                        |
+| jpeg declared `image/jpg` (non-standard spelling)      | 201    | —                        |
+| empty file declared `image/png`                        | 415    | `unsupported-image-type` |
+| text bytes declared `image/png`                        | 415    | `unsupported-image-type` |
+| png bytes declared `text/plain`                        | 415    | `unsupported-image-type` |
+| webp / avif declared `application/octet-stream`        | 415    | `unsupported-image-type` |
+| 15,728,640 B                                           | 201    | —                        |
+| 15,728,641 B                                           | 413    | `upload-too-large`       |
+| no `file` part                                         | 400    | `missing-request-part`   |
+| no `category` part                                     | 400    | `validation-failure`     |
+
+**The client check is an experience measure, not a boundary.** It mirrors the server's _declared-type_
+axis, emptiness and size. It does **not** accept only what the server accepts, because it cannot see
+the bytes: text bytes declared `image/png` pass `validateUpload` and are refused by the server's
+magic-byte sniff with 415 `unsupported-image-type`. Decoding every pick client-side would be a second
+parser to keep in step, and the server's sniff remains the authority. Size has the same shape: the
+client refuses an oversized pick early, but the server enforces the ceiling (measured: 15,728,640 B →
+201, 15,728,641 B → 413).
+
+- `lib/upload/validation.ts` accepts the server's five formats plus `image/jpg`. The picker's
+  `accept` hint lists the five standard types; `image/jpg` is accepted from a drop or another
+  browser even though the hint omits it. File names are never consulted — the server discards them.
+- The limit comes from `VITE_MAX_UPLOAD_MB` (default 15, accepted range 1–1024, malformed values fall
+  back to the default rather than disabling validation); the backend's `AETHER_MAX_UPLOAD_MB` remains
+  the authority. Both keys are now documented side by side in `.env.example`, with the mirroring note.
+- The suite is hermetic against that key: `vite.config.ts` pins `VITE_MAX_UPLOAD_MB` beside
+  `VITE_API_BASE_URL`, and the size-boundary tests pass `maxBytes` explicitly so they measure the
+  validator rather than the machine. Because that pin would hide a hardcoded default, one test
+  re-loads the module under a stubbed `VITE_MAX_UPLOAD_MB=20` (a value the 15 default cannot produce)
+  and asserts the loaded limit; it fails against `MAX_UPLOAD_MB = DEFAULT_MAX_UPLOAD_MB`. Measured:
+
+  ```bash
+  VITE_MAX_UPLOAD_MB=20 npx vitest run src/lib/upload/validation.test.ts \
+    src/features/workshop/WorkshopView.test.tsx
+  # Test Files 2 passed (2) · Tests 21 passed (21)
+  ```
+
+- The selected state is the photo, full-bleed under the theme's scrim, and one glass panel reading
+  "Photo selected." with "Choose another". The preview carries `loading="lazy"` and `decoding="async"`
+  per the rendering rule. There is no upload action, progress element, retry or invalidation in this
+  slice; a test pins **zero buttons** as well as no "upload" text, and the browser probe found
+  **0 buttons** on the screen, so nothing promises an action slices B and C have not shipped.
+- The probe also found a defect the unit tests could not see: a file the client accepts by declared
+  type but the browser cannot decode showed Chrome's broken-image glyph through the scrim. The
+  preview is now dropped on `error` while the selection survives, and the scrim stays mounted so the
+  glass panel still composites over a known backdrop; both are pinned by a test.
+- The name test passes file-shaped objects with real names in both directions (`.png` name declaring
+  `text/plain` → refused; `.txt` name declaring `image/png` → accepted), so it exercises the axis it
+  names rather than only the declaration.
+
+Browser probe: the built bundle under Chromium 152 at 390 × 844 (DPR 3), served same-origin by a
+local static server.
+
+- Picking `not-image.txt` showed the refusal sentence, kept the view `idle`, and made **0 network
+  requests** — validation is local.
+- Picking `fixture.png` reached `selected` with a 64 × 64 preview, focus on the replace-picker input,
+  the panel and live region both reading "Photo selected.", and no horizontal overflow. **10 requests,
+  `offOrigin: []`, no console errors, no uncaught exceptions.**
+- Layout at 390: the panel is `x16 y723 358 × 105`, "Choose another" is `126 × 44`; computed glass is
+  `rgba(0, 0, 0, 0.4)` + `blur(15px) saturate(1.2)`, text `rgb(232, 230, 227)`. Capture:
+  `reports/e4s1a-selected-390.png`.
+- A decoy (`text` bytes declared `image/png`) passed the client check and lost its preview on decode,
+  while the view stayed `selected`.
+
+What this pass does **not** cover: an upload path (slice B/C), a real screen reader's announcement,
+browsers other than Chromium 152, a physical phone, and the native picker in jsdom (the component
+tests set `files` and fire `change`; the browser probe uses `DOM.setFileInputFiles`).
+
 ## Zero external requests — measured on the built bundle
 
 ```bash

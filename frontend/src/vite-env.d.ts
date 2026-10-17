@@ -24,4 +24,12 @@ interface ImportMetaEnv {
    * `http://localhost:8080`, the backend's documented dev port. Never present in a build.
    */
   readonly VITE_API_PROXY_TARGET?: string;
+  /**
+   * The client's mirror of the archive's upload ceiling, in whole megabytes. Unset means **15**, the
+   * backend's documented default (`aether.storage.max-upload-mb`, `AETHER_MAX_UPLOAD_MB`); a deployment
+   * that changes the backend key sets this one to match. The server remains the authority — the client's
+   * copy exists so an oversized pick is refused before the bytes are sent — and a value outside the
+   * backend's own 1–1024 bounds falls back to the default (`lib/upload/validation.ts`).
+   */
+  readonly VITE_MAX_UPLOAD_MB?: string;
 }

@@ -28,11 +28,12 @@
 | 4 | E3-S4 | Quiet loading / empty / error states | 2 | p1 | Done | #108 |
 | 5a | E3-S5A | Accessibility — the axe gate (criteria 1, 2) | 1 | p0 | Done | #110 |
 | 5b | E3-S5B | Accessibility — contrast, `inert`, the announcement fix, the manual pass (criteria 3–5) | 2 | p0 | Done | #111 |
-| 6 | E4-S1 | Single photo upload | 5 | p0 | Todo | — |
+| 6a | E4-S1A | Single photo upload — the picker and the validation (criterion 1) | 2 | p0 | In review | #114 |
+| 6b | E4-S1B | Single photo upload — send with progress and cancel, then retry and invalidation (criteria 2–4) | 3 | p0 | Todo | — |
 | 7 | E4-S2 | Multi-select (≤ 6) & client-side downscale | 5 | p0 | Todo | — |
 
-**Total: 9 slices · 28 points** (the row above them is a chore, not a story; E3-S1A/B and E3-S5A/B are
-each one story, split — see the notes at the end of this section). The order is the
+**Total: 10 slices · 28 points** (the row above them is a chore, not a story; E3-S1A/B, E3-S5A/B and
+E4-S1A/B are each one story, split — see the notes at the end of this section). The order is the
 dependency chain, with the placements worth a sentence:
 
 - **E3-S1 first** — the sprint's goal made visible: the app opens on a full-bleed random photo and nothing
@@ -51,7 +52,9 @@ dependency chain, with the placements worth a sentence:
 - **E3-S4 fourth** — the quiet states are cross-cutting (loading/empty/error); they close E3-S1's
   empty-archive criterion, and the upload flows consume their feedback patterns.
 - **E3-S5 fifth** — by definition it tests the real S1–S4 code; running it earlier would test placeholders.
-- **E4-S1 then E4-S2** — the upload pipeline lands once (picker → validate → upload → invalidate);
+- **E4-S1 then E4-S2** — the upload pipeline lands once (picker → validate → upload → invalidate), in **two
+  slices** (see the note at the end of this section: the criteria are a dependency chain, so the first
+  slice is the only one that can exist alone and it measured 714, over the branch threshold);
   the multi-select story builds directly on it. The cap and the downscale decision are pure functions,
   which is also how they are tested (jsdom has no canvas — ADR-018).
 
@@ -259,6 +262,16 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   split" claim has been withdrawn** (E3-S1, E3-S3, E3-S4, here), and the lesson is now a rule rather than a
   resolution: construct the cut you did not name — by criterion, by state, by surface — before claiming the
   exception, and if the branch is under ~500 argue the arithmetic instead. E3-S5B closes #30.
+  *Correction, 2026-10-17 — of a correction.* A note added earlier today removed **E3-S3** from this list on
+  the ground that its review "judged the claim to survive". That was wrong, and wrong in the way it claimed
+  to fix: the E3-S3 review's blocker is headed "the atomic-story claim does not survive **as written**", and
+  the author's own response to it says "my claim failed its literal test even though the conclusion
+  survives". So the written claim *was* withdrawn — what survived was the **budget arithmetic** it was
+  restated on, and no split followed. The distinction is worth keeping rather than flattening: **a withdrawn
+  claim can still leave a valid conclusion**, which is exactly the form E3-S4, E3-S5 and E4-S1 now use. The
+  first correction is undone by this entry rather than amended, because history here is append-only — and it
+  is recorded because it is the same defect twice: a record stated from memory without re-reading its
+  source, one day after the same mistake was named.
 - 2026-10-17 — **E3-S5A merged (`97d258b`, PR #110) and E3-S5B (`ed5cd94`, PR #111); the E3 epic is
   complete.** The split cost is measured rather than asserted, in both of its figures: **656 (+19%) at the
   review tips, 733 (+33%) after the review fixes** — the extra 77 lines are the review's own findings, so
@@ -274,3 +287,22 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   (E3-S3, E3-S4, E3-S5A, E3-S5B) a reviewer's own mutant taught more than the author's, and this is the
   first that proved a test by *not* killing it. A mutation battery that only demonstrates killing is half
   a battery.
+- 2026-10-17 — **E4-S1 was split into E4-S1A (the picker and the validation, criterion 1, 2 pts) and
+  E4-S1B (send with progress and cancel, then retry and invalidation, criteria 2–4, 3 pts), in that
+  order from an updated `develop`.** The unsliced story measured 1,434 hand-written lines, production
+  alone 711. The #113 review rejected its atomic-story claim **on its own arithmetic** — it priced two
+  slices at ≈450 and ≈200, both under the branch threshold, and then argued from the summed production —
+  and found the suite not hermetic against `VITE_MAX_UPLOAD_MB`: the README tells developers to set the
+  key that broke two tests. Slice A measured **714 at review, 776 at its final tip** (production 350,
+  tests 328, docs 82, build/config 16) — 276 over the ~500 branch threshold — so it claims the
+  exception, but in the E3-S3 form: **restated on a measured cut rather than on an inseparability
+  claim.** The cut the review named — by *state*: keep the picker, validation and refusal notice; defer
+  the selected preview, its panel and their tests — was constructed in a throwaway copy at the tip,
+  typechecked, linted, tested (17 against the slice's 21) and measured at **555 hand-written lines**,
+  still 55 over the threshold. No cut reaches the budget while the criteria, their tests and their
+  documentation stay in the slice, so the slice stays whole. The review's estimate (~568) was 13 lines
+  off the measured cut; the measured number is the one recorded. **The commit shape is a post-hoc
+  partition** — four commits within 19 seconds, the first mixing production, tests, README and config —
+  which history cannot fix, so it is recorded here for the retrospective rather than re-cut: it belongs
+  beside Sprint 2's "measure the change, not just the total", since a diff split after the fact makes
+  both numbers true and the story of how they were produced false.
