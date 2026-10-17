@@ -32,6 +32,7 @@ Statuses: `Proposed` · `Accepted` · `Superseded by ADR-NNN` · `Rejected`.
 | [ADR-020](#adr-020--the-theme-layer-role-mapping-in-oklch-contrast-by-construction-one-glass-fallback) | 2026-10-16 | The theme layer: role mapping in OKLCh, contrast by construction, one glass fallback | Accepted |
 | [ADR-021](#adr-021--the-splash-hero-a-photo-per-visit-read-once-and-what-the-placeholder-can-be) | 2026-10-16 | The splash hero: a photo per visit, read once, and what the placeholder can be | Accepted |
 | [ADR-022](#adr-022--route-transitions-and-the-motion-vocabulary-css-keyframes-no-animation-library) | 2026-10-17 | Route transitions and the motion vocabulary: CSS keyframes, no animation library | Accepted |
+| [ADR-023](#adr-023--the-aura-picker-the-chosen-page-colour-is-kept-the-glass-flips-suggestions-merge-by-pixel-share) | 2026-10-17 | The aura picker: the chosen page colour is kept, the glass flips, suggestions merge by pixel share | Accepted |
 
 ---
 
@@ -941,20 +942,24 @@ token, or flip the glass tint with the text.
 
 **Decision.**
 
-1. **`themeFromBackground(hex)` keeps the page exactly the colour the user picked.** The surface steps
-   away from the text (darker under light text, lighter under dark text); text starts from the nearer
-   neutral base and steps toward its extreme until text-on-page, text-on-surface and text-on-glass all
-   clear 4.5:1; muted raises its alpha until it clears on the page; the accent is the background's own
-   hue at a usable chroma (the fallback sand when the background has no hue), fitted by `fitAccent`.
-   The text stops short of pure white/black, per the brief. A narrow band of saturated mid-tones where
-   no such text exists is **refused with a message** rather than silently darkened: measured on a 16³
-   sRGB cube, **90 of 4096 backgrounds (2.2%) are refused**, e.g. `#0066ff`.
+1. **`themeFromBackground(hex)` keeps the page exactly the colour the user picked.** Each text
+   direction steps the surface away from the text (darker under light text, lighter under dark text)
+   and the text from its neutral base toward its extreme until text-on-page, text-on-surface and
+   text-on-glass all clear 4.5:1. **Both directions are tried** — the nearer base is only a preference
+   — before a page is refused, and the search never returns pure black or pure white text. Pure black
+   and pure white **pages** are refused by policy, because the brief's bases stop at
+   `#0B0B0D`/`#E8E6E3`. Measured on a 16³ sRGB cube: **4,094 of 4,096 backgrounds accepted; the two
+   refusals are `#000000` and `#ffffff`**, both by that policy. (The first cut committed to one
+   direction and refused 90 colours, claiming none had a legible text; #133's review falsified the
+   claim by carrying every one of them with the other direction, and this ADR records the corrected
+   design.)
 2. **The glass tint flips with the text.** Black tint and white hairline under light text; white tint
    and black hairline under dark text. This is a deliberate extension of the design language's dark
-   glass, recorded here rather than improvised: keeping black glass on every page was measured at
-   **1,930 of 4,096 backgrounds (47.1%) refused**, because the black composite is darker than any dark
-   text that passes on a light page. The token layer already owns `--aura-glass`, `--aura-glass-solid`
-   and `--aura-hairline` per theme, so the flip is data, not a second component.
+   glass, recorded here rather than improvised: with black glass on every page and both text directions
+   tried, **1,799 of 4,096 backgrounds (43.9%)** could not carry one text colour on the page and the
+   glass — the black composite is darker than any dark text that passes on a light page. The token
+   layer already owns `--aura-glass`, `--aura-glass-solid` and `--aura-hairline` per theme, so the
+   flip is data, not a second component.
 3. **Suggestions merge across the selected photos.** Each photo's palette is extracted (the E2-S4
    pipeline, 64 px edge); colours are pooled, deduplicated by normalised hex and ranked by the sum of
    their weights across the images — confidence is the colour's share of the selected pixels. The top
@@ -965,11 +970,12 @@ token, or flip the glass tint with the text.
    still never are. The preview applies the theme on the workshop's root and clears it on unmount, as
    the splash does.
 
-**Consequences.** A chosen colour is never modified behind the user's back; the refusal band is small,
-measured and explainable. The light-glass variant means "dark glassmorphism" becomes
-"contrast-directed glassmorphism" for user-chosen pages — a further divergence (per-surface text
-tokens, pure white/black text, dark glass on light pages, or persisting the aura across sessions) needs
-a new ADR.
+**Consequences.** A chosen colour is never modified behind the user's back, and every accepted page
+has a legible text colour in at least one direction. The light-glass variant means "dark glassmorphism"
+becomes "contrast-directed glassmorphism" for user-chosen pages; `.claude/rules/design-language.md` and
+`docs/engineering/DESIGN-SYSTEM.md` §3 point at this ADR for that case. A further divergence (per-surface
+text tokens, pure white/black pages or text, dark glass on light pages, or persisting the aura across
+sessions) needs a new ADR.
 
 ---
 
