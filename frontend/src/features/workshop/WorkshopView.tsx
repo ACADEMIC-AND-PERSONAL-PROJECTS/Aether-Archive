@@ -90,7 +90,7 @@ import type { UploadProgress } from "../../api/uploadPhoto";
  * `displayOrder` 0–5 being that index. Reordering is refused while a batch is uploading: the queue
  * captured the array when it started, and moving a tile mid-batch would leave the grid disagreeing
  * with the requests already on the wire. The grid's own header carries the sensors, the scroll rule
- * and the decision to keep the tile out of the tab order until E4-S3C brings the keyboard path.
+ * and the decision to keep the tile out of the tab order until E4-S3D brings the keyboard path.
  *
  * ## The files never outlive the screen
  *

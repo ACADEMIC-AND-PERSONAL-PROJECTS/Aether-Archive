@@ -65,7 +65,7 @@ import {
  * ## The activator is not focusable yet, on purpose
  *
  * The keyboard sensor, dnd-kit's `attributes`, the announcements and the instructions are the second
- * half of E4-S3C, not this slice. Spreading `attributes` without a sensor would put a control in the
+ * half of E4-S3 (E4-S3D), not this slice. Spreading `attributes` without a sensor would put a control in the
  * tab order that does nothing when activated — a dead focus stop — and point a screen reader at keys
  * the grid does not listen for. So this slice spreads **only the listeners**: the activator is a
  * pointer/touch surface, the remove button stays the tile's only focusable control, and
