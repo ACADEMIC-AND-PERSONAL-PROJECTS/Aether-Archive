@@ -408,8 +408,8 @@ opens on tap, feels tactile, and gets out of the way.
 | E4-S2A2 | Multi-select (≤ 6) and the sequential queue (criteria 1, 4) | p0 | 2 | 3 | Done |
 | E4-S2B | Client-side downscale before upload (criterion 2) | p0 | 2 | 3 | Done |
 | E4-S3A | The order reducer (criterion 2, reducer half) | p0 | 1 | 4 | Done |
-| E4-S3B | The gesture core: mouse/touch sensors, sortable grid, overlay (criterion 1) | p0 | 4 | 4 | In review |
-| E4-S3C | Keyboard, announcements, auto-scroll and motion (criteria 3, 4) | p0 | 3 | 4 | Todo |
+| E4-S3B | The gesture core: mouse/touch sensors, sortable grid, overlay (criterion 1) | p0 | 4 | 4 | Done |
+| E4-S3C | Motion: drop ≤ 300 ms, auto-scroll and reduced motion (criterion 4) — two PRs | p0 | 1 | 4 | In progress |
 | E4-S4 | Aura colour picker with palette suggestions | p0 | 5 | 4 | Todo |
 | E4-S5 | Publish dump with optimistic UI | p0 | 5 | 4 | Todo |
 
@@ -462,6 +462,13 @@ opens on tap, feels tactile, and gets out of the way.
 > budget**, so the claim was withdrawn. The same review found the shuffled suite flaky (a leaked dnd-kit
 > document listener between tests), fixed in the re-cut. **S3A** ships the reducer, **S3B** the gesture
 > core (its own measured exception), **S3C** keyboard/announcements/auto-scroll/motion. Points unchanged.
+>
+> Re-cut again at PR #127's review: the motion slice had grown to **521 hand-written including records,
+> 21 past the ~500 branch trigger**, after the pre-cut had measured it at 496. Rather than claim an
+> exception the reviewer could falsify, auto-scroll is delivered on its own branch (constant, one
+> `DndContext` prop, an exact-value test, its own probe) and #127 keeps the drop animation, the overlay
+> scrim and reduced motion. Same slice id and point, so the sprint total does not move; keyboard is
+> **S3D**.
 >
 > **Carried into S3C from S3B's review:** the sort settle (and any drop transition) must respect
 > `prefers-reduced-motion` — `global.css` freezes `animation-duration` only, not `transition-duration`;

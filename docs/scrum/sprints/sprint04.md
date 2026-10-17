@@ -15,13 +15,16 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | E6-S1 | CI on every PR — backend and frontend jobs, cached, under 8 minutes | 5 | p0 | Done | #123 |
 | 2a | E4-S3A | The order reducer — `moveItem`/`orderedIds`, pure and tested | 1 | p0 | Done | #125 |
-| 2b | E4-S3B | The gesture core — mouse/touch sensors, sortable grid, overlay | 4 | p0 | In review | #126 |
-| 2c | E4-S3C | Keyboard, announcements, auto-scroll and motion | 3 | p0 | Todo | — |
+| 2b | E4-S3B | The gesture core — mouse/touch sensors, sortable grid, overlay | 4 | p0 | Done | #126 |
+| 2c | E4-S3C | Motion: drop ≤ 300 ms, auto-scroll, reduced motion (criterion 4) — two PRs | 1 | p0 | In progress | #127 + this PR |
 | 3 | E4-S4 | Aura colour picker — hex input, palette swatches, live glass preview | 5 | p0 | Todo | — |
 | 4 | E4-S5 | Publish dump — `POST /dumps`, optimistic insert, rollback | 5 | p0 | Todo | — |
 | 5 | E6-S2 | Required status checks on `main` and `develop` | 2 | p0 | Todo | — |
 
 **Total: 25 points across 7 slices** (E4-S3 was re-cut at #124's review into 2a/2b/2c — points unchanged).
+E4-S3C is delivered in two PRs at review: the auto-scroll half on its own branch (the ~500-line branch
+budget), and #127 for the drop animation and reduced motion. The slice id and its point are kept
+unchanged so the sprint total does not move for a split that adds no scope.
 The order is deliberate:
 
 - **CI first, not last.** The Sprint 3 retrospective's preview named E4-S3 as the first story; this
