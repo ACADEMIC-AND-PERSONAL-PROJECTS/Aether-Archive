@@ -29,7 +29,7 @@
 | 5a | E3-S5A | Accessibility — the axe gate (criteria 1, 2) | 1 | p0 | Done | #110 |
 | 5b | E3-S5B | Accessibility — contrast, `inert`, the announcement fix, the manual pass (criteria 3–5) | 2 | p0 | Done | #111 |
 | 6a | E4-S1A | Single photo upload — the picker and the validation (criterion 1) | 2 | p0 | Done | #114 |
-| 6b | E4-S1B | Single photo upload — send with progress and cancel, then retry and invalidation (criteria 2–4) | 3 | p0 | In progress | — |
+| 6b | E4-S1B | Single photo upload — send with progress and cancel, then retry and invalidation (criteria 2–4) | 3 | p0 | In review | #115 |
 | 7 | E4-S2 | Multi-select (≤ 6) & client-side downscale | 5 | p0 | Todo | — |
 
 **Total: 10 slices · 28 points** (the row above them is a chore, not a story; E3-S1A/B, E3-S5A/B and
@@ -307,3 +307,16 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   which history cannot fix, so it is recorded here for the retrospective rather than re-cut: it belongs
   beside Sprint 2's "measure the change, not just the total", since a diff split after the fact makes
   both numbers true and the story of how they were produced false.
+- 2026-10-17 — **E4-S1B (PR #115) carries the send path**: `POST /api/v1/photos` over `XMLHttpRequest`
+  (the only transport with request progress and in-flight cancel), the quiet 2 px progress line, Cancel
+  returning to the same `File`, Try again resending that same object, and one prefix invalidation of
+  `photos` on success only — pinned in both directions, which kills the `onSuccess → onSettled` mutant
+  the #113 review found alive. It measured **1,234 hand-written** at its tip (production 485, tests 624,
+  docs 125), 2.5× the ~500 branch threshold. Its exception is claimed on a **constructed criterion cut**
+  — defer criterion 3's retry surface, keep criteria 2 and 4 — which typechecks, lints, passes 25 of the
+  slice's 29 tests and measures **1,122**, still 2.2× the threshold; the two surface sums are 588 (API)
+  and 646 (view), and neither is a viable slice (the API alone delivers nothing visible; the view alone
+  cannot send). So no cut reaches the budget, and the claim is stated as that measurement rather than as
+  an inseparability. The cancelled-upload sentence is visible now (`toBeVisible()` on the panel node,
+  not a hidden one), and the screen never claims the archive stored nothing — a cancel can race
+  `StorageService.store`, which the README and the probe record on both sides.
