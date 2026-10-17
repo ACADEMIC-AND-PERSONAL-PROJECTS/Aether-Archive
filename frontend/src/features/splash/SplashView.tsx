@@ -43,6 +43,18 @@ import { GlassMenu } from "../menu/GlassMenu";
  *   for. The shell is untouched: no navigation, no reload, no second app instance. The surface carries
  *   that module's `touch-action`, without which a real browser takes the drag for a scroll and the gesture
  *   never happens (measured; the constant's comment has the trace).
+ * - **The quiet states' announcement (E3-S5).** A live region announces *changes* to content that already
+ *   exists, not a node inserted together with its text. So the sentence for the empty and error states is
+ *   carried by one visually hidden `role="status"` region that is mounted here, in every state, and
+ *   filled when the state changes; the visible sentences in `components/QuietState.tsx` are ordinary
+ *   paragraphs. The trade: a screen-reader user who browses the page afterwards finds the same words in
+ *   the visible element too — that is the same status message seen twice, not two messages.
+ * - **`inert` on what the dialog covers (E3-S5).** While the menu is open this `<main>` is inert: removed
+ *   from the tab order, from pointer hit-testing and from the accessibility tree, so an assistive
+ *   technology's virtual cursor cannot reach the tap target behind the dialog. Baseline since April 2023;
+ *   a browser without it simply ignores the attribute and keeps E3-S2's focus trap as the guarantee.
+ *   jsdom implements neither the property nor its effect, so the suite pins the attribute and Chromium
+ *   measures that the button leaves the accessibility tree and focus order (probe in the PR).
  *
  * ## Not owned here — named, so this file cannot be read as claiming them
  *
@@ -62,6 +74,19 @@ const EMPTY_ARCHIVE_CODE = "empty-archive";
 
 /** Which of the four things the splash is doing — the seam E3-S4 renders into. */
 export type SplashState = "loading" | "ready" | "empty" | "error";
+
+/**
+ * What the persistent live region says for each state. Loading and ready are silent on purpose: §7's
+ * loading placeholder is not a labelled spinner, and a photo appearing is not an event that needs
+ * announcing. The two sentences are the visible ones in `components/QuietState.tsx`, word for word —
+ * a user who browses the page afterwards must not find a different message from the one announced.
+ */
+const ANNOUNCEMENTS: Record<SplashState, string> = {
+  loading: "",
+  ready: "",
+  empty: "Your archive is empty for now.",
+  error: "Couldn't load a photo.",
+};
 
 /** The archive answered `404 empty-archive`: the archive holds no photo yet. */
 function isEmptyArchive(error: unknown): boolean {
@@ -132,10 +157,21 @@ export function SplashView() {
       <main
         data-state={state}
         className={`relative flex flex-1 overflow-hidden bg-aura-bg ${PULL_SURFACE_TOUCH_ACTION}`}
+        // E3-S5: while the dialog is open the page it covers is inert. React writes the boolean HTML
+        // attribute (`inert=""` — probed: the DOM *property* does not exist in jsdom 30, the attribute
+        // does), so the unit test can pin the declaration; Chromium is where the effect is measured.
+        inert={menuOpen}
         {...pull.handlers}
       >
         {/* The view's name for assistive technology. Nothing about it is visible: the photo is the view. */}
         <h1 className="sr-only">Aether Archive</h1>
+
+        {/* The one live region (E3-S5), mounted in every state so it has a previous value to change
+            from. `.sr-only` keeps it out of the composition; `role="status"` is polite and atomic. Its
+            sentence is deliberately empty while loading and ready — see ANNOUNCEMENTS. */}
+        <p role="status" className="sr-only">
+          {ANNOUNCEMENTS[state]}
+        </p>
 
         {/* Under the photo and the tap target: the placeholder for a photo that is not painted yet. */}
         {state === "loading" ? <QuietLoading /> : null}

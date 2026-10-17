@@ -44,11 +44,14 @@ import { ENTER_DRIFT_BASE, ENTER_FADE_BASE } from "../../lib/motion/tokens";
  * - **The page scroll.** Locked while open (`overflow: hidden` on the document root — the element it
  *   propagates to the viewport from) and restored to whatever it was on close, including when the
  *   close is a route change that unmounts the splash with the menu inside it.
- * - **Not `inert` on the page behind.** Probed in the test process: `HTMLElement.prototype.inert` does
- *   not exist in jsdom 30.1.3 (setting `element.inert` is a plain JS property there, and writes no
- *   attribute), so behaviour built on it would be the one part of this story nothing could test. The
- *   APG allows `aria-modal` only when the code really does block the rest: the trap is that blocking,
- *   and it is tested.
+ * - **The inert background, which is the view's to declare (E3-S5).** The dialog itself cannot mark its
+ *   siblings inert: the splash owns the open state and therefore owns `<main inert={menuOpen}>`, the
+ *   element the dialog covers. The APG allows `aria-modal` when the code really does block the rest;
+ *   the trap blocks the keyboard, the veil the pointer, and `inert` blocks the assistive-technology
+ *   virtual cursor (Baseline since April 2023; jsdom implements none of its effect, so Chromium is
+ *   where it is measured). A browser without `inert` ignores the attribute and keeps the first two.
+ *   This component is a sibling of the inert element on purpose — a dialog nested inside it would be
+ *   inert too.
  * - **Not the route change.** The two destinations are `Link`s, and leaving the splash is the close:
  *   this component unmounts with the view that owns it, which is also what releases the scroll lock.
  * - **Not its own timings.** The entry is §5's vocabulary (`lib/motion/tokens.ts`): the same fade the
