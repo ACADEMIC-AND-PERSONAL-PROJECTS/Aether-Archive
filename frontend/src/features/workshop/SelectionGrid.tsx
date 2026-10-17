@@ -7,10 +7,8 @@ import {
   closestCenter,
   useSensor,
   useSensors,
-  type Announcements,
   type DragEndEvent,
   type DragStartEvent,
-  type UniqueIdentifier,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -19,17 +17,10 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 
 import { prefersReducedMotion } from "../../lib/motion/reduced";
 import { EASE_SOFT } from "../../lib/motion/tokens";
-import {
-  cancelAnnouncement,
-  dropAnnouncement,
-  moveAnnouncement,
-  pickupAnnouncement,
-  SCREEN_READER_INSTRUCTIONS,
-} from "../../lib/ordering/announce";
 import {
   AUTO_SCROLL_OPTIONS,
   DROP_ANIMATION_MS,
@@ -81,15 +72,15 @@ import {
  * ## The keyboard path (E4-S3D)
  *
  * dnd-kit's `attributes` put the drag surface in the tab order with `role="button"`, a name that
- * states the photo's position and file, and `aria-describedby` pointing at our instructions;
+ * states the photo's position and file, and `aria-describedby` pointing at its built-in instructions;
  * `KeyboardSensor` with `sortableKeyboardCoordinates` turns Space/Enter into a lift, the arrows into
  * moves to the nearest tile, Space/Enter into a drop and Escape into a cancel. Without the coordinate
  * getter the sensor moves the overlay in 25 px steps and never changes the order. E4-S3B deliberately
  * shipped no focus stop without a sensor; the two land together here.
  *
- * Announcements (`lib/ordering/announce.ts`) are built from the current array, so a reader hears
- * "Photo 2 of 6 moved to position 4." rather than generated ids. The workshop's own `role="status"`
- * region stays silent during a drag: it narrates uploads, and a drag changes none.
+ * The announcement copy is the follow-up slice (E4-S3D1): this branch uses dnd-kit's defaults, which
+ * name the generated `selection-N` ids. Replacing them with position-based sentences is a copy change
+ * over the same sensor, so it ships separately rather than doubling this PR.
  *
  * ## Reordering
  *
@@ -355,50 +346,6 @@ export function SelectionGrid({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  /*
-   * The announcements are built from the current array so they speak positions rather than ids.
-   * `positionOf` is 1-based; `null` stands for "no such tile" (an over that resolved to nothing).
-   */
-  const announcements = useMemo<Announcements>(() => {
-    const positionOf = (id: UniqueIdentifier | null | undefined): number | null => {
-      if (id === null || id === undefined) {
-        return null;
-      }
-      const index = items.findIndex((item) => item.id === id);
-      return index === -1 ? null : index + 1;
-    };
-
-    return {
-      onDragStart({ active }) {
-        const position = positionOf(active.id);
-        return position === null ? undefined : pickupAnnouncement(position, items.length);
-      },
-      onDragOver({ active, over }) {
-        const position = positionOf(active.id);
-        const destination = positionOf(over?.id);
-        // dnd-kit's first `over` is the tile itself. Announcing "moved to position 1" there would
-        // overwrite the pick-up instructions with a sentence that says nothing moved.
-        return position === null || destination === null || destination === position
-          ? undefined
-          : moveAnnouncement(position, items.length, destination);
-      },
-      onDragEnd({ active, over }) {
-        const position = positionOf(active.id);
-        if (position === null) {
-          return undefined;
-        }
-        const destination = positionOf(over?.id);
-        return destination === null
-          ? cancelAnnouncement(position, items.length)
-          : dropAnnouncement(destination, items.length);
-      },
-      onDragCancel({ active }) {
-        const position = positionOf(active.id);
-        return position === null ? undefined : cancelAnnouncement(position, items.length);
-      },
-    };
-  }, [items]);
-
   const activeItem =
     activeId === null ? null : (items.find((item) => item.id === activeId) ?? null);
 
@@ -426,10 +373,6 @@ export function SelectionGrid({
       sensors={sensors}
       collisionDetection={closestCenter}
       autoScroll={AUTO_SCROLL_OPTIONS}
-      accessibility={{
-        announcements,
-        screenReaderInstructions: { draggable: SCREEN_READER_INSTRUCTIONS },
-      }}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveId(null)}

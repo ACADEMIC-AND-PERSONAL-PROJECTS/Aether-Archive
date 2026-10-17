@@ -166,21 +166,6 @@ function activatorFor(name: string): HTMLElement {
   return activator;
 }
 
-/**
- * dnd-kit's live region, told apart from the workshop's by `aria-atomic`: dnd-kit sets it, the
- * workshop's persistent status region does not. Both are `role="status"`, and during a drag only this
- * one changes — which is the contract the two-region test below pins.
- */
-function dragAnnouncement(): HTMLElement {
-  const region = screen
-    .getAllByRole("status")
-    .find((node) => node.getAttribute("aria-atomic") === "true");
-  if (region === undefined) {
-    throw new Error("dnd-kit mounted no live region");
-  }
-  return region;
-}
-
 /** A keyboard press, then the event-loop turn dnd-kit's keyboard sensor needs to attach its listener. */
 async function pressKey(target: Element | Document, code: string, key: string): Promise<void> {
   fireEvent.keyDown(target, { code, key });
@@ -626,12 +611,11 @@ describe("reordering", () => {
     expect(first).toHaveClass("touch-manipulation");
     expect(screen.getByRole("button", { name: "Photo 3 of 3: c.png" })).toBeVisible();
 
-    // The instructions the tile points at are ours, not dnd-kit's default: they name the arrow keys.
+    // The instructions the tile points at come from dnd-kit's built-in accessibility; the custom
+    // position-based copy is the follow-up slice (E4-S3D1), not this one.
     const instructions = first.getAttribute("aria-describedby");
     expect(instructions).not.toBeNull();
-    expect(document.getElementById(instructions ?? "")).toHaveTextContent(
-      "To move a photo, press Space or Enter to pick it up.",
-    );
+    expect(document.getElementById(instructions ?? "")).toHaveTextContent("space bar");
 
     // The remove control is a sibling of the drag surface, so a pointer-down on it reaches no sensor.
     const remove = screen.getByRole("button", { name: "Remove a.png" });
@@ -639,7 +623,7 @@ describe("reordering", () => {
     expect(remove.contains(first)).toBe(false);
   });
 
-  it("should move a tile down with the keyboard and announce both positions", async () => {
+  it("should move a tile down with the keyboard", async () => {
     renderWorkshop();
     pickFiles(screen.getByLabelText("Choose photos"), sixFiles());
     stubGridRects();
@@ -656,21 +640,11 @@ describe("reordering", () => {
     await pressKey(first, "Space", " ");
     expect(first).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByTestId("drag-overlay")).toBeVisible();
-
-    // The first `over` in a keyboard drag is the tile itself; the pick-up sentence must survive it.
-    expect(dragAnnouncement()).toHaveTextContent("Photo 1 of 6 picked up.");
-    expect(dragAnnouncement().textContent).not.toContain("selection-");
     expect(screen.getByTestId("workshop-status")).toHaveTextContent("6 photos selected.");
 
-    // The stubbed three-column pitch puts `d` directly under `a`; the announcement names positions
-    // from the current array, never dnd-kit's generated ids.
+    // The stubbed three-column pitch puts `d` directly under `a`; the drop lands on position 4.
     await pressKey(document, "ArrowDown", "ArrowDown");
-    expect(dragAnnouncement()).toHaveTextContent("Photo 1 of 6 moved to position 4.");
-    expect(dragAnnouncement().textContent).not.toContain("selection-");
-    expect(screen.getByTestId("workshop-status")).toHaveTextContent("6 photos selected.");
-
     await pressKey(document, "Space", " ");
-    expect(dragAnnouncement()).toHaveTextContent("Photo 4 of 6 dropped.");
     expect(tileLines()).toEqual([
       "b.png: Waiting",
       "c.png: Waiting",
@@ -683,7 +657,7 @@ describe("reordering", () => {
     await settleDragListeners();
   });
 
-  it("should move a tile up with the keyboard and announce both positions", async () => {
+  it("should move a tile up with the keyboard", async () => {
     renderWorkshop();
     pickFiles(screen.getByLabelText("Choose photos"), sixFiles());
     stubGridRects();
@@ -693,10 +667,7 @@ describe("reordering", () => {
     await pressKey(fourth, "Space", " ");
 
     await pressKey(document, "ArrowUp", "ArrowUp");
-    expect(dragAnnouncement()).toHaveTextContent("Photo 4 of 6 moved to position 1.");
-
     await pressKey(document, "Space", " ");
-    expect(dragAnnouncement()).toHaveTextContent("Photo 1 of 6 dropped.");
     expect(tileLines()).toEqual([
       "d.png: Waiting",
       "a.png: Waiting",
@@ -717,15 +688,11 @@ describe("reordering", () => {
     first.focus();
     await pressKey(first, "Space", " ");
     await pressKey(document, "ArrowRight", "ArrowRight");
-    expect(dragAnnouncement()).toHaveTextContent("Photo 1 of 3 moved to position 2.");
-
     await pressKey(document, "Escape", "Escape");
 
-    expect(dragAnnouncement()).toHaveTextContent(
-      "Move cancelled. Photo 1 of 3 is back in position 1.",
-    );
     expect(tileLines()).toEqual(["a.png: Waiting", "b.png: Waiting", "c.png: Waiting"]);
-    // The cancel clears the overlay and the source slot's dragging state, not just the array.
+    // dnd-kit clears its own overlay and the source slot's dragging state on cancel; the array never
+    // saw the move, so the order is untouched.
     expect(screen.queryByTestId("drag-overlay")).toBeNull();
     expect(document.querySelector('[data-dragging="true"]')).toBeNull();
     expect(first).not.toHaveAttribute("aria-pressed");

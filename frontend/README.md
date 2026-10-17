@@ -1285,31 +1285,30 @@ The grid is operable without a pointer. The array is still the only order: the k
 through the same `moveItem`, and the queue sends the displayed order.
 
 **The keyboard path.** `KeyboardSensor` uses `sortableKeyboardCoordinates`: Space or Enter lifts,
-arrows walk the grid, Space or Enter drops, Escape puts the photo back. The activator now spreads
-`useSortable`'s `attributes` — `role="button"`, `tabIndex: 0`, `aria-roledescription="sortable"` and
-the instructions behind `aria-describedby` — with a name rebuilt from the live array: `Photo 1 of 6:
-photo-1.png`. Positions are computed at announcement time, so they are never a stale index and never
-an internal id. While a batch uploads, the tiles carry `aria-disabled="true"` and the sensor has no
-listeners, so the keys are inert as well as the pointer.
+arrows move to the nearest tile in that direction, Space or Enter drops, Escape puts the photo back.
+The activator now spreads `useSortable`'s `attributes` — `role="button"`, `tabIndex: 0`,
+`aria-roledescription="sortable"` and built-in instructions behind `aria-describedby` — with a name
+rebuilt from the live array: `Photo 1 of 6: photo-1.png`. While a batch uploads, the tiles carry
+`aria-disabled="true"` and the sensor has no listeners, so the keys are inert as well as the pointer.
+The left/right/up/down reach comes from the coordinate getter; without it the sensor moves the
+overlay in 25 px steps and never changes the order.
 
-dnd-kit's `accessibility` prop carries both `screenReaderInstructions` and `announcements`, built in
-`lib/ordering/announce.ts` (8 unit tests): "Photo 1 of 6 picked up. …", "Photo 1 of 6 moved to
-position 4.", "Photo 4 of 6 dropped.", "Move cancelled. Photo 1 of 6 is back in position 1." The
-first `over` in a drag is the tile itself, so the handler skips an over whose destination equals the
-current position; without that guard the pick-up instructions were replaced one frame later by
-"moved to position 1", a sentence that says nothing moved. The workshop's own `role="status"` region
-stays silent during a lift, so the two never speak over each other.
+**The live region, stated honestly.** This slice uses dnd-kit's **default** announcements, which name
+its generated ids — measured: "Draggable item selection-0 was moved over droppable area selection-3."
+The position-based copy ("Photo 1 of 6 moved to position 4.") is the follow-up slice **E4-S3D1**,
+over the same sensor; it ships separately rather than doubling this PR. The workshop's own
+`role="status"` region stays silent during a drag either way, because a drag changes no upload state.
 
 Probe: headless Chromium **153.0.8010.12**, built `dist/` on `vite preview`, scripts outside the
 repository, 390 × 844 DPR 3.
 
-| Step (probe)    | Evidence                                                                                                                                          |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Focus           | name `Photo 1 of 6: photo-1.png`, `role="button"`, `aria-roledescription="sortable"`, `aria-describedby` present                                  |
-| Space (lift)    | `aria-pressed="true"`; overlay 1; live region "Photo 1 of 6 picked up. …"; upload region still "6 photos selected."; neighbour `transform 0.2s …` |
-| ArrowDown       | live region "Photo 1 of 6 moved to position 4."; upload region still "6 photos selected."                                                         |
-| Space (drop)    | live region "Photo 4 of 6 dropped."; order `[1,2,3,4,5,6]` → `[2,3,4,1,5,6]`; overlay 0, `data-dragging` 0                                        |
-| Escape mid-move | live region "Move cancelled. Photo 1 of 6 is back in position 1."; order unchanged; overlay 0, `data-dragging` 0                                  |
+| Step (probe)    | Evidence                                                                                                         |
+| --------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Focus           | name `Photo 1 of 6: photo-1.png`, `role="button"`, `aria-roledescription="sortable"`, `aria-describedby` present |
+| Space (lift)    | `aria-pressed="true"`; overlay 1; upload region still "6 photos selected."; neighbour `transform 0.2s …`         |
+| ArrowDown       | upload region still "6 photos selected."; the live region narrates (default copy)                                |
+| Space (drop)    | order `[1,2,3,4,5,6]` → `[2,3,4,1,5,6]`; overlay 0, `data-dragging` 0                                            |
+| Escape mid-move | order unchanged; overlay 0, `data-dragging` 0                                                                    |
 
 0 off-origin requests and 0 page/console exceptions in the probe. The full transcript is in the PR
 body; the raw run also produced `version "153.0.8010.12"` and `PROBE_DONE`.
@@ -1318,15 +1317,14 @@ Capture: `reports/e4s3-keyboard-390.png` (1170 × 2532, 390 × 844 DPR 3), taken
 the source cell is empty, the clone is over the destination and the state line sits on its scrim.
 
 Tests changed: the S3B dead-focus-stop test is replaced by the attributes test, and 3 are added
-(keyboard down, which also pins the two live regions, keyboard up, and Escape cancel), plus 8 in
-`announce.test.ts`. The full suite is **33 files / 383 tests**; the shuffled suite was run **three
-times** (`npm run test -- --run --sequence.shuffle`), green each time. The workshop chunk grows from
-60.45 kB / 19.88 kB gzip to **63.78 kB / 20.84 kB gzip** — dnd-kit's keyboard sensor and coordinate
-getter, inside the already-lazy chunk.
+(keyboard down, keyboard up, and Escape cancel). The full suite is **33 files / 375 tests**; the
+shuffled suite was run **three times** (`npm run test -- --run --sequence.shuffle`), green each time.
+The workshop chunk grows from 60.45 kB / 19.88 kB gzip to **62.45 kB / 20.45 kB gzip** — dnd-kit's
+keyboard sensor and coordinate getter, inside the already-lazy chunk.
 
-Not measured here: a real screen reader (the announcement text is pinned and the live region is
-measured, but whether a reader speaks it is not), keyboards on iOS/Safari, and a physical device —
-**SKIPPED**.
+Not measured here: a real screen reader (the default region is measured, but whether a reader speaks
+it is not; the custom copy and its exact-string tests are E4-S3D1), keyboards on iOS/Safari, and a
+physical device — **SKIPPED**.
 
 ## Auto-scroll — measured (E4-S3C, auto-scroll branch)
 
