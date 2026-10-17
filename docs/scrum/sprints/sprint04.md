@@ -18,18 +18,22 @@
 | 2b | E4-S3B | The gesture core — mouse/touch sensors, sortable grid, overlay | 4 | p0 | Done | #126 |
 | 2c | E4-S3C | Motion: drop ≤ 300 ms, auto-scroll, reduced motion (criterion 4) — two PRs | 1 | p0 | Done | #127 + #128 |
 | 2d | E4-S3D | Keyboard path and cancel, with dnd-kit's default announcements (criterion 3) | 1 | p0 | Done | #131 |
-| 2e | E4-S3D1 | Position-based announcement copy and instructions (criterion 3) | 1 | p0 | In progress | — |
-| 3 | E4-S4 | Aura colour picker — hex input, palette swatches, live glass preview | 5 | p0 | Todo | — |
+| 2e | E4-S3D1 | Position-based announcement copy and instructions (criterion 3) | 1 | p0 | Done | #132 |
+| 3a | E4-S4A | The chosen-background theme engine — hex validation, contrast by construction | 1 | p0 | In progress | — |
+| 3b | E4-S4B | Palette suggestions from the selected photos, merged and ranked | 2 | p0 | Todo | — |
+| 3c | E4-S4C | The Aura picker UI, live preview, reset and session persistence | 2 | p0 | Todo | — |
 | 4 | E4-S5 | Publish dump — `POST /dumps`, optimistic insert, rollback | 5 | p0 | Todo | — |
 | 5 | E6-S2 | Required status checks on `main` and `develop` | 2 | p0 | Todo | — |
 
-**Total: 25 points across 9 slices** (E4-S3 was re-cut at #124's review into 2a/2b/2c, and 2c was
+**Total: 25 points across 11 slices** (E4-S3 was re-cut at #124's review into 2a/2b/2c, and 2c was
 pre-cut after measuring 928 hand-written lines into motion (2c, 1 pt) and keyboard (2d, 2 pts) — points
 unchanged; 2d was split again at #131's review into the keyboard path (2d, 1 pt) and the custom
 announcement copy (2e, 1 pt), the cut the reviewer built and measured green at 260 lines — points
-unchanged). E4-S3C's motion is itself delivered in two PRs at review: auto-scroll on its own branch
-(#128) and the drop animation plus reduced motion on #127. Slice ids and their 1 points are unchanged,
-so the sprint total does not move for splits that add no scope.
+unchanged; E4-S4 was pre-cut before implementation into the theme engine (3a, 1 pt), suggestions (3b,
+2 pts) and the picker UI (3c, 2 pts) — points unchanged). E4-S3C's motion is itself delivered in two
+PRs at review: auto-scroll on its own branch (#128) and the drop animation plus reduced motion on #127.
+Slice ids and their points are unchanged, so the sprint total does not move for splits that add no
+scope.
 The order is deliberate:
 
 - **CI first, not last.** The Sprint 3 retrospective's preview named E4-S3 as the first story; this

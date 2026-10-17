@@ -411,8 +411,10 @@ opens on tap, feels tactile, and gets out of the way.
 | E4-S3B | The gesture core: mouse/touch sensors, sortable grid, overlay (criterion 1) | p0 | 4 | 4 | Done |
 | E4-S3C | Motion: drop ≤ 300 ms, auto-scroll and reduced motion (criterion 4) — two PRs | p0 | 1 | 4 | Done |
 | E4-S3D | Keyboard path and cancel, with dnd-kit's default announcements (criterion 3) | p0 | 1 | 4 | Done |
-| E4-S3D1 | Position-based announcement copy and instructions (criterion 3) | p0 | 1 | 4 | In progress |
-| E4-S4 | Aura colour picker with palette suggestions | p0 | 5 | 4 | Todo |
+| E4-S3D1 | Position-based announcement copy and instructions (criterion 3) | p0 | 1 | 4 | Done |
+| E4-S4A | The chosen-background theme engine — hex validation, contrast by construction (criterion 2) | p0 | 1 | 4 | In progress |
+| E4-S4B | Palette suggestions from the selected photos, merged and ranked (criterion 1) | p0 | 2 | 4 | Todo |
+| E4-S4C | The Aura picker UI, live preview, reset and session persistence (criteria 1–4) | p0 | 2 | 4 | Todo |
 | E4-S5 | Publish dump with optimistic UI | p0 | 5 | 4 | Todo |
 
 ### E4-S1 — Single photo upload · 5 pts · p0 · **split at review into E4-S1A (2) + E4-S1B (3)**
@@ -493,7 +495,16 @@ opens on tap, feels tactile, and gets out of the way.
 - [ ] **(C)** Auto-scroll while dragging near edges; drop animation feels tactile (≤ 300 ms).
 - [ ] **(A/B/C)** Tests: reducer, keyboard move, reorder persistence in the payload.
 
-### E4-S4 — Aura colour picker with palette suggestions · 5 pts · p0
+### E4-S4 — Aura colour picker with palette suggestions · 5 pts · p0 · **pre-cut into S4A (1) + S4B (2) + S4C (2)**
+
+> Split before implementation: **S4A** is the pure theme engine (a chosen `#RRGGBB` → the §2.2 tokens,
+> contrast by construction, a sampled-cube test) and the hex validation; **S4B** is the extraction and
+> merge pipeline that ranks suggestions by pixel share; **S4C** is the picker UI, the live preview, the
+> reset and session persistence. Each slice is independently reviewable and under the PR budget.
+> **ADR-023** records the decisions the spec leaves open: the chosen colour is kept exactly, both text
+> directions are searched and pure black/white pages are refused by policy (4,094 of 4,096 sampled
+> colours accepted), the glass tint flips with the text, suggestions merge by summed pixel weight, and
+> the aura — only the aura — persists for the browsing session.
 
 *As the curator, I want to choose the dump's background colour, so that the river reflects its mood.*
 
