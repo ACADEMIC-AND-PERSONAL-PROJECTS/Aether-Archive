@@ -42,7 +42,14 @@ export type ItemState = "waiting" | "uploading" | "error";
 /** One tile: the File, its preview URL, and what the screen knows about it. */
 export interface SelectionItem {
   readonly id: string;
+  /** The picked file. The tile preview always comes from this object, never from the re-encode. */
   readonly file: File;
+  /**
+   * What the queue will send: the downscaled `File` once E4-S2B has prepared it, the original before
+   * that and whenever preparation failed. `null` until the first attempt; keeping it here is what lets
+   * "Try again" resend the same object instead of re-encoding (and re-wrapping) it.
+   */
+  readonly uploadFile: File | null;
   readonly previewUrl: string;
   readonly state: ItemState;
   /** The quiet failure sentence for `error`; `null` in every other state. */

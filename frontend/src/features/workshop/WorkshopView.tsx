@@ -5,6 +5,7 @@ import { ApiError } from "../../api/client";
 import { useUploadPhoto } from "../../api/photos";
 import { GlassPanel } from "../../components/GlassPanel";
 import { ENTER_FADE_BASE, LOADING_PULSE } from "../../lib/motion/tokens";
+import { downscaleForUpload } from "../../lib/upload/downscale";
 import { isCurrentProgress } from "../../lib/upload/progress";
 import {
   planSelection,
@@ -55,6 +56,15 @@ import type { UploadProgress } from "../../api/uploadPhoto";
  * invalidate. Because the hook fires the invalidation without returning its promise, the queue is never
  * gated on a refetch.
  *
+ * ## Downscaling before upload
+ *
+ * Before a file's request opens, the queue asks `downscaleForUpload` for the bytes it should send
+ * (E4-S2B). The returned `File` is kept on the item as `uploadFile`, so "Try again" resends **that same
+ * object** rather than encoding twice — identity, like E4-S2A2's retry promise. The progress total is the
+ * size of the file actually sent, and the tile preview stays the original object URL: the user keeps
+ * seeing their photo, not a re-encode of it. `downscaleForUpload` resolves to the original on every
+ * failure; the queue catches a rejection too, because a downscale must never block an upload.
+ *
  * ## Settling, and cancelling the batch
  *
  * When the queue settles, the panel says what this batch did — "Added 3 photos.", "2 photos couldn't be
@@ -76,8 +86,7 @@ import type { UploadProgress } from "../../api/uploadPhoto";
  * Each preview is an object URL created from the picked `File`; it is revoked when its tile is removed,
  * when its upload succeeds, and for everything still held when the view unmounts. The `File`s are React
  * state and **nothing is persisted** — no localStorage, no IndexedDB, no disk. An in-flight request is
- * aborted on unmount, and no file name or content is logged. Downscaling is E4-S2B: no canvas work is in
- * this slice.
+ * aborted on unmount, and no file name or content is logged.
  */
 
 type Phase = "idle" | "selected" | "uploading" | "error";
@@ -195,6 +204,7 @@ export function WorkshopView() {
       const item: SelectionItem = {
         id: `selection-${nextIdRef.current}`,
         file,
+        uploadFile: null,
         previewUrl,
         state: "waiting",
         message: null,
@@ -254,18 +264,39 @@ export function WorkshopView() {
         break;
       }
 
+      // Prepare the bytes before the request: downscale is async, and a cancel or an unmount can land
+      // while it runs, so the loop re-checks both afterwards. `uploadFile` is the item's memory of a
+      // previous attempt — a retry sends exactly that object and never encodes twice.
+      let prepared: File;
+      try {
+        prepared = entry.uploadFile ?? (await downscaleForUpload(entry.file));
+      } catch {
+        // The library already returns the original on its own failures; this catch exists so a future
+        // rejection can never strand a tile. A downscale failure must never block an upload.
+        prepared = entry.file;
+      }
+      if (!aliveRef.current) {
+        return;
+      }
+      if (cancelledRef.current) {
+        break;
+      }
+
       const controller = new AbortController();
       controllerRef.current = controller;
-      setProgress({ loaded: 0, total: entry.file.size });
+      // The line describes the bytes actually sent, not the source file.
+      setProgress({ loaded: 0, total: prepared.size });
       setItems((previous) =>
         previous.map((item) =>
-          item.id === entry.id ? { ...item, state: "uploading", message: null } : item,
+          item.id === entry.id
+            ? { ...item, state: "uploading", message: null, uploadFile: prepared }
+            : item,
         ),
       );
 
       try {
         await upload.mutateAsync({
-          file: entry.file,
+          file: prepared,
           signal: controller.signal,
           onProgress: (next) => {
             // Two races, one gate: the request must still be the one on screen (a late event from a
@@ -348,7 +379,11 @@ export function WorkshopView() {
     cancelledRef.current = false;
     setNotice("");
     setUploading(true);
-    setProgress({ loaded: 0, total: queue[0]?.file.size ?? 0 });
+    const head = queue[0];
+    // A retried file already knows the size it will send. An unprepared one does not: downscaling
+    // happens first, so the line is indeterminate (the quiet pulse) until the loop knows the bytes —
+    // claiming the source size here would describe a file that is not the one being sent.
+    setProgress({ loaded: 0, total: head?.uploadFile?.size ?? 0 });
     // A retry re-queues failed tiles; they are waiting again until their own request opens.
     setItems((previous) =>
       previous.map((item) =>
@@ -423,12 +458,15 @@ export function WorkshopView() {
                 {phase === "uploading" ? (
                   <>
                     <p className="text-sm text-aura-text">Uploading</p>
+                    {/* `data-total` is the byte total the line is computed against — for the tests
+                        and the probe. It is never painted, and the user never reads a percentage. */}
                     <div
                       role="progressbar"
                       aria-label="Upload progress"
                       aria-valuemin={0}
                       aria-valuemax={100}
                       {...(percent === null ? {} : { "aria-valuenow": percent })}
+                      data-total={progress.total}
                       className="h-0.5 w-full overflow-hidden rounded-full bg-aura-text/15"
                     >
                       {percent === null ? (
