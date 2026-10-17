@@ -206,6 +206,11 @@ describe("uploading", () => {
     pickFile(screen.getByLabelText("Choose a photo"), picked);
     const first = await startUpload();
 
+    // A duplicate-submit guard: while the request is in flight, Cancel is the ONLY action. The
+    // reviewing pass added a second Upload button inside this branch and the suite stayed green.
+    expect(within(screen.getByRole("main")).getAllByRole("button")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
+
     expect(multipartBody(first).get("category")).toBe("uncategorized");
     expect(multipartBody(first).get("file")).toBe(picked);
 
@@ -266,6 +271,9 @@ describe("uploading", () => {
     expect(screen.getByRole("main")).toHaveAttribute("data-state", "error");
     expect(screen.getByLabelText("Choose another")).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent("The archive couldn't read that image.");
+    // Focus follows the failure: the recovery action is where the keyboard already is. The reviewing
+    // pass removed this branch of the focus effect and the suite stayed green.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Try again" })).toHaveFocus());
 
     const second = await startUpload("Try again");
     expect(multipartBody(second).get("file")).toBe(picked);
@@ -279,6 +287,8 @@ describe("uploading", () => {
     );
     expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle");
     expect(screen.getByRole("status")).toHaveTextContent("Added to your archive.");
+    // Focus returns to the picker after a success, so the next photo is one keystroke away.
+    await waitFor(() => expect(screen.getByLabelText("Choose a photo")).toHaveFocus());
   });
 
   it("should map the archive's upload-too-large code to its own sentence", async () => {
@@ -353,6 +363,26 @@ describe("uploading", () => {
     await waitFor(() => expect(client.getQueryState(queryKeys.photos)?.isInvalidated).toBe(true));
     // Prefix matching: `["photos", "random"]` is under `["photos"]`, so one invalidation covers both.
     expect(client.getQueryState(queryKeys.randomPhoto)?.isInvalidated).toBe(true);
+  });
+
+  it("should show the success state without waiting for the refetch", async () => {
+    const { client } = renderWorkshop();
+    // A mounted feed consumer could make the refetch slow. The hook fires the invalidation without
+    // returning its promise, so the success sentence is not gated on it — measured by the reviewing
+    // pass: with an awaited callback the view stayed `uploading` until this promise resolved.
+    const invalidate = vi.spyOn(client, "invalidateQueries").mockReturnValue(new Promise(() => {}));
+
+    pickFile(screen.getByLabelText("Choose a photo"), fileOf(4096));
+    const request = await startUpload();
+    await act(async () => {
+      request.respond(201, UPLOADED);
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("workshop-notice")).toHaveTextContent("Added to your archive."),
+    );
+    expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle");
+    expect(invalidate).toHaveBeenCalledTimes(1);
   });
 
   it("should abort an in-flight upload when the view unmounts", async () => {
