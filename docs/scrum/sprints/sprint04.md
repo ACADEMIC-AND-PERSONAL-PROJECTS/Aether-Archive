@@ -16,7 +16,7 @@
 | 1 | E6-S1 | CI on every PR — backend and frontend jobs, cached, under 8 minutes | 5 | p0 | Done | #123 |
 | 2a | E4-S3A | The order reducer — `moveItem`/`orderedIds`, pure and tested | 1 | p0 | Done | #125 |
 | 2b | E4-S3B | The gesture core — mouse/touch sensors, sortable grid, overlay | 4 | p0 | Done | #126 |
-| 2c | E4-S3C | Motion: drop ≤ 300 ms, auto-scroll, reduced motion (criterion 4) — two PRs | 1 | p0 | In review | #127 + #128 |
+| 2c | E4-S3C | Motion: drop ≤ 300 ms, auto-scroll, reduced motion (criterion 4) — two PRs | 1 | p0 | Done | #127 + #128 |
 | 2d | E4-S3D | Keyboard and announcements, with the cancel path (criterion 3) | 2 | p0 | Todo | — |
 | 3 | E4-S4 | Aura colour picker — hex input, palette swatches, live glass preview | 5 | p0 | Todo | — |
 | 4 | E4-S5 | Publish dump — `POST /dumps`, optimistic insert, rollback | 5 | p0 | Todo | — |
@@ -120,3 +120,8 @@ The order is deliberate:
   test, its own probe), and #127 keeps the drop animation, the overlay scrim and reduced motion. The
   slice id and its 1 point stay unchanged (sprint total still 25); keyboard is **S3D** (2 pts).
   #127 merges `develop` after #128 and is re-measured at its tip; no exception is claimed.
+- 2026-10-17 — **E4-S3C merged, both halves** (`#128` auto-scroll, `#127` drop + scrim + reduced
+  motion; merge commits `30d9cb9` and `35b0dca`). Final sizes, re-measured at each tip: **107**
+  hand-written for #128 and **498** for #127 (production 156 / tests 222 / docs 120 / records 0) —
+  both under the ~500 trigger, no exception claimed. The review's recorded nits (scrim contrast
+  8.57/7.45, E6-S23, listener lifecycle, mid-session preference change) are all closed.
