@@ -32,7 +32,7 @@
 | 6b | E4-S1B | Single photo upload — send with progress and cancel, then retry and invalidation (criteria 2–4) | 3 | p0 | Done | #115 |
 | 7a | E4-S2A1 | The selection grid surface — one tile, its state and its remove action (criterion 3) | 1 | p0 | Done | #117 |
 | 7b | E4-S2A2 | Multi-select (≤ 6) and the sequential queue (criteria 1, 4) | 2 | p0 | Done | #118 |
-| 7c | E4-S2B | Client-side downscale before upload (criterion 2) | 2 | p0 | In progress | — |
+| 7c | E4-S2B | Client-side downscale before upload (criterion 2) | 2 | p0 | In review | #119 |
 
 **Total: 12 slices · 28 points** (the row above them is a chore, not a story; E3-S1A/B, E3-S5A/B,
 E4-S1A/B and E4-S2A1/A2/B are each one story, split — see the notes at the end of this section). The order is the
@@ -377,3 +377,13 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   transport's abort was a no-op and the photo was stored. The post-loop now compares processed files to
   the queue length — when every file was processed the summary wins — and a test pins the interleaving
   (restoring the old check fails it).
+- 2026-10-17 — **E4-S2B (PR #119) closes E4-S2 and the sprint's scope**: `planDownscale` is the pure
+  decision (2560 px long edge or 6 MiB; JPEG/JPG/PNG/WebP eligible, GIF/AVIF untouched; JPEG q0.9,
+  PNG preserved for alpha), `downscaleForUpload` the injectable browser edge (EXIF orientation, the
+  encoded blob's own type, the original on every failure), and the queue stores the prepared `File`
+  so a retry resends that same object. It measured **885 hand-written** (production 370, tests 446,
+  docs 69). The exception is the story's **irreducible half**: the executor and its tests alone are
+  **672**, over the ~500 threshold, and without them nothing downscales; the integration half (213)
+  cannot exist without the module. The probe measured 4000 × 3000 / 3,800,460 B → **2560 × 1920 /
+  853,780 B (22.5 %)**, same JPEG magic, decodes; the progress total carries the sent size, and the
+  line starts indeterminate while preparation runs because the sent size is not yet known.
