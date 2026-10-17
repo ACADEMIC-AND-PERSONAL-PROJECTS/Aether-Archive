@@ -7,24 +7,29 @@ import { FakeXhr } from "../../api/__fixtures__/fakeXhr";
 import { PROBLEM_413_TOO_LARGE, PROBLEM_415_UNSUPPORTED } from "../../api/__fixtures__/problems";
 import { queryKeys } from "../../api/queryKeys";
 import { createQueryClient } from "../../app/queryClient";
+import { MAX_SELECTION } from "../../lib/upload/selection";
 import { ACCEPT_ATTRIBUTE, MAX_UPLOAD_BYTES } from "../../lib/upload/validation";
 import { runAxe, violationSummary } from "../../test/axe";
 
 import type { Photo } from "../../types/api";
 
 /**
- * The workshop's pick-and-upload behaviour, as the user observes it (E4-S1B).
+ * The workshop's multi-select and sequential-queue behaviour (E4-S2A), as the user observes it.
  *
  * The transport's browser edge is the fake from `api/__fixtures__/fakeXhr.ts`; everything above it is the
  * shipped component, the real mutation hook and a real `QueryClient`. The tests pin this slice's criteria
- * — a real progress line, cancellation that keeps the same File, failures that keep it and retry it, and
- * invalidation on success only — plus the picker coverage slice A established and the announcement rule
- * E3-S5B established.
+ * — the cap and its explanation, a tile per file with a real remove button, one request at a time in
+ * selection order, per-file failure isolation, retry identity, batch cancellation — plus the picker and
+ * announcement contracts E4-S1A/S1B/E3-S5B established.
+ *
+ * Object URLs are stubbed with a counter so a test can name the URL a tile owns; the shipped code still
+ * calls the real `URL.createObjectURL`/`revokeObjectURL` shape (jsdom implements both, measured in the
+ * test-environment table in `frontend/README.md`).
  *
  * jsdom limitation, stated rather than papered over: the file input has no native picker. The suite
  * assigns `files` on the input and fires a real `change` event (the working pattern, probed in this
  * environment: `Object.defineProperty(input, "files", …)` succeeds, while `DataTransfer` does not exist
- * in jsdom 30). The browser-level picker is exercised by the Chromium probe, not here.
+ * in jsdom 30). The browser-level picker and the real queue are exercised by the Chromium probe.
  */
 
 const UPLOADED: Photo = {
@@ -34,15 +39,21 @@ const UPLOADED: Photo = {
   uploadedAt: "2026-10-17T03:46:21.684975Z",
 };
 
+let previewCount = 0;
+
 /** A file with its `File`-native size overridden, so a 15 MB boundary does not allocate 15 MB. */
 function fileOf(size: number, type = "image/png", name = "photo.png"): File {
-  const file = new File([new Uint8Array(Math.min(size, 8))], name, { type });
-  Object.defineProperty(file, "size", { configurable: true, value: size });
+  const payload = new Uint8Array(Math.min(size, 8));
+  const file = new File([payload], name, { type });
+  if (size > payload.byteLength) {
+    Object.defineProperty(file, "size", { configurable: true, value: size });
+  }
   return file;
 }
 
-function pickFile(input: HTMLElement, file: File): void {
-  Object.defineProperty(input, "files", { configurable: true, value: [file] });
+/** The jsdom pattern for a native pick: define the FileList, then fire the change React listens for. */
+function pickFiles(input: HTMLElement, files: readonly File[]): void {
+  Object.defineProperty(input, "files", { configurable: true, value: files });
   fireEvent.change(input);
 }
 
@@ -56,16 +67,31 @@ function renderWorkshop(): { client: QueryClient; unmount: () => void } {
   return { client, unmount };
 }
 
-/** The panel's action that starts the request, awaited until the transport has opened it. */
-async function startUpload(name: "Upload" | "Try again" = "Upload"): Promise<FakeXhr> {
-  const before = FakeXhr.instances.length;
-  fireEvent.click(screen.getByRole("button", { name }));
-  await waitFor(() => expect(FakeXhr.instances).toHaveLength(before + 1));
-  const request = FakeXhr.instances[before];
+/** The request at `index`, awaited until the queue has opened it. */
+async function requestAt(index: number): Promise<FakeXhr> {
+  await waitFor(() => expect(FakeXhr.instances.length).toBeGreaterThan(index));
+  const request = FakeXhr.instances[index];
   if (request === undefined) {
-    throw new Error("the upload action opened no request");
+    throw new Error(`request ${index} opened no XHR`);
   }
   return request;
+}
+
+async function respond(
+  request: FakeXhr,
+  status: number,
+  body: unknown,
+  contentType = "application/json",
+): Promise<void> {
+  await act(async () => {
+    request.respond(status, body, contentType);
+  });
+}
+
+async function startUpload(): Promise<FakeXhr> {
+  const before = FakeXhr.instances.length;
+  fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+  return requestAt(before);
 }
 
 function multipartBody(request: FakeXhr): FormData {
@@ -75,9 +101,29 @@ function multipartBody(request: FakeXhr): FormData {
   return request.body;
 }
 
+/** The list item that owns a file, found through the remove button's accessible name. */
+function tileFor(name: string): HTMLElement {
+  const button = screen.getByRole("button", { name: `Remove ${name}` });
+  const tile = button.closest("li");
+  if (tile === null) {
+    throw new Error(`no tile for ${name}`);
+  }
+  return tile;
+}
+
+function selectedTiles(): readonly HTMLElement[] {
+  return within(screen.getByRole("list", { name: "Selected photos" })).getAllByRole("listitem");
+}
+
 beforeEach(() => {
   FakeXhr.reset();
   vi.stubGlobal("XMLHttpRequest", FakeXhr);
+  previewCount = 0;
+  // Deterministic preview URLs: the first picked file owns `blob:preview-1`, in pick order.
+  vi.spyOn(URL, "createObjectURL").mockImplementation(() => {
+    previewCount += 1;
+    return `blob:preview-${previewCount}`;
+  });
 });
 
 afterEach(() => {
@@ -85,99 +131,136 @@ afterEach(() => {
 });
 
 describe("the picker", () => {
-  it("should accept images only through the native hint, and start idle", () => {
+  it("should accept images only, offer multi-select and start idle", () => {
     renderWorkshop();
 
-    expect(screen.getByText("Add a photo to your archive.")).toBeVisible();
-    expect(screen.getByLabelText("Choose a photo")).toHaveAttribute("accept", ACCEPT_ATTRIBUTE);
+    expect(screen.getByText("Add photos to your archive.")).toBeVisible();
+    const input = screen.getByLabelText("Choose photos");
+    expect(input).toHaveAttribute("accept", ACCEPT_ATTRIBUTE);
+    expect(input).toHaveAttribute("multiple");
     expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle");
     expect(screen.getByRole("status")).toHaveTextContent("");
-    // The idle screen has no action yet: validation happens on the pick, and no request exists before
-    // a file is chosen.
+    // No request exists before a file is chosen, and the idle screen has no action yet.
     expect(screen.queryAllByRole("button")).toHaveLength(0);
     expect(screen.queryByRole("progressbar")).toBeNull();
     expect(FakeXhr.instances).toHaveLength(0);
   });
 
-  it("should refuse a non-image before any request and say why", () => {
+  it("should refuse a non-image before any request and name the file", () => {
     renderWorkshop();
 
-    pickFile(screen.getByLabelText("Choose a photo"), fileOf(16, "text/plain", "notes.png"));
+    pickFiles(screen.getByLabelText("Choose photos"), [fileOf(16, "text/plain", "notes.png")]);
 
-    expect(screen.getByTestId("workshop-notice")).toHaveTextContent(
-      "isn't an image the archive can keep",
-    );
+    const notice = screen.getByTestId("workshop-notice");
+    expect(notice).toHaveTextContent("notes.png:");
+    expect(notice).toHaveTextContent("isn't an image the archive can keep");
     expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle");
     expect(screen.queryAllByRole("button")).toHaveLength(0);
     expect(FakeXhr.instances).toHaveLength(0);
-    expect(screen.getByRole("status")).toHaveTextContent(
-      screen.getByTestId("workshop-notice").textContent ?? "",
-    );
+    expect(screen.getByRole("status")).toHaveTextContent(notice.textContent ?? "");
   });
 
   it("should refuse an oversize file, and accept the limit exactly", () => {
     renderWorkshop();
-    const input = screen.getByLabelText("Choose a photo");
 
-    pickFile(input, fileOf(MAX_UPLOAD_BYTES + 1));
+    pickFiles(screen.getByLabelText("Choose photos"), [fileOf(MAX_UPLOAD_BYTES + 1)]);
     expect(screen.getByTestId("workshop-notice")).toHaveTextContent("larger than 15 MB");
     expect(FakeXhr.instances).toHaveLength(0);
     expect(screen.queryAllByRole("button")).toHaveLength(0);
 
-    pickFile(input, fileOf(MAX_UPLOAD_BYTES));
+    pickFiles(screen.getByLabelText("Choose photos"), [fileOf(MAX_UPLOAD_BYTES)]);
+    expect(screen.getByRole("main")).toHaveAttribute("data-state", "selected");
     expect(screen.getByRole("button", { name: "Upload" })).toBeVisible();
     expect(FakeXhr.instances).toHaveLength(0);
   });
 
-  it("should show the picked photo, name the state and move focus to the upload action", async () => {
+  it("should keep six of seven picked photos and explain the one that was left out", () => {
     renderWorkshop();
+    const seven = Array.from({ length: 7 }, (_, index) =>
+      fileOf(16, "image/png", `photo-${index}.png`),
+    );
 
-    pickFile(screen.getByLabelText("Choose a photo"), fileOf(2048));
-    const upload = screen.getByRole("button", { name: "Upload" });
+    pickFiles(screen.getByLabelText("Choose photos"), seven);
 
     expect(screen.getByRole("main")).toHaveAttribute("data-state", "selected");
-    expect(document.querySelector("main img")).not.toBeNull();
-    // One message, two roles: the panel's sentence and the persistent status region.
-    expect(within(screen.getByRole("main")).getByText("Photo selected.")).toBeVisible();
-    expect(screen.getByRole("status")).toHaveTextContent("Photo selected.");
-    expect(screen.getByLabelText("Choose another")).toBeVisible();
-    await waitFor(() => expect(upload).toHaveFocus());
-  });
-
-  it("should load the preview lazily and decode it off the main thread", () => {
-    renderWorkshop();
-
-    pickFile(screen.getByLabelText("Choose a photo"), fileOf(2048));
-    const preview = document.querySelector("main img");
-    if (!(preview instanceof HTMLImageElement)) {
-      throw new Error("the picked file has no preview");
-    }
-
-    // `.claude/rules/frontend.md`: every image except the splash hero. The preview is full-bleed, so
-    // `lazy` costs nothing here and keeps the rule uniform for the grid and dump images that follow.
-    expect(preview).toHaveAttribute("loading", "lazy");
-    expect(preview).toHaveAttribute("decoding", "async");
-  });
-
-  it("should return to the picker when a replacement pick is refused", () => {
-    renderWorkshop();
-    pickFile(screen.getByLabelText("Choose a photo"), fileOf(2048));
-    expect(document.querySelector("main img")).not.toBeNull();
-
-    pickFile(screen.getByLabelText("Choose another"), fileOf(16, "text/plain", "notes.png"));
-
-    expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle");
-    expect(document.querySelector("main img")).toBeNull();
+    expect(selectedTiles()).toHaveLength(MAX_SELECTION);
     expect(screen.getByTestId("workshop-notice")).toHaveTextContent(
-      "isn't an image the archive can keep",
+      "You can add up to 6 photos at a time — 1 wasn't added.",
     );
-    expect(screen.queryAllByRole("button")).toHaveLength(0);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "You can add up to 6 photos at a time — 1 wasn't added.",
+    );
+    expect(FakeXhr.instances).toHaveLength(0);
   });
 
-  it("should drop a preview the browser cannot decode, keeping the file selected", async () => {
+  it("should count the existing selection against the cap when adding more", () => {
+    renderWorkshop();
+    pickFiles(
+      screen.getByLabelText("Choose photos"),
+      Array.from({ length: 5 }, (_, index) => fileOf(16, "image/png", `first-${index}.png`)),
+    );
+    expect(selectedTiles()).toHaveLength(5);
+
+    pickFiles(screen.getByLabelText("Add photos"), [
+      fileOf(16, "image/png", "sixth.png"),
+      fileOf(16, "image/png", "seventh.png"),
+    ]);
+
+    expect(selectedTiles()).toHaveLength(6);
+    expect(screen.getByTestId("workshop-notice")).toHaveTextContent("1 wasn't added");
+    expect(screen.getByRole("button", { name: "Remove sixth.png" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Remove seventh.png" })).toBeNull();
+    expect(FakeXhr.instances).toHaveLength(0);
+  });
+
+  it("should report every refused file by name and keep the valid ones", () => {
     renderWorkshop();
 
-    pickFile(screen.getByLabelText("Choose a photo"), fileOf(64, "image/png", "decoy.png"));
+    pickFiles(screen.getByLabelText("Choose photos"), [
+      fileOf(16, "text/plain", "notes.txt"),
+      fileOf(0, "image/png", "empty.png"),
+      fileOf(16, "image/png", "good.png"),
+    ]);
+
+    const notice = screen.getByTestId("workshop-notice");
+    expect(notice).toHaveTextContent("notes.txt:");
+    expect(notice).toHaveTextContent("empty.png: That file is empty.");
+    expect(screen.getByRole("main")).toHaveAttribute("data-state", "selected");
+    expect(selectedTiles()).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Remove good.png" })).toBeVisible();
+    expect(FakeXhr.instances).toHaveLength(0);
+  });
+
+  it("should keep the current selection when a later pick is refused", () => {
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [fileOf(16, "image/png", "kept.png")]);
+
+    pickFiles(screen.getByLabelText("Add photos"), [fileOf(16, "text/plain", "notes.txt")]);
+
+    expect(screen.getByRole("main")).toHaveAttribute("data-state", "selected");
+    expect(screen.getByRole("button", { name: "Remove kept.png" })).toBeVisible();
+    expect(screen.getByTestId("workshop-notice")).toHaveTextContent("notes.txt:");
+  });
+
+  it("should load every preview lazily and decode it off the main thread", () => {
+    renderWorkshop();
+
+    pickFiles(screen.getByLabelText("Choose photos"), [
+      fileOf(2048, "image/png", "a.png"),
+      fileOf(2048, "image/png", "b.png"),
+    ]);
+
+    const previews = Array.from(document.querySelectorAll("main img"));
+    expect(previews).toHaveLength(2);
+    for (const preview of previews) {
+      expect(preview).toHaveAttribute("loading", "lazy");
+      expect(preview).toHaveAttribute("decoding", "async");
+    }
+  });
+
+  it("should drop a preview the browser cannot decode, keeping the tile and its scrim", async () => {
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [fileOf(64, "image/png", "decoy.png")]);
     const preview = document.querySelector("main img");
     if (!(preview instanceof HTMLImageElement)) {
       throw new Error("the picked file has no preview");
@@ -186,33 +269,293 @@ describe("the picker", () => {
     fireEvent.error(preview);
 
     await waitFor(() => expect(document.querySelector("main img")).toBeNull());
-    // The broken glyph is gone, but the selection is not: the server still gets to judge the bytes.
+    // The broken glyph is gone, but the tile and the file are not: the server still judges the bytes.
+    const tile = tileFor("decoy.png");
+    expect(tile).toBeVisible();
+    expect(tile.querySelector("div[aria-hidden='true']")?.tagName).toBe("DIV");
     expect(screen.getByRole("main")).toHaveAttribute("data-state", "selected");
-    // The scrim stays behind the panel when the preview is dropped, so the glass still composites
-    // over a known backdrop rather than the raw base alone.
-    const backdrops = document.querySelectorAll('main [aria-hidden="true"]');
-    expect(backdrops).toHaveLength(1);
-    expect(backdrops[0]?.tagName).toBe("DIV");
-    expect(within(screen.getByRole("main")).getByText("Photo selected.")).toBeVisible();
-    expect(screen.getByLabelText("Choose another")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Upload" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Remove decoy.png" })).toBeVisible();
   });
 });
 
-describe("uploading", () => {
-  it("should report real progress, cancel it, and keep the same File for another attempt", async () => {
+describe("the grid", () => {
+  it("should list every file with a named remove button, and removing releases its preview", () => {
+    const revoke = vi.spyOn(URL, "revokeObjectURL");
     renderWorkshop();
-    const picked = fileOf(4096);
-    pickFile(screen.getByLabelText("Choose a photo"), picked);
+    pickFiles(screen.getByLabelText("Choose photos"), [
+      fileOf(16, "image/png", "a.png"),
+      fileOf(16, "image/png", "b.png"),
+      fileOf(16, "image/png", "c.png"),
+    ]);
+
+    const list = screen.getByRole("list", { name: "Selected photos" });
+    expect(within(list).getAllByRole("listitem")).toHaveLength(3);
+    const removeB = screen.getByRole("button", { name: "Remove b.png" });
+    expect(removeB).toHaveClass("h-11", "w-11");
+    // One message, two roles: the panel's count sentence and the persistent status region.
+    expect(screen.getByTestId("workshop-notice")).toHaveTextContent("3 photos selected.");
+    expect(screen.getByRole("status")).toHaveTextContent("3 photos selected.");
+
+    fireEvent.click(removeB);
+
+    expect(revoke).toHaveBeenCalledWith("blob:preview-2");
+    expect(within(list).getAllByRole("listitem")).toHaveLength(2);
+    expect(screen.getByTestId("workshop-notice")).toHaveTextContent("2 photos selected.");
+    expect(screen.getByRole("status")).toHaveTextContent("2 photos selected.");
+    expect(screen.queryByRole("button", { name: "Remove b.png" })).toBeNull();
+  });
+
+  it("should return to the picker and focus it when the last tile is removed", async () => {
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [fileOf(16, "image/png", "only.png")]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove only.png" }));
+
+    expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle");
+    expect(screen.queryByRole("list", { name: "Selected photos" })).toBeNull();
+    await waitFor(() => expect(screen.getByLabelText("Choose photos")).toHaveFocus());
+  });
+
+  it("should show the per-file state under each tile", async () => {
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [
+      fileOf(16, "image/png", "a.png"),
+      fileOf(16, "image/png", "b.png"),
+    ]);
+
+    expect(tileFor("a.png")).toHaveAttribute("data-state", "waiting");
+    expect(tileFor("a.png")).toHaveTextContent("Waiting");
+    expect(tileFor("b.png")).toHaveTextContent("Waiting");
+
     const first = await startUpload();
+    await waitFor(() => expect(tileFor("a.png")).toHaveAttribute("data-state", "uploading"));
+    expect(tileFor("a.png")).toHaveTextContent("Uploading");
+    expect(tileFor("b.png")).toHaveAttribute("data-state", "waiting");
 
-    // A duplicate-submit guard: while the request is in flight, Cancel is the ONLY action. The
-    // reviewing pass added a second Upload button inside this branch and the suite stayed green.
-    expect(within(screen.getByRole("main")).getAllByRole("button")).toHaveLength(1);
-    expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
+    await respond(first, 413, PROBLEM_413_TOO_LARGE, "application/problem+json");
+    await waitFor(() => expect(tileFor("a.png")).toHaveAttribute("data-state", "error"));
+    expect(tileFor("a.png")).toHaveTextContent("That photo is larger than the archive accepts.");
+  });
+});
 
-    expect(multipartBody(first).get("category")).toBe("uncategorized");
-    expect(multipartBody(first).get("file")).toBe(picked);
+describe("the queue", () => {
+  it("should upload one file at a time in selection order and remove each success", async () => {
+    renderWorkshop();
+    const firstFile = fileOf(16, "image/png", "a.png");
+    const secondFile = fileOf(16, "image/png", "b.png");
+    const thirdFile = fileOf(16, "image/png", "c.png");
+    pickFiles(screen.getByLabelText("Choose photos"), [firstFile, secondFile, thirdFile]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+    const first = await requestAt(0);
+    // Concurrency one: the click opened exactly one request, in pick order.
+    await act(async () => {});
+    expect(FakeXhr.instances).toHaveLength(1);
+    expect(multipartBody(first).get("file")).toBe(firstFile);
+    await waitFor(() => expect(tileFor("a.png")).toHaveAttribute("data-state", "uploading"));
+    expect(tileFor("b.png")).toHaveAttribute("data-state", "waiting");
+    expect(tileFor("c.png")).toHaveAttribute("data-state", "waiting");
+
+    await respond(first, 201, UPLOADED);
+    const second = await requestAt(1);
+    expect(FakeXhr.instances).toHaveLength(2);
+    expect(multipartBody(second).get("file")).toBe(secondFile);
+    expect(screen.queryByRole("button", { name: "Remove a.png" })).toBeNull();
+    await waitFor(() => expect(tileFor("b.png")).toHaveAttribute("data-state", "uploading"));
+
+    await respond(second, 201, UPLOADED);
+    const third = await requestAt(2);
+    expect(multipartBody(third).get("file")).toBe(thirdFile);
+
+    await respond(third, 201, UPLOADED);
+    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle"));
+    expect(screen.getByTestId("workshop-notice")).toHaveTextContent("Added 3 photos.");
+    expect(screen.getByRole("status")).toHaveTextContent("Added 3 photos.");
+    expect(screen.queryByRole("list", { name: "Selected photos" })).toBeNull();
+    // Focus returns to the picker after a full success, so the next batch is one keystroke away.
+    await waitFor(() => expect(screen.getByLabelText("Choose photos")).toHaveFocus());
+  });
+
+  it("should keep going after a failure and name the file that failed", async () => {
+    renderWorkshop();
+    const firstFile = fileOf(16, "image/png", "a.png");
+    const secondFile = fileOf(16, "image/png", "b.png");
+    const thirdFile = fileOf(16, "image/png", "c.png");
+    pickFiles(screen.getByLabelText("Choose photos"), [firstFile, secondFile, thirdFile]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+    const first = await requestAt(0);
+    await respond(first, 201, UPLOADED);
+
+    const second = await requestAt(1);
+    expect(multipartBody(second).get("file")).toBe(secondFile);
+    await respond(second, 415, PROBLEM_415_UNSUPPORTED, "application/problem+json");
+
+    // The third file is sent even though the second failed — one failure never aborts the queue.
+    const third = await requestAt(2);
+    expect(multipartBody(third).get("file")).toBe(thirdFile);
+    await waitFor(() => expect(tileFor("b.png")).toHaveAttribute("data-state", "error"));
+    expect(tileFor("b.png")).toHaveTextContent("The archive couldn't read that image.");
+
+    await respond(third, 201, UPLOADED);
+    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "error"));
+    expect(screen.getByTestId("workshop-notice")).toHaveTextContent(
+      "Added 2 photos. 1 photo couldn't be added.",
+    );
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Added 2 photos. 1 photo couldn't be added.",
+    );
+    expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Remove a.png" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Remove c.png" })).toBeNull();
+  });
+
+  it("should invalidate once per success and never for a failure", async () => {
+    const { client } = renderWorkshop();
+    client.setQueryData(queryKeys.photos, []);
+    client.setQueryData(queryKeys.randomPhoto, UPLOADED);
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+
+    pickFiles(screen.getByLabelText("Choose photos"), [
+      fileOf(16, "image/png", "a.png"),
+      fileOf(16, "image/png", "b.png"),
+      fileOf(16, "image/png", "c.png"),
+    ]);
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+    expect(invalidate).not.toHaveBeenCalled();
+
+    const first = await requestAt(0);
+    await respond(first, 201, UPLOADED);
+    await waitFor(() => expect(invalidate).toHaveBeenCalledTimes(1));
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.photos });
+
+    const second = await requestAt(1);
+    await respond(second, 415, PROBLEM_415_UNSUPPORTED, "application/problem+json");
+    await waitFor(() => expect(tileFor("b.png")).toHaveAttribute("data-state", "error"));
+    // A refused upload stores nothing, so it invalidates nothing: the success count does not move.
+    expect(invalidate).toHaveBeenCalledTimes(1);
+
+    const third = await requestAt(2);
+    await respond(third, 201, UPLOADED);
+    await waitFor(() => expect(invalidate).toHaveBeenCalledTimes(2));
+    expect(client.getQueryState(queryKeys.photos)?.isInvalidated).toBe(true);
+    // Prefix matching: `["photos", "random"]` is under `["photos"]`, so one invalidation covers both.
+    expect(client.getQueryState(queryKeys.randomPhoto)?.isInvalidated).toBe(true);
+  });
+
+  it("should retry failed files with the same File objects", async () => {
+    renderWorkshop();
+    const firstFile = fileOf(16, "image/png", "a.png");
+    const secondFile = fileOf(4096, "image/png", "b.png");
+    pickFiles(screen.getByLabelText("Choose photos"), [firstFile, secondFile]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+    const first = await requestAt(0);
+    await respond(first, 201, UPLOADED);
+    const second = await requestAt(1);
+    await respond(second, 415, PROBLEM_415_UNSUPPORTED, "application/problem+json");
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Try again" })).toBeVisible());
+    expect(screen.getByTestId("workshop-notice")).toHaveTextContent(
+      "Added 1 photo. 1 photo couldn't be added.",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    const retry = await requestAt(2);
+    // Identity, not equivalence: the same File object, not a re-read from the input.
+    expect(multipartBody(retry).get("file")).toBe(secondFile);
+
+    await respond(retry, 201, UPLOADED);
+    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle"));
+    expect(screen.getByTestId("workshop-notice")).toHaveTextContent("Added 1 photo.");
+  });
+
+  it("should map the archive's failure codes to per-file sentences", async () => {
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [fileOf(16, "image/png", "photo.png")]);
+    const request = await startUpload();
+
+    await respond(request, 413, PROBLEM_413_TOO_LARGE, "application/problem+json");
+
+    await waitFor(() => expect(tileFor("photo.png")).toHaveAttribute("data-state", "error"));
+    expect(tileFor("photo.png")).toHaveTextContent(
+      "That photo is larger than the archive accepts.",
+    );
+    expect(screen.getByRole("main")).toHaveAttribute("data-state", "error");
+    expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
+    expect(screen.getByTestId("workshop-notice")).toHaveTextContent("1 photo couldn't be added.");
+    expect(screen.getByRole("status")).toHaveTextContent("1 photo couldn't be added.");
+  });
+
+  it.each([
+    ["network", (request: FakeXhr) => request.failNetwork()],
+    ["timeout", (request: FakeXhr) => request.expire()],
+  ])("should say the archive did not answer after a %s failure", async (_kind, fail) => {
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [fileOf(16, "image/png", "photo.png")]);
+    const request = await startUpload();
+
+    await act(async () => {
+      fail(request);
+    });
+
+    await waitFor(() => expect(tileFor("photo.png")).toHaveAttribute("data-state", "error"));
+    expect(tileFor("photo.png")).toHaveTextContent("The archive didn't answer. Try again.");
+    expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent("1 photo couldn't be added.");
+  });
+
+  it("should cancel the batch, abort the request and leave the remaining files waiting", async () => {
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [
+      fileOf(16, "image/png", "a.png"),
+      fileOf(16, "image/png", "b.png"),
+      fileOf(16, "image/png", "c.png"),
+    ]);
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+    const first = await requestAt(0);
+    await waitFor(() => expect(tileFor("a.png")).toHaveAttribute("data-state", "uploading"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("workshop-notice")).toHaveTextContent("Upload cancelled."),
+    );
+    expect(first.aborted).toBe(true);
+    // The queue stopped: no second request was opened, and no tile was uploaded or failed.
+    await act(async () => {});
+    expect(FakeXhr.instances).toHaveLength(1);
+    expect(screen.getByRole("main")).toHaveAttribute("data-state", "selected");
+    for (const name of ["a.png", "b.png", "c.png"]) {
+      expect(tileFor(name)).toHaveAttribute("data-state", "waiting");
+    }
+    expect(screen.getByRole("status")).toHaveTextContent("Upload cancelled.");
+    expect(screen.getByRole("button", { name: "Upload" })).toBeVisible();
+  });
+
+  it("should abort an in-flight upload and revoke every preview when the view unmounts", async () => {
+    const revoke = vi.spyOn(URL, "revokeObjectURL");
+    const { unmount } = renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [
+      fileOf(16, "image/png", "a.png"),
+      fileOf(16, "image/png", "b.png"),
+    ]);
+    const request = await startUpload();
+
+    unmount();
+
+    expect(request.aborted).toBe(true);
+    expect(revoke).toHaveBeenCalledWith("blob:preview-1");
+    expect(revoke).toHaveBeenCalledWith("blob:preview-2");
+  });
+
+  it("should report real progress for the file in flight, without a percentage", async () => {
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [
+      fileOf(4096, "image/png", "a.png"),
+      fileOf(4096, "image/png", "b.png"),
+    ]);
+    const first = await startUpload();
 
     act(() => {
       first.emitProgress(50, 100);
@@ -224,23 +567,15 @@ describe("uploading", () => {
     // A line, not a number: no percentage is rendered anywhere on the screen.
     expect(within(screen.getByRole("main")).queryByText(/%/)).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    await waitFor(() =>
-      expect(within(screen.getByRole("main")).getByText("Upload cancelled.")).toBeVisible(),
-    );
-
-    expect(first.aborted).toBe(true);
-    expect(screen.getByRole("main")).toHaveAttribute("data-state", "selected");
-    expect(screen.getByRole("status")).toHaveTextContent("Upload cancelled.");
-
-    // The same File object is retried — nothing was dropped with the aborted request.
-    const second = await startUpload();
-    expect(multipartBody(second).get("file")).toBe(picked);
+    await respond(first, 201, UPLOADED);
+    await requestAt(1);
+    // The line resets to the second file's own start instead of carrying the first file's 50 %.
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "0");
   });
 
   it("should show an indeterminate line when the browser cannot compute the length", async () => {
     renderWorkshop();
-    pickFile(screen.getByLabelText("Choose a photo"), fileOf(4096));
+    pickFiles(screen.getByLabelText("Choose photos"), [fileOf(4096, "image/png", "photo.png")]);
     const request = await startUpload();
 
     act(() => {
@@ -252,156 +587,47 @@ describe("uploading", () => {
     expect(progressbar.firstElementChild).toHaveClass("opacity-25");
   });
 
-  it("should surface a failure, keep the file and retry it successfully", async () => {
+  it("should keep Cancel as the only action while the batch runs", async () => {
     renderWorkshop();
-    const picked = fileOf(4096);
-    pickFile(screen.getByLabelText("Choose a photo"), picked);
-    const first = await startUpload();
+    pickFiles(screen.getByLabelText("Choose photos"), [
+      fileOf(16, "image/png", "a.png"),
+      fileOf(16, "image/png", "b.png"),
+    ]);
+    await startUpload();
 
-    await act(async () => {
-      first.respond(415, PROBLEM_415_UNSUPPORTED, "application/problem+json");
-    });
-
-    // The sentence is shown in the panel and announced in the status region — one message, two roles.
-    await waitFor(() =>
-      expect(
-        within(screen.getByRole("main")).getByText("The archive couldn't read that image."),
-      ).toBeVisible(),
-    );
-    expect(screen.getByRole("main")).toHaveAttribute("data-state", "error");
-    expect(screen.getByLabelText("Choose another")).toBeVisible();
-    expect(screen.getByRole("status")).toHaveTextContent("The archive couldn't read that image.");
-    // Focus follows the failure: the recovery action is where the keyboard already is. The reviewing
-    // pass removed this branch of the focus effect and the suite stayed green.
-    await waitFor(() => expect(screen.getByRole("button", { name: "Try again" })).toHaveFocus());
-
-    const second = await startUpload("Try again");
-    expect(multipartBody(second).get("file")).toBe(picked);
-
-    await act(async () => {
-      second.respond(201, UPLOADED);
-    });
-
-    await waitFor(() =>
-      expect(screen.getByTestId("workshop-notice")).toHaveTextContent("Added to your archive."),
-    );
-    expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle");
-    expect(screen.getByRole("status")).toHaveTextContent("Added to your archive.");
-    // Focus returns to the picker after a success, so the next photo is one keystroke away.
-    await waitFor(() => expect(screen.getByLabelText("Choose a photo")).toHaveFocus());
-  });
-
-  it("should map the archive's upload-too-large code to its own sentence", async () => {
-    renderWorkshop();
-    pickFile(screen.getByLabelText("Choose a photo"), fileOf(4096));
-    const request = await startUpload();
-
-    await act(async () => {
-      request.respond(413, PROBLEM_413_TOO_LARGE, "application/problem+json");
-    });
-
-    await waitFor(() =>
-      expect(
-        within(screen.getByRole("main")).getByText(
-          "That photo is larger than the archive accepts.",
-        ),
-      ).toBeVisible(),
-    );
-    expect(screen.getByRole("main")).toHaveAttribute("data-state", "error");
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "That photo is larger than the archive accepts.",
-    );
-  });
-
-  it.each([
-    ["network", (request: FakeXhr) => request.failNetwork()],
-    ["timeout", (request: FakeXhr) => request.expire()],
-  ])("should say the archive did not answer after a %s failure", async (_kind, fail) => {
-    renderWorkshop();
-    pickFile(screen.getByLabelText("Choose a photo"), fileOf(4096));
-    const request = await startUpload();
-
-    await act(async () => {
-      fail(request);
-    });
-
-    await waitFor(() =>
-      expect(
-        within(screen.getByRole("main")).getByText("The archive didn't answer. Try again."),
-      ).toBeVisible(),
-    );
-    expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
-    expect(screen.getByRole("status")).toHaveTextContent("The archive didn't answer. Try again.");
-  });
-
-  it("should invalidate the feed and the splash hero on success, and never on failure", async () => {
-    const { client } = renderWorkshop();
-    client.setQueryData(queryKeys.photos, []);
-    client.setQueryData(queryKeys.randomPhoto, UPLOADED);
-    const invalidate = vi.spyOn(client, "invalidateQueries");
-
-    pickFile(screen.getByLabelText("Choose a photo"), fileOf(4096));
-    const first = await startUpload();
-
-    // A request in flight, and a failure, change nothing the archive holds.
-    expect(client.getQueryState(queryKeys.photos)?.isInvalidated).toBe(false);
-    await act(async () => {
-      first.respond(415, PROBLEM_415_UNSUPPORTED, "application/problem+json");
-    });
-    await waitFor(() => expect(screen.getByRole("button", { name: "Try again" })).toBeVisible());
-    expect(invalidate).not.toHaveBeenCalled();
-    expect(client.getQueryState(queryKeys.photos)?.isInvalidated).toBe(false);
-    expect(client.getQueryState(queryKeys.randomPhoto)?.isInvalidated).toBe(false);
-
-    const second = await startUpload("Try again");
-    await act(async () => {
-      second.respond(201, UPLOADED);
-    });
-
-    await waitFor(() => expect(invalidate).toHaveBeenCalledTimes(1));
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.photos });
-    await waitFor(() => expect(client.getQueryState(queryKeys.photos)?.isInvalidated).toBe(true));
-    // Prefix matching: `["photos", "random"]` is under `["photos"]`, so one invalidation covers both.
-    expect(client.getQueryState(queryKeys.randomPhoto)?.isInvalidated).toBe(true);
+    expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
+    expect(screen.queryByRole("button", { name: "Upload" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    // Removal waits for the batch: a tile cannot vanish from under the queue's snapshot.
+    expect(screen.getByRole("button", { name: "Remove a.png" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Remove b.png" })).toBeDisabled();
   });
 
   it("should show the success state without waiting for the refetch", async () => {
     const { client } = renderWorkshop();
     // A mounted feed consumer could make the refetch slow. The hook fires the invalidation without
-    // returning its promise, so the success sentence is not gated on it — measured by the reviewing
-    // pass: with an awaited callback the view stayed `uploading` until this promise resolved.
+    // returning its promise, so the success sentence is not gated on it.
     const invalidate = vi.spyOn(client, "invalidateQueries").mockReturnValue(new Promise(() => {}));
 
-    pickFile(screen.getByLabelText("Choose a photo"), fileOf(4096));
+    pickFiles(screen.getByLabelText("Choose photos"), [fileOf(16, "image/png", "photo.png")]);
     const request = await startUpload();
-    await act(async () => {
-      request.respond(201, UPLOADED);
-    });
+    await respond(request, 201, UPLOADED);
 
-    await waitFor(() =>
-      expect(screen.getByTestId("workshop-notice")).toHaveTextContent("Added to your archive."),
-    );
-    expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle");
+    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle"));
+    expect(screen.getByTestId("workshop-notice")).toHaveTextContent("Added 1 photo.");
     expect(invalidate).toHaveBeenCalledTimes(1);
-  });
-
-  it("should abort an in-flight upload when the view unmounts", async () => {
-    const { unmount } = renderWorkshop();
-    pickFile(screen.getByLabelText("Choose a photo"), fileOf(4096));
-    const request = await startUpload();
-
-    unmount();
-
-    expect(request.aborted).toBe(true);
   });
 });
 
 describe("accessibility", () => {
-  it("should have no structural violations while idle, selected, uploading and in error", async () => {
-    renderWorkshop();
+  it("should have no structural violations while idle, selected and uploading", async () => {
+    const { unmount } = renderWorkshop();
     expect(violationSummary(await runAxe(document.body))).toEqual([]);
 
-    pickFile(screen.getByLabelText("Choose a photo"), fileOf(4096));
+    pickFiles(screen.getByLabelText("Choose photos"), [
+      fileOf(4096, "image/png", "a.png"),
+      fileOf(4096, "image/png", "b.png"),
+    ]);
     expect(screen.getByRole("main")).toHaveAttribute("data-state", "selected");
     expect(violationSummary(await runAxe(document.body))).toEqual([]);
 
@@ -412,10 +638,18 @@ describe("accessibility", () => {
     expect(screen.getByRole("main")).toHaveAttribute("data-state", "uploading");
     expect(violationSummary(await runAxe(document.body))).toEqual([]);
 
-    await act(async () => {
-      request.respond(413, PROBLEM_413_TOO_LARGE, "application/problem+json");
-    });
+    // The first request is still in flight; unmounting is the branch's own abort path.
+    unmount();
+  });
+
+  it("should have no structural violations with a failed tile", async () => {
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [fileOf(4096, "image/png", "c.png")]);
+    const failing = await startUpload();
+    await respond(failing, 413, PROBLEM_413_TOO_LARGE, "application/problem+json");
+
     await waitFor(() => expect(screen.getByRole("button", { name: "Try again" })).toBeVisible());
+    expect(screen.getByRole("main")).toHaveAttribute("data-state", "error");
     expect(violationSummary(await runAxe(document.body))).toEqual([]);
   });
 });
