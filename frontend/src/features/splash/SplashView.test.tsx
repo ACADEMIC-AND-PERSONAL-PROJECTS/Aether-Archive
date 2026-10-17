@@ -13,6 +13,7 @@ import {
   PULL_THRESHOLD_PX,
   TAP_SLOP_PX,
 } from "../../lib/gesture/pullToRefresh";
+import { LOADING_PULSE } from "../../lib/motion/tokens";
 
 import type { Palette } from "../../lib/color/types";
 import type * as HeroModule from "../../lib/image/hero";
@@ -264,6 +265,12 @@ describe("SplashView — a re-roll that will not decode", () => {
     // outranked `failed` (as it did before this was pinned) the view would report `ready` and E3-S4
     // would have nothing to render its notice for.
     expect(hero()).toHaveAttribute("src", DECODED_SRC);
+    // The notice is rendered *over* that photo, with its own scrim — `error` does not imply a bare
+    // background (the E3-S1A finding this story was routed). The scrim is what makes the glass
+    // readable on the photo underneath; the painted contrast is measured in the browser.
+    expect(screen.getByRole("status")).toHaveTextContent(/^Couldn't load a photo\.$/);
+    expect(screen.getByTestId("quiet-error-scrim")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
 });
 
@@ -469,28 +476,86 @@ describe("SplashView — pull to refresh", () => {
   });
 });
 
-describe("SplashView — quiet states (E3-S4 renders their words)", () => {
-  it("should show the empty state, never a crash, when the archive holds no photo", async () => {
+describe("SplashView — quiet states (E3-S4)", () => {
+  it("should breathe the theme's tone while loading, never a labelled spinner", async () => {
+    stubApi(() => jsonResponse(PHOTO));
+    // A decode that never finishes: the window the placeholder exists for.
+    heroEnvironment.decode.mockImplementation(() => new Promise(() => {}));
+    renderSplash();
+
+    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "loading"));
+
+    const pulse = screen.getByTestId("quiet-loading");
+    expect(pulse).toHaveAttribute("aria-hidden", "true");
+    // What a unit test can honestly pin is the vocabulary. jsdom has no `getAnimations` and no
+    // `matchMedia`, and this suite loads no stylesheet (measured — `frontend/README.md`, "The quiet
+    // states — measured"), so the class is asserted here and the frames are a Chromium measurement.
+    expect(pulse).toHaveClass(LOADING_PULSE);
+    expect(pulse).not.toHaveClass("motion-enter");
+    expect(pulse).toHaveClass("bg-aura-surface", "opacity-25");
+    expect(screen.queryByRole("progressbar")).toBeNull();
+    expect(screen.queryByText(/loading/i)).toBeNull();
+  });
+
+  it("should say the empty archive in one display-serif sentence on the base", async () => {
     stubApi(() => problemResponse("empty-archive", 404));
     renderSplash();
 
-    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "empty"));
-    expect(hero()).not.toBeInTheDocument();
+    const sentence = await screen.findByRole("status");
+    expect(sentence).toHaveTextContent(/^Your archive is empty for now\.$/);
+    // The criterion's type rule, and §2.2's token rule: display serif, the text token, not the muted
+    // one (the muted token is guaranteed on the page, not through glass — §2.2).
+    expect(sentence).toHaveClass("font-display");
+    expect(sentence).toHaveClass("text-aura-text");
+    expect(sentence).not.toHaveClass("text-aura-muted");
+    // One sentence, no chrome: no retry, no spinner, and the loading placeholder is gone.
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    expect(screen.queryByRole("progressbar")).toBeNull();
+    expect(screen.queryByTestId("quiet-loading")).toBeNull();
     // The screen is still the app: the view is named and the tap target is still there.
     expect(screen.getByRole("heading", { level: 1, name: "Aether Archive" })).toBeInTheDocument();
     expect(tapTarget()).toBeInTheDocument();
   });
 
-  it("should show the error state, never a crash, when the archive refuses the request", async () => {
-    // A 4xx that is not the empty archive. A 5xx or an unreachable archive reaches the same branch
-    // after the app's retry policy (two attempts, 500 ms and 1 s) — not exercised here to keep the
-    // suite free of real waits; `api/retryPolicy.test.ts` owns that policy.
-    stubApi(() => problemResponse("not-found", 404));
+  it("should show a glass notice with a named retry, and never the server's words", async () => {
+    const fetchSpy = stubApi(() => problemResponse("not-found", 404));
     renderSplash();
 
-    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "error"));
-    expect(screen.getByRole("heading", { level: 1, name: "Aether Archive" })).toBeInTheDocument();
-    expect(tapTarget()).toBeInTheDocument();
+    const notice = await screen.findByRole("status");
+    expect(notice).toHaveTextContent(/^Couldn't load a photo\.$/);
+    // The problem+json body in this test carries `detail: "Nothing to show."`; criterion 3 forbids
+    // echoing it, and a raw message is exactly what a copied server string looks like.
+    expect(notice).not.toHaveTextContent("Nothing to show.");
+    expect(screen.queryByRole("alert")).toBeNull();
+
+    const retry = screen.getByRole("button", { name: "Try again" });
+    expect(retry).toHaveAttribute("type", "button");
+    expect(retry).toHaveAttribute("aria-describedby", notice.id);
+    expect(retry).toHaveClass("text-aura-text");
+    expect(retry).not.toHaveClass("text-aura-muted");
+    // The single glass material, and the notice's own scrim. Measured over a white photo: the glass
+    // tint alone is 2.30:1, scrim + glass + text is 7.47:1 (README, "The quiet states — measured").
+    expect(retry.closest(".glass")).not.toBeNull();
+    expect(screen.getByTestId("quiet-error-scrim")).toHaveClass("bg-aura-bg/70");
+    expect(screen.queryByTestId("quiet-loading")).toBeNull();
+
+    fireEvent.click(retry);
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
+  });
+
+  it("should recover the photo when the retry is answered", async () => {
+    let answers = 0;
+    stubApi(() => {
+      answers += 1;
+      return answers === 1 ? problemResponse("not-found", 404) : jsonResponse(PHOTO);
+    });
+    renderSplash();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
+
+    const photo = await screen.findByRole("img", { name: "A photo from your archive" });
+    expect(photo).toHaveAttribute("src", DECODED_SRC);
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
   });
 
   it("should keep the shell when a photo arrives but cannot be decoded", async () => {
@@ -500,8 +565,31 @@ describe("SplashView — quiet states (E3-S4 renders their words)", () => {
 
     await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "error"));
     expect(hero()).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(/^Couldn't load a photo\.$/);
     expect(screen.getByRole("heading", { level: 1, name: "Aether Archive" })).toBeInTheDocument();
     expect(tapTarget()).toBeInTheDocument();
+  });
+
+  it("should raise the notice over the photo a failed re-roll request kept", async () => {
+    let answers = 0;
+    const fetchSpy = stubApi(() => {
+      answers += 1;
+      return answers === 1 ? jsonResponse(PHOTO) : problemResponse("not-found", 404);
+    });
+
+    renderSplash();
+    await screen.findByRole("img", { name: "A photo from your archive" });
+
+    // A real pull, a real failed request — not a state flip. TanStack keeps the last successful
+    // `data` when the refetch fails, so `data !== undefined` alone would answer `ready` and the API
+    // failure would be silent; the notice is the only thing that reports it.
+    drag(PULL_THRESHOLD_PX);
+
+    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "error"));
+    expect(hero()).toHaveAttribute("src", DECODED_SRC);
+    expect(screen.getByRole("status")).toHaveTextContent(/^Couldn't load a photo\.$/);
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 });
 
