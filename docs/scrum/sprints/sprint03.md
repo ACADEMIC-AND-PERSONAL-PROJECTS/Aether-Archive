@@ -31,7 +31,7 @@
 | 6a | E4-S1A | Single photo upload — the picker and the validation (criterion 1) | 2 | p0 | Done | #114 |
 | 6b | E4-S1B | Single photo upload — send with progress and cancel, then retry and invalidation (criteria 2–4) | 3 | p0 | Done | #115 |
 | 7a | E4-S2A1 | The selection grid surface — one tile, its state and its remove action (criterion 3) | 1 | p0 | Done | #117 |
-| 7b | E4-S2A2 | Multi-select (≤ 6) and the sequential queue (criteria 1, 4) | 2 | p0 | In progress | — |
+| 7b | E4-S2A2 | Multi-select (≤ 6) and the sequential queue (criteria 1, 4) | 2 | p0 | In review | #118 |
 | 7c | E4-S2B | Client-side downscale before upload (criterion 2) | 2 | p0 | Todo | — |
 
 **Total: 12 slices · 28 points** (the row above them is a chore, not a story; E3-S1A/B, E3-S5A/B,
@@ -358,3 +358,15 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   (301.30 against a computed 301.31) and recaptured; and the slice count (12, not 13). The nits were
   turned into tests (tile `data-state="error"` on every failure path, URL revocation on replace and
   remove, the empty-name fallback, focus after a refused replacement).
+- 2026-10-17 — **E4-S2A2 (PR #118) carries multi-select and the queue**, and with it the fix for the
+  defect #116's review found: `aliveRef` is re-armed in the effect setup, so `npm run dev` uploads again,
+  and a **StrictMode-wrapped test** pins it. It measured **1,721 hand-written** at its tip (production
+  631, tests 970, docs 120). Its exception is claimed on the **coupling** of criteria 1 and 4, with the
+  cut constructed: multi-select, cap and grid without the queue, typechecked, linted, **24 tests green**,
+  measured at **1,252** — but it deletes E4-S1B's shipped send path and its tests (629 deletions), so it
+  is a regression rather than a slice; a criterion-4-only cut is E4-S1B. The queue is concurrency one
+  (`maxActive: 1` over six files, every second answered 415), the loop carries on (`continue` mutant
+  killed), retry resends the same objects, and the nine mutants include the StrictMode re-arm, the
+  success-path revocation, the cancel-reset and the alive half of the progress gate. The progress gate
+  is a pure predicate (`lib/upload/progress.ts`) because React 19 no-ops a post-unmount `setState`
+  silently — measured as 0 `console.error`.
