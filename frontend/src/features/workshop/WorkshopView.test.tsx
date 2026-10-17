@@ -38,9 +38,10 @@ const mockedDownscale = vi.mocked(downscaleForUpload);
  * shipped component, the real mutation hook and a real `QueryClient`. The tests pin this slice's criteria
  * — the cap and its explanation, a tile per file with a real remove button, one request at a time in
  * selection order, per-file failure isolation, retry identity, batch cancellation and its reset — plus
- * the picker and announcement contracts E4-S1A/S1B/E3-S5B/A1 established, and E4-S3B's gestures: the two
- * activation thresholds, the overlay, the reorder callback and the disabled state while uploading.
- * Keyboard moves and announcements are E4-S3C and are not asserted here.
+ * the picker and announcement contracts E4-S1A/S1B/E3-S5B/A1 established, E4-S3B's gestures (the two
+ * activation thresholds, the overlay, the reorder callback and the disabled state while uploading), and
+ * E4-S3C's motion slice: the auto-scroll tuning, the tuned drop animation and the reduced-motion
+ * reading. Keyboard moves and announcements are E4-S3D and are not asserted here.
  *
  * Object URLs are stubbed with a counter so a test can name the URL a tile owns; the shipped code still
  * calls the real `URL.createObjectURL`/`revokeObjectURL` shape (jsdom implements both, measured in the
@@ -140,7 +141,7 @@ function selectedTiles(): readonly HTMLElement[] {
   return within(screen.getByRole("list", { name: "Selected photos" })).getAllByRole("listitem");
 }
 
-/** The drag surfaces, in display order. They are not focusable in E4-S3B: see `SelectionGrid`. */
+/** The drag surfaces, in display order. They are not focusable in this slice: see `SelectionGrid`. */
 function dragActivators(): readonly HTMLElement[] {
   return screen.getAllByTestId("drag-activator");
 }
@@ -471,6 +472,8 @@ describe("reordering", () => {
     await act(async () => {});
     expect(tileFor("a.png")).toHaveAttribute("data-dragging", "true");
     expect(screen.getByTestId("drag-overlay")).toBeVisible();
+    // The lifted clone carries its own scrim so its state line never sits on a raw photo.
+    expect(screen.getByTestId("drag-overlay-scrim")).toBeInTheDocument();
 
     fireEvent.mouseUp(document, { clientX: 66, clientY: 56 });
     await settleDragListeners();
@@ -568,15 +571,16 @@ describe("reordering", () => {
     expect(selectedTiles()).toHaveLength(1);
   });
 
-  it("should not add a dead focus stop before the keyboard path exists", () => {
+  it("should not add a dead focus stop before the keyboard slice exists", () => {
     renderWorkshop();
     pickFiles(screen.getByLabelText("Choose photos"), [
       fileOf(16, "image/png", "a.png"),
       fileOf(16, "image/png", "b.png"),
     ]);
 
-    // E4-S3C adds the KeyboardSensor and dnd-kit's attributes together. Until then the activator is a
-    // pointer surface only — no role, no tab index — and the remove button is the tile's only control.
+    // The KeyboardSensor and dnd-kit's attributes are E4-S3D. Until then the
+    // activator is a pointer surface only — no role, no tab index — and the remove button is the
+    // tile's only control.
     const activator = dragActivators()[0];
     expect(activator).toHaveClass("touch-manipulation");
     expect(activator).not.toHaveAttribute("tabindex");
@@ -585,6 +589,84 @@ describe("reordering", () => {
     const tile = tileFor("a.png");
     expect(within(tile).getAllByRole("button")).toHaveLength(1);
     expect(within(tile).getByRole("button")).toHaveAccessibleName("Remove a.png");
+  });
+
+  it("should remove the settle and the drop motion when the reader asks for reduced motion", async () => {
+    // The WAAPI drop gating is NOT asserted here: jsdom's zero geometry makes dnd-kit skip the drop
+    // animation altogether, so an `animate` assertion passes with or without the gate (verified with
+    // a mutant). The Chromium probe is the guard — one 250 ms call with motion, zero under reduce.
+    const { unmount } = renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [
+      fileOf(16, "image/png", "a.png"),
+      fileOf(16, "image/png", "b.png"),
+    ]);
+    stubGridRects();
+
+    const first = dragActivators()[0];
+    if (first === undefined) {
+      throw new Error("the first tile has no drag activator");
+    }
+    fireEvent.mouseDown(first, { clientX: 56, clientY: 56, button: 0 });
+    fireEvent.mouseMove(document, { clientX: 66, clientY: 56 });
+    await act(async () => {});
+    // Baseline: the untouched neighbour carries the 200 ms settle, and the overlay the 250 ms drop.
+    expect(tileFor("b.png").style.transition).toContain("200ms");
+    expect(screen.getByTestId("drag-overlay")).toHaveAttribute("data-drop-animation", "250ms");
+    fireEvent.mouseUp(document, { clientX: 66, clientY: 56 });
+    await settleDragListeners();
+    unmount();
+
+    // jsdom has no matchMedia; the stubbed query reports the preference the hook then reads, and the
+    // listener spies pin the effect's lifecycle (subscribe on mount, unsubscribe on unmount).
+    const addEventListener = vi.fn();
+    const removeEventListener = vi.fn();
+    const media = { matches: true, addEventListener, removeEventListener };
+    const matchMedia = vi.fn().mockReturnValue(media);
+    vi.stubGlobal("matchMedia", matchMedia);
+
+    const reduced = renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [
+      fileOf(16, "image/png", "a.png"),
+      fileOf(16, "image/png", "b.png"),
+    ]);
+    stubGridRects();
+    const reducedFirst = dragActivators()[0];
+    if (reducedFirst === undefined) {
+      throw new Error("the first tile has no drag activator");
+    }
+    fireEvent.mouseDown(reducedFirst, { clientX: 56, clientY: 56, button: 0 });
+    fireEvent.mouseMove(document, { clientX: 66, clientY: 56 });
+    await act(async () => {});
+
+    expect(matchMedia).toHaveBeenCalledWith("(prefers-reduced-motion: reduce)");
+    expect(tileFor("b.png").style.transition).toBe("");
+    expect(screen.getByTestId("drag-overlay")).toHaveAttribute("data-drop-animation", "none");
+
+    // The preference can change while the page is open: the hook re-reads it and motion returns.
+    // Captured before any assertion so a failure cannot leave the drag (and its document listeners)
+    // open for the next test.
+    media.matches = false;
+    await act(async () => {
+      (addEventListener.mock.calls[0]?.[1] as () => void)();
+    });
+    const reEnabledDrop = screen.getByTestId("drag-overlay").getAttribute("data-drop-animation");
+
+    // Reduced motion is not "no drag": a pointer move still reorders the grid.
+    fireEvent.mouseMove(document, { clientX: 176, clientY: 56 });
+    await act(async () => {});
+    fireEvent.mouseUp(document, { clientX: 176, clientY: 56 });
+    await act(async () => {});
+    expect(tileLines()).toEqual(["b.png: Waiting", "a.png: Waiting"]);
+    await settleDragListeners();
+    // The update handler re-enabled the drop without a remount (the settle is not observable here:
+    // dnd-kit owns the active drag's transform transition while the drag is live).
+    expect(reEnabledDrop).toBe("250ms");
+
+    // The motion-preference listener is a lifecycle addition: it must be subscribed while the grid is
+    // mounted and released with it, or a long-lived page accumulates one listener per mount.
+    expect(addEventListener).toHaveBeenCalledWith("change", expect.any(Function));
+    reduced.unmount();
+    expect(removeEventListener).toHaveBeenCalledWith("change", expect.any(Function));
   });
 
   it("should refuse a drag while the batch is uploading", async () => {
@@ -601,7 +683,6 @@ describe("reordering", () => {
     if (first === undefined) {
       throw new Error("the first tile has no drag activator");
     }
-
     fireEvent.mouseDown(first, { clientX: 56, clientY: 56, button: 0 });
     fireEvent.mouseMove(document, { clientX: 116, clientY: 56 });
     await act(async () => {});
@@ -653,6 +734,46 @@ describe("the queue", () => {
     expect(screen.queryByRole("list", { name: "Selected photos" })).toBeNull();
     // Focus returns to the picker after a full success, so the next batch is one keystroke away.
     await waitFor(() => expect(screen.getByLabelText("Choose photos")).toHaveFocus());
+  });
+
+  it("should send the files in the displayed order after a reorder", async () => {
+    renderWorkshop();
+    const firstFile = fileOf(16, "image/png", "a.png");
+    const secondFile = fileOf(16, "image/png", "b.png");
+    const thirdFile = fileOf(16, "image/png", "c.png");
+    pickFiles(screen.getByLabelText("Choose photos"), [firstFile, secondFile, thirdFile]);
+    stubGridRects();
+
+    // Arrange the display order with a pointer before any request exists: b, a, c.
+    const first = dragActivators()[0];
+    if (first === undefined) {
+      throw new Error("the first tile has no drag activator");
+    }
+    fireEvent.mouseDown(first, { clientX: 56, clientY: 56, button: 0 });
+    fireEvent.mouseMove(document, { clientX: 66, clientY: 56 });
+    await act(async () => {});
+    fireEvent.mouseMove(document, { clientX: 176, clientY: 56 });
+    await act(async () => {});
+    fireEvent.mouseUp(document, { clientX: 176, clientY: 56 });
+    await act(async () => {});
+    await settleDragListeners();
+    expect(tileLines()).toEqual(["b.png: Waiting", "a.png: Waiting", "c.png: Waiting"]);
+
+    // The queue reads the array when the batch starts, so the wire order follows the grid, not pick order.
+    const firstRequest = await startUpload();
+    expect(multipartBody(firstRequest).get("file")).toBe(secondFile);
+    await respond(firstRequest, 201, UPLOADED);
+
+    const secondRequest = await requestAt(1);
+    expect(multipartBody(secondRequest).get("file")).toBe(firstFile);
+    await respond(secondRequest, 201, UPLOADED);
+
+    const thirdRequest = await requestAt(2);
+    expect(multipartBody(thirdRequest).get("file")).toBe(thirdFile);
+    await respond(thirdRequest, 201, UPLOADED);
+
+    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle"));
+    expect(screen.getByTestId("workshop-notice")).toHaveTextContent("Added 3 photos.");
   });
 
   it("should announce the batch as Uploading. while the queue runs", async () => {
@@ -1131,10 +1252,43 @@ describe("StrictMode", () => {
     await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle"));
     expect(screen.getByTestId("workshop-notice")).toHaveTextContent("Added 1 photo.");
   });
+
+  it("should reorder with a pointer under StrictMode", async () => {
+    // The sortable context mounts the sensors in effects; StrictMode runs every setup → cleanup → setup.
+    // If a sensor were registered only on the first setup, the grid would be inert in development while
+    // the suite stayed green — the same class of bug as the `aliveRef` fix.
+    render(
+      <StrictMode>
+        <QueryClientProvider client={createQueryClient()}>
+          <WorkshopView />
+        </QueryClientProvider>
+      </StrictMode>,
+    );
+    pickFiles(screen.getByLabelText("Choose photos"), [
+      fileOf(16, "image/png", "strict-a.png"),
+      fileOf(16, "image/png", "strict-b.png"),
+    ]);
+    stubGridRects();
+
+    const first = dragActivators()[0];
+    if (first === undefined) {
+      throw new Error("the first tile has no drag activator");
+    }
+    fireEvent.mouseDown(first, { clientX: 56, clientY: 56, button: 0 });
+    fireEvent.mouseMove(document, { clientX: 66, clientY: 56 });
+    await act(async () => {});
+    fireEvent.mouseMove(document, { clientX: 176, clientY: 56 });
+    await act(async () => {});
+    fireEvent.mouseUp(document, { clientX: 176, clientY: 56 });
+    await act(async () => {});
+    await settleDragListeners();
+
+    expect(tileLines()).toEqual(["strict-b.png: Waiting", "strict-a.png: Waiting"]);
+  });
 });
 
 describe("accessibility", () => {
-  it("should have no structural violations while idle, selected and uploading", async () => {
+  it("should have no structural violations while idle, sortable and uploading", async () => {
     const { unmount } = renderWorkshop();
     expect(violationSummary(await runAxe(document.body))).toEqual([]);
 

@@ -113,6 +113,14 @@ describe("motion tokens — the stylesheet mirrors them", () => {
     expect(SOURCE).toContain(`animation-duration: 0.01ms !important`);
   });
 
+  it("should freeze transitions too, not only keyframe animations", () => {
+    // E4-S3C's carry-over: the sortable grid settles its neighbours with an inline `transition`, which
+    // the animation freeze cannot reach. A component transition under `reduce` is movement the user
+    // asked not to see, so the same block neutralises it — and the `!important` is what beats the
+    // inline style. The reduced-motion Chromium probe reads the computed value back.
+    expect(REDUCED).toContain(`transition-duration: 0.01ms !important`);
+  });
+
   it("should name only variables the stylesheet defines", () => {
     const referenced = new Set(
       CLASS_STRINGS.flatMap((className) =>

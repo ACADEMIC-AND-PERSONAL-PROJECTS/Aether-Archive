@@ -11,11 +11,13 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 
+import { prefersReducedMotion } from "../../lib/motion/reduced";
 import { EASE_SOFT } from "../../lib/motion/tokens";
 import {
   AUTO_SCROLL_OPTIONS,
+  DROP_ANIMATION_MS,
   MOUSE_DRAG_DISTANCE_PX,
   SORT_SETTLE_MS,
   TOUCH_LONG_PRESS_DELAY_MS,
@@ -24,7 +26,7 @@ import {
 
 /**
  * The selection grid — one tile per picked photo, with its own state and its own way out (E4-S2A1),
- * and since E4-S3B the place where the dump's order is arranged by pointer or finger.
+ * and since E4-S3 the place where the dump's order is arranged by pointer or finger.
  *
  * ## Why it is a separate component
  *
@@ -55,24 +57,19 @@ import {
  * not a drag" — the other half is the sensors' own activation thresholds (8 px for a mouse, 250 ms for a
  * finger), pinned in `lib/ordering/interaction.ts`.
  *
- * While an upload is in flight, the remove button is disabled rather than removed: the request holds a
- * snapshot of the file, and letting the tile vanish mid-flight would leave the screen describing
- * something the user can no longer see. **Dragging is disabled for the same reason** and is the E4-S3B
- * decision the story asked for: the queue reads the array once when it starts, so a reorder mid-batch
- * would make the grid disagree with the order the requests are actually leaving in. Both controls come
- * back when the request settles.
+ * While an upload is in flight, the remove button is disabled rather than removed, and dragging is
+ * disabled for the same reason — the E4-S3B decision the story asked for: the queue reads the array
+ * once when it starts, so a reorder mid-batch would make the grid disagree with the order the requests
+ * are actually leaving in. Both controls come back when the request settles.
  *
  * ## The activator is not focusable yet, on purpose
  *
- * E4-S3B ships pointer and touch only; the keyboard sensor, its announcements and its instructions are
- * E4-S3C. dnd-kit's `useSortable` returns an `attributes` object whose centrepiece is
- * `tabIndex: 0` + `role="button"` + `aria-describedby` pointing at instructions that say "press the
- * space bar". Spreading it without a keyboard sensor would put a control in the tab order that does
- * nothing when activated — a dead focus stop — and point a screen reader at keys the grid does not
- * listen for. So this branch spreads **only the listeners**: the activator is a pointer/touch surface,
- * the remove button stays the tile's only focusable control, and `data-testid="drag-activator"` is
- * what tests and the probe use. S3C adds `attributes`, the `KeyboardSensor` and the announcement
- * builders together, when the space bar actually works.
+ * The keyboard sensor, dnd-kit's `attributes`, the announcements and the instructions are the second
+ * half of E4-S3 (E4-S3D), not this slice. Spreading `attributes` without a sensor would put a control in the
+ * tab order that does nothing when activated — a dead focus stop — and point a screen reader at keys
+ * the grid does not listen for. So this slice spreads **only the listeners**: the activator is a
+ * pointer/touch surface, the remove button stays the tile's only focusable control, and
+ * `data-testid="drag-activator"` is what tests and the probe use.
  *
  * ## Reordering
  *
@@ -85,8 +82,24 @@ import {
  * 390 × 300 viewport, where the grid's own scroller has no travel — so a photo can be carried to a row
  * that is not on screen (E4-S3C).
  *
- * The overlay's drop animation and its reduced-motion reading are E4-S3C's; this branch leaves the
- * library's short default settle in place and adds no motion of its own.
+ * ## The overlay
+ *
+ * `DragOverlay` carries a clone of the tile with the project's one soft shadow and a hairline edge; the
+ * drop animation is `DROP_ANIMATION_MS` (250 ms, under the story's 300 ms ceiling) on the shared ease.
+ * The clone is paint, not a second sortable.
+ *
+ * The state line is **inside the lifted surface**, on its own gradient scrim. Below the square it would
+ * float over whatever the overlay happens to pass across — another photo — and the design language
+ * forbids text over a busy photo without a scrim. Inside the lifted, already-scrimmed surface it stays
+ * legible over a pale, dark or busy tile, and the drop animation measures the square alone rather than
+ * the square plus a detached caption (`getMeasurableNode` returns the only child).
+ *
+ * **Reduced motion.** The global stylesheet freezes CSS animations *and transitions* under `reduce`
+ * (block 5 of `global.css`), but the drop is a Web Animations API animation — no stylesheet rule can
+ * reach it. The grid therefore reads `prefers-reduced-motion` itself (`lib/motion/reduced.ts`): the
+ * sortable settle is `null` and the overlay has no drop animation when it is set. The direct
+ * manipulation — the tile under the pointer — stays, as it is the drag itself rather than decorative
+ * motion. `data-drop-animation` exposes which reading is active to the tests and the probe.
  *
  * ## The state line
  *
@@ -133,6 +146,23 @@ export interface SelectionGridProps {
  * fresh object each render would make every tile's style prop new for no reason.
  */
 const SORTABLE_TRANSITION = { duration: SORT_SETTLE_MS, easing: EASE_SOFT } as const;
+
+/** Tracks the reader's motion preference; a missing `matchMedia` (jsdom) reads as no preference. */
+function useReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(() => prefersReducedMotion());
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") {
+      return;
+    }
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = (): void => setReduced(query.matches);
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
+  return reduced;
+}
 
 /** The sentence under a tile. */
 function statusSentence(item: SelectionItem): string {
@@ -183,11 +213,13 @@ function TileFace({
 function SortableTile({
   item,
   busy,
+  reducedMotion,
   onRemove,
   onPreviewError,
 }: {
   readonly item: SelectionItem;
   readonly busy: boolean;
+  readonly reducedMotion: boolean;
   readonly onRemove: (id: string) => void;
   readonly onPreviewError: (id: string) => void;
 }) {
@@ -195,7 +227,7 @@ function SortableTile({
     useSortable({
       id: item.id,
       disabled: busy,
-      transition: SORTABLE_TRANSITION,
+      transition: reducedMotion ? null : SORTABLE_TRANSITION,
     });
 
   const style: CSSProperties = {
@@ -214,7 +246,7 @@ function SortableTile({
     >
       <div className="relative aspect-square overflow-hidden rounded-[14px]">
         {/* The drag surface. Deliberately a sibling of the remove button, and deliberately not a
-            focus stop until E4-S3C brings the keyboard sensor: see the header. */}
+            focus stop until the keyboard slice brings the sensor: see the header. */}
         <div
           ref={setActivatorNodeRef}
           {...listeners}
@@ -267,6 +299,7 @@ export function SelectionGrid({
   onPreviewError,
 }: SelectionGridProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
+  const reducedMotion = useReducedMotion();
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: MOUSE_DRAG_DISTANCE_PX } }),
@@ -286,9 +319,8 @@ export function SelectionGrid({
   };
 
   const handleDragEnd = (event: DragEndEvent): void => {
-    // Cleared first: the overlay renders only while `activeId` is set — measured, not assumed: the
-    // `[data-testid="drag-overlay"]` count is 0 within 20 ms of `mouseUp`. The library's drop
-    // animation (when one runs) belongs to E4-S3C's overlay tuning, not to this clone's lifetime.
+    // Cleared first: the overlay's drop animation keeps a clone of the previous children on screen
+    // for its own duration even though this component has already stopped rendering the drag state.
     setActiveId(null);
     if (event.over === null) {
       return;
@@ -321,6 +353,7 @@ export function SelectionGrid({
               key={item.id}
               item={item}
               busy={busy}
+              reducedMotion={reducedMotion}
               onRemove={onRemove}
               onPreviewError={onPreviewError}
             />
@@ -329,18 +362,29 @@ export function SelectionGrid({
       </SortableContext>
 
       {/* A clone, not a second sortable: calling `useSortable` here would register a duplicate id.
-          `aria-hidden` because the tile's own text already describes it; the overlay is paint. */}
-      <DragOverlay>
+          `aria-hidden` because the tile's own text already describes it. The status line sits inside
+          the lifted square on its own scrim: see the header. */}
+      <DragOverlay
+        dropAnimation={reducedMotion ? null : { duration: DROP_ANIMATION_MS, easing: EASE_SOFT }}
+      >
         {activeItem === null ? null : (
           <div
             aria-hidden="true"
             data-testid="drag-overlay"
-            className="flex h-full w-full flex-col"
+            data-drop-animation={reducedMotion ? "none" : `${DROP_ANIMATION_MS}ms`}
+            className="w-full"
           >
             <div className="relative aspect-square w-full scale-[1.03] overflow-hidden rounded-[14px] shadow-[0_8px_24px_rgba(0,0,0,0.24)] outline outline-1 -outline-offset-1 outline-aura-text/20">
               <TileFace item={activeItem} onPreviewError={onPreviewError} />
+              {/* A gradient scrim, not a floating label: the text stays on the lifted surface and
+                  never sits directly on another photo (§3's scrim rule). */}
+              <div
+                data-testid="drag-overlay-scrim"
+                className="absolute inset-x-0 bottom-0 bg-linear-to-t from-aura-bg/85 via-aura-bg/75 to-transparent px-2 pt-7 pb-1.5"
+              >
+                <p className="text-xs break-words text-aura-text">{statusSentence(activeItem)}</p>
+              </div>
             </div>
-            <p className="mt-1 text-xs break-words text-aura-text">{statusSentence(activeItem)}</p>
           </div>
         )}
       </DragOverlay>
