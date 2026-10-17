@@ -620,11 +620,8 @@ describe("reordering", () => {
     // listener spies pin the effect's lifecycle (subscribe on mount, unsubscribe on unmount).
     const addEventListener = vi.fn();
     const removeEventListener = vi.fn();
-    const matchMedia = vi.fn().mockReturnValue({
-      matches: true,
-      addEventListener,
-      removeEventListener,
-    });
+    const media = { matches: true, addEventListener, removeEventListener };
+    const matchMedia = vi.fn().mockReturnValue(media);
     vi.stubGlobal("matchMedia", matchMedia);
 
     const reduced = renderWorkshop();
@@ -645,6 +642,15 @@ describe("reordering", () => {
     expect(tileFor("b.png").style.transition).toBe("");
     expect(screen.getByTestId("drag-overlay")).toHaveAttribute("data-drop-animation", "none");
 
+    // The preference can change while the page is open: the hook re-reads it and motion returns.
+    // Captured before any assertion so a failure cannot leave the drag (and its document listeners)
+    // open for the next test.
+    media.matches = false;
+    await act(async () => {
+      (addEventListener.mock.calls[0]?.[1] as () => void)();
+    });
+    const reEnabledDrop = screen.getByTestId("drag-overlay").getAttribute("data-drop-animation");
+
     // Reduced motion is not "no drag": a pointer move still reorders the grid.
     fireEvent.mouseMove(document, { clientX: 176, clientY: 56 });
     await act(async () => {});
@@ -652,6 +658,9 @@ describe("reordering", () => {
     await act(async () => {});
     expect(tileLines()).toEqual(["b.png: Waiting", "a.png: Waiting"]);
     await settleDragListeners();
+    // The update handler re-enabled the drop without a remount (the settle is not observable here:
+    // dnd-kit owns the active drag's transform transition while the drag is live).
+    expect(reEnabledDrop).toBe("250ms");
 
     // The motion-preference listener is a lifecycle addition: it must be subscribed while the grid is
     // mounted and released with it, or a long-lived page accumulates one listener per mount.

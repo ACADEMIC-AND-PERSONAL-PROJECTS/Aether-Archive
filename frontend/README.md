@@ -1294,10 +1294,10 @@ moved photo 1 from position 1 to position 6: `[1,2,3,4,5,6]` → `[2,3,4,5,6,1]`
 The `autoScroll` prop's **wiring** is probe-covered rather than suite-covered: the shipped suite does
 not mock `DndContext`, so nothing pins that the prop is received, and jsdom cannot perform the scroll
 either — measured here instead. Capture: `reports/e4s3-autoscroll-390.png` (1170 × 900, 390 × 300
-DPR 3). The drop animation and the reduced-motion reading are on the other E4-S3C PR, not this branch.
+DPR 3). The drop animation and the reduced-motion reading are on #127.
 
-Tests added: 1 in `interaction.test.ts` (the exact-value pin); the full suite is **32 files /
-372 tests** at this branch's tip. Probe: headless Chromium **153.0.8010.12**, built `dist/` on
+Tests added: 1 in `interaction.test.ts` (the exact-value pin); the full suite is **31 files /
+364 tests** at #128's tip. Probe: headless Chromium **153.0.8010.12**, built `dist/` on
 `vite preview`, scripts outside the repository. Not measured here: a physical phone's auto-scroll feel
 while a finger holds a tile at the edge (the probe drives a synthetic mouse pointer) and Safari/iOS's
 scroll behaviour — **SKIPPED**, tracked with E6-S4.
