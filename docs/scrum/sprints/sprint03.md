@@ -29,8 +29,8 @@
 | 5a | E3-S5A | Accessibility — the axe gate (criteria 1, 2) | 1 | p0 | Done | #110 |
 | 5b | E3-S5B | Accessibility — contrast, `inert`, the announcement fix, the manual pass (criteria 3–5) | 2 | p0 | Done | #111 |
 | 6a | E4-S1A | Single photo upload — the picker and the validation (criterion 1) | 2 | p0 | Done | #114 |
-| 6b | E4-S1B | Single photo upload — send with progress and cancel, then retry and invalidation (criteria 2–4) | 3 | p0 | In review | #115 |
-| 7 | E4-S2 | Multi-select (≤ 6) & client-side downscale | 5 | p0 | Todo | — |
+| 6b | E4-S1B | Single photo upload — send with progress and cancel, then retry and invalidation (criteria 2–4) | 3 | p0 | Done | #115 |
+| 7 | E4-S2 | Multi-select (≤ 6) & client-side downscale | 5 | p0 | In progress | — |
 
 **Total: 10 slices · 28 points** (the row above them is a chore, not a story; E3-S1A/B, E3-S5A/B and
 E4-S1A/B are each one story, split — see the notes at the end of this section). The order is the
@@ -307,7 +307,7 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   which history cannot fix, so it is recorded here for the retrospective rather than re-cut: it belongs
   beside Sprint 2's "measure the change, not just the total", since a diff split after the fact makes
   both numbers true and the story of how they were produced false.
-- 2026-10-17 — **E4-S1B (PR #115) carries the send path**: `POST /api/v1/photos` over `XMLHttpRequest`
+- 2026-10-17 — **E4-S1B (PR #115, merged `eced081`) carries the send path**: `POST /api/v1/photos` over `XMLHttpRequest`
   (the only transport with request progress and in-flight cancel), the quiet 2 px progress line, Cancel
   returning to the same `File`, Try again resending that same object, and one prefix invalidation of
   `photos` on success only — pinned in both directions, which kills the `onSuccess → onSettled` mutant
