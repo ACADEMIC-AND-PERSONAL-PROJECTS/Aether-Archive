@@ -44,11 +44,19 @@ import { ENTER_DRIFT_BASE, ENTER_FADE_BASE } from "../../lib/motion/tokens";
  * - **The page scroll.** Locked while open (`overflow: hidden` on the document root — the element it
  *   propagates to the viewport from) and restored to whatever it was on close, including when the
  *   close is a route change that unmounts the splash with the menu inside it.
- * - **Not `inert` on the page behind.** Probed in the test process: `HTMLElement.prototype.inert` does
- *   not exist in jsdom 30.1.3 (setting `element.inert` is a plain JS property there, and writes no
- *   attribute), so behaviour built on it would be the one part of this story nothing could test. The
- *   APG allows `aria-modal` only when the code really does block the rest: the trap is that blocking,
- *   and it is tested.
+ * - **Not `inert` itself — the splash owns that, on `<main>` (E3-S5B).** This dialog is rendered as a
+ *   **sibling of `<main>`**, never inside it, and that placement is load-bearing: while the menu is open
+ *   `<main>` carries `inert`, which removes the covered page from the tab order, from pointer hit-testing
+ *   and from the accessibility tree. A dialog nested inside that subtree would be removed with it —
+ *   measured in Chromium: the same dialog moved under the inert `<main>` comes back `ignored: true,
+ *   ignoredReasons: ["inertElement"]`, while as a sibling it stays exposed and focusable. So the
+ *   placement is a contract between this component and `features/splash/SplashView.tsx`, not a layout
+ *   preference. What `inert` does not replace: the focus trap still wraps `Tab` (an AT virtual cursor is
+ *   not a tab order), the veil still takes the pointer (inert covers itself, not the dialog), and
+ *   `aria-modal` still describes the dialog. jsdom 30.1.3 implements neither the property nor the
+ *   effect, so the suite pins the attribute, the sibling relationship and the focus return; Chromium
+ *   measures the tree and the focus order. A browser without `inert` ignores the attribute and keeps
+ *   E3-S2's trap as the blocking, which is the pre-E3-S5 behaviour.
  * - **Not the route change.** The two destinations are `Link`s, and leaving the splash is the close:
  *   this component unmounts with the view that owns it, which is also what releases the scroll lock.
  * - **Not its own timings.** The entry is §5's vocabulary (`lib/motion/tokens.ts`): the same fade the

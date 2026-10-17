@@ -29,6 +29,15 @@ import { LOADING_PULSE } from "../lib/motion/tokens";
  * against 4.14:1 for the muted token over glass). The muted token is raised by the generator until it
  * clears 4.5:1 on the *page background*; a glass notice is not the page background.
  *
+ * ## Announcement (E3-S5B): the sentences are not live regions
+ *
+ * A live region announces changes to content that already exists; a node inserted together with its text
+ * is not reliably announced. These two sentences therefore mount as ordinary paragraphs, and the splash
+ * owns **one persistent `role="status"` region** (`features/splash/SplashView.tsx`) outside `<main>`,
+ * present from the first render and filled when the state changes. The words are duplicated word for
+ * word there, and a test pins the pair. The retry's `aria-describedby` still points at the visible
+ * sentence, so its name and description stay in the page.
+ *
  * ## Placement: no portal, and no `position: fixed`
  *
  * The notice is `position: absolute` inside the view's own `<main>` (which is `relative`), not
@@ -50,7 +59,7 @@ export function QuietEmpty() {
   return (
     <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-8">
       <p
-        role="status"
+        data-testid="quiet-empty"
         className="max-w-xs text-center font-display text-lg tracking-display text-aura-text"
       >
         Your archive is empty for now.
@@ -86,13 +95,11 @@ export interface QuietErrorProps {
 /**
  * The error notice: a bottom-anchored glass panel, one sentence plus a real retry button.
  *
- * `role="status"` is the polite half of the ARIA guidance (WAI-ARIA APG, alert pattern): the region is
- * exposed politely, focus is **not** moved, and the retry stays in the normal tab order. **What that does
- * not buy, stated rather than implied**: the region mounts together with its text, and a live region
- * announces *changes* to content that already exists — most screen readers will not announce a node
- * inserted with its content. So the exposure is real and the announcement is unverified; **E3-S5** owns
- * the AT pass that decides between a persistent region and this one, and the same applies to
- * {@link QuietEmpty}, whose sentence is on screen from its first render.
+ * **The sentence is ordinary text, not a live region (E3-S5B).** It mounts together with its content,
+ * and a live region announces *changes* to content that already exists, so the announcement is owned by
+ * the splash's persistent `role="status"` region instead (file comment above). Focus is **not** moved,
+ * and the retry stays in the normal tab order.
+ *
  * The button's visible name is "Try again"; `aria-describedby` gives it the sentence as its
  * description, so a screen reader hears the context without the accessible name drifting away from
  * the visible label (WCAG 2.5.3).
@@ -111,7 +118,7 @@ export function QuietError({ onRetry }: QuietErrorProps) {
         className="absolute inset-0 rounded-[20px] bg-aura-bg/70"
       />
       <GlassPanel className="relative flex items-center gap-4 px-4 py-2">
-        <p id={messageId} role="status" className="text-base text-aura-text">
+        <p data-testid="quiet-error-message" id={messageId} className="text-base text-aura-text">
           Couldn&apos;t load a photo.
         </p>
         <button
