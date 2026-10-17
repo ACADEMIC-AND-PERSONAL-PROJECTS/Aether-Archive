@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { Route, Routes } from "react-router";
 
 import { RouteFallback } from "./RouteFallback";
+import { RouteTransition } from "./RouteTransition";
 
 /**
  * The route table — the whole of the app's structure, and the only place a URL becomes a view.
@@ -16,6 +17,10 @@ import { RouteFallback } from "./RouteFallback";
  * `App` deliberately does **not** contain the router. `BrowserRouter` is mounted in `main.tsx`, so a
  * test can render this same component under a `MemoryRouter` at any URL — the route smoke test does
  * exactly that (`App.test.tsx`).
+ *
+ * Since E3-S3 the routes sit inside `RouteTransition`, which owns the entry animation and replays it
+ * when the view changes. It is inside the `Suspense` boundary on purpose: a view is a lazy chunk, and
+ * the animation belongs to the view that is really there, not to the fallback that precedes it.
  */
 const SplashView = lazy(() =>
   import("../features/splash/SplashView").then((module) => ({ default: module.SplashView })),
@@ -34,12 +39,14 @@ const CheckView = lazy(() =>
 export function App() {
   return (
     <Suspense fallback={<RouteFallback />}>
-      <Routes>
-        <Route path="/" element={<SplashView />} />
-        <Route path="/river" element={<RiverView />} />
-        <Route path="/curate" element={<WorkshopView />} />
-        <Route path="/check" element={<CheckView />} />
-      </Routes>
+      <RouteTransition>
+        <Routes>
+          <Route path="/" element={<SplashView />} />
+          <Route path="/river" element={<RiverView />} />
+          <Route path="/curate" element={<WorkshopView />} />
+          <Route path="/check" element={<CheckView />} />
+        </Routes>
+      </RouteTransition>
     </Suspense>
   );
 }

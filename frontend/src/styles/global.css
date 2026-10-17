@@ -5,9 +5,9 @@
  *   1. Scan scope     — Tailwind's build inputs, declared, never discovered (ADR-017).
  *   2. Faces          — the two families, self-hosted, never a CDN (ADR-005, ADR-019).
  *   3. Theme          — what Tailwind knows: colour namespace, type scale, the two families.
- *   4. Runtime tokens — what CSS and JS read: the fallback palette, safe areas, spacing.
+ *   4. Runtime tokens — what CSS and JS read: the fallback palette, safe areas, spacing, motion.
  *   5. Base           — dark page, full height, scrollbars, overscroll, reduced motion.
- *   6. Component animation — the glass menu's entry, the one `@keyframes` pair a utility cannot carry.
+ *   6. Motion         — §5's two entry patterns, the keyframes a utility cannot carry.
  */
 
 /* ---------------------------------------------------------------- 1. Scan scope --- */
@@ -152,6 +152,18 @@
   --safe-left: env(safe-area-inset-left, 0px);
 
   /*
+   * The motion vocabulary (DESIGN-SYSTEM §5) — the stylesheet's copy of the values in
+   * `lib/motion/tokens.ts`, which `lib/motion/tokens.test.ts` reads back value for value. Components
+   * name these variables instead of writing a duration, so §5 is the only place a timing exists.
+   * `--motion-distance-enter` is the one that changes meaning under `reduce` (block 5).
+   */
+  --motion-duration-quick: 180ms;
+  --motion-duration-base: 320ms;
+  --motion-duration-slow: 600ms;
+  --motion-ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-distance-enter: 16px;
+
+  /*
    * The 4 px rhythm (DESIGN-SYSTEM §6). Tailwind's numeric utilities carry the same unit
    * (`gap-2` = 0.5rem = `--space-2`); these variables are the raw-CSS access to it.
    */
@@ -216,17 +228,32 @@ body {
 }
 
 /*
- * Reduced motion (§5): animations freeze at their end state — a loop that only communicates
- * state (the loading pulse) becomes a still frame. Transitions are left to the components,
- * which switch movement to opacity-only with Tailwind's `motion-safe:` / `motion-reduce:`
- * variants; and nothing scrolls smoothly.
+ * Reduced motion (§5): the drift collapses to nothing, the fade stays, and every animation outside the
+ * vocabulary freezes at its end state — a loop that only communicates state (the loading pulse)
+ * becomes a still frame.
+ *
+ * The distance is what changes, not the timing: an entry is `.motion-enter` (block 6) and reads
+ * `--motion-distance-enter`, so at 0 px it is an opacity fade over the same 320/600 ms and the
+ * transform is a no-op. That is §5's "opacity-only transitions, no transforms" — *not* "motionless":
+ * E3-S2 shipped the other reading (the animation was never applied, so the surface was simply there),
+ * and E3-S3 moved the app to one rule for every surface.
+ *
+ * The freeze rule therefore names its exception. `.motion-enter` elements are the vocabulary's own
+ * entries and keep their duration; everything else — a loading pulse, a future loop — is squashed. A
+ * surface that animates without the marker is frozen under `reduce` deliberately: the marker is an
+ * opt-in, and `lib/motion/tokens.test.ts` fails if the class in this selector and the constant in
+ * `lib/motion/tokens.ts` ever drift apart.
  */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  *:not(.motion-enter),
+  *:not(.motion-enter)::before,
+  *:not(.motion-enter)::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+  }
+
+  :root {
+    --motion-distance-enter: 0px;
   }
 
   html {
@@ -234,38 +261,43 @@ body {
   }
 }
 
-/* -------------------------------------------------------- 6. Component animation --- */
+/* ------------------------------------------------------------------ 6. Motion --- */
 
 /*
- * The glass menu's entry (E3-S2). `@keyframes` cannot be spelled as a utility, so these two names are
- * the declaration side of `motion-safe:animate-[aether-…]` in `features/menu/GlassMenu.tsx`; the
- * numbers are that story's own criterion — a fade plus a 16 px drift, §5's `duration-base` (320 ms)
- * and `ease-soft`. The motion *tokens* (durations, easings, distances as data, and the enter/exit
- * pairing) are E3-S3's story, which takes these names with it when it lands.
+ * §5's two entry patterns, as `@keyframes` — the half of the vocabulary a utility cannot carry. They
+ * are named by the class strings in `lib/motion/tokens.ts` (`animate-[aether-enter_…]`), which is where
+ * a component picks one up; `lib/motion/tokens.test.ts` checks that both names exist here, because a
+ * class naming a keyframe that does not exist is an animation that silently never runs.
  *
- * `motion-safe:` is the whole reduced-motion path: under `reduce` the animation is not applied at all
- * and the menu is simply on screen — §5's "opacity only" at its floor — with no `matchMedia` involved
- * (absent in the test environment, measured in E2-S1). The veil fades; the sheet fades *and* drifts,
- * and the drift is on the panel so the opaque scrim never uncovers an edge for the length of the run.
+ * **No fill mode, and `to` is `transform: none`.** E3-S2 spelled its entry `… _both`, which holds the
+ * last keyframe for the life of the element: `transform: translateY(0)` still makes an element a
+ * containing block for `position: fixed` descendants, which would re-anchor the glass menu to the view
+ * instead of the viewport for as long as the view is mounted. Without a fill mode the element is back
+ * to its own styles (`transform: none`) the moment the run ends, and before it starts.
+ *
+ * **The veil does not drift.** A full-height surface translated by 16 px uncovers a strip of whatever
+ * is under it along one edge for the length of the run (measured in E3-S2); the drift belongs on the
+ * panel, which is opaque and small. `aether-enter` (fade + drift) is for a view and for the sheet;
+ * `aether-fade` is for the scrim.
  */
-@keyframes aether-veil-in {
+@keyframes aether-enter {
   from {
     opacity: 0;
+    transform: translateY(var(--motion-distance-enter));
   }
 
   to {
     opacity: 1;
+    transform: none;
   }
 }
 
-@keyframes aether-sheet-in {
+@keyframes aether-fade {
   from {
     opacity: 0;
-    transform: translateY(16px);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
