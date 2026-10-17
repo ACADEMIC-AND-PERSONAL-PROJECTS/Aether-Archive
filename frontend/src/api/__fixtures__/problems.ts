@@ -28,3 +28,27 @@ export const PROBLEM_500 = {
   instance: "/api/v1/photos",
   code: "internal-failure",
 } as const satisfies ProblemDetail;
+
+/**
+ * `POST /api/v1/photos` with a text file declared `image/png`: the server's sniff refused it. Measured
+ * in E4-S1's probe (status, content type and body copied from the running backend).
+ */
+export const PROBLEM_415_UNSUPPORTED = {
+  type: "about:blank",
+  title: "Unsupported image type",
+  status: 415,
+  detail:
+    "the content of the upload is not a recognised image; the archive accepts jpg, jpeg, png, gif, webp, avif",
+  instance: "/api/v1/photos",
+  code: "unsupported-image-type",
+} as const satisfies ProblemDetail;
+
+/** `POST /api/v1/photos` one byte over the ceiling: measured, 413 with the archive's own code. */
+export const PROBLEM_413_TOO_LARGE = {
+  type: "about:blank",
+  title: "Upload too large",
+  status: 413,
+  detail: "The upload is larger than the configured limit of 15 MB (AETHER_MAX_UPLOAD_MB).",
+  instance: "/api/v1/photos",
+  code: "upload-too-large",
+} as const satisfies ProblemDetail;

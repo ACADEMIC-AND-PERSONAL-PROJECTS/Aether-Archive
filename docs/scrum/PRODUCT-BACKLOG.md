@@ -402,8 +402,8 @@ opens on tap, feels tactile, and gets out of the way.
 
 | ID | Story | P | Pts | Sprint | Status |
 | --- | --- | --- | --- | --- | --- |
-| E4-S1A | Single photo upload — the picker and the validation (criterion 1) | p0 | 2 | 3 | In review | |
-| E4-S1B | Single photo upload — send, progress, cancel, retry, invalidation (criteria 2–4) | p0 | 3 | 3 | Todo | |
+| E4-S1A | Single photo upload — the picker and the validation (criterion 1) | p0 | 2 | 3 | Done |
+| E4-S1B | Single photo upload — send, progress, cancel, retry, invalidation (criteria 2–4) | p0 | 3 | 3 | In review |
 | E4-S2 | Multi-select (≤ 6) & client-side downscale | p0 | 5 | 3 | Todo |
 | E4-S3 | Drag-and-drop ordering | p0 | 8 | 4 | Todo |
 | E4-S4 | Aura colour picker with palette suggestions | p0 | 5 | 4 | Todo |
@@ -416,12 +416,14 @@ opens on tap, feels tactile, and gets out of the way.
 > **Split during Sprint 3, in two slices, after the #113 review rejected the story's atomic-story claim
 > on its own arithmetic** (1,434 hand-written lines, production alone 711; the review found it had priced
 > two slices under the branch threshold and then argued from the summed production, and that the suite
-> was not hermetic against `VITE_MAX_UPLOAD_MB`). **E4-S1A** (2 pts, PR #114) carries criterion 1 — the
+> was not hermetic against `VITE_MAX_UPLOAD_MB`). **E4-S1A** (2 pts, PR #114, merge `c376404`) carries criterion 1 — the
 > picker and the validation; measured **776 hand-written** at its tip, and its exception is claimed on a
 > **measured state cut** at **555**, still over the ~500 branch threshold, so no cut reaches the budget.
-> **E4-S1B** (3 pts) carries criteria 2–4 — send with progress and cancel, then retry and invalidation;
-> it closes #31. Points are unchanged; the sprint record (`docs/scrum/sprints/sprint03.md`, notes) carries
-> the measurements.
+> **E4-S1B** (3 pts, PR #115) carries criteria 2–4 — send with progress and cancel, then retry and
+> invalidation; it closes #31. It measured **1,279 hand-written** at its final tip (branch total 1,326
+> with the records) and claims the exception on a **constructed criterion cut** at **1,157** — 1,122 at
+> the reviewed tip, 1,115 in the reviewer's reconstruction — still 2.3× the ~500 threshold. Points are
+> unchanged; the sprint record (`docs/scrum/sprints/sprint03.md`, notes) carries the measurements.
 
 - [ ] **(A)** Native file picker (accept images only), client-side type/size validation before upload.
 - [ ] **(B)** Upload progress indicator (glass, quiet); cancel supported where feasible.

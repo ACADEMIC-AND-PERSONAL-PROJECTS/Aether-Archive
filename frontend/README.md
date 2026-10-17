@@ -727,11 +727,11 @@ client refuses an oversized pick early, but the server enforces the ceiling (mea
   # Test Files 2 passed (2) · Tests 21 passed (21)
   ```
 
-- The selected state is the photo, full-bleed under the theme's scrim, and one glass panel reading
-  "Photo selected." with "Choose another". The preview carries `loading="lazy"` and `decoding="async"`
-  per the rendering rule. There is no upload action, progress element, retry or invalidation in this
-  slice; a test pins **zero buttons** as well as no "upload" text, and the browser probe found
-  **0 buttons** on the screen, so nothing promises an action slices B and C have not shipped.
+- At slice A the selected state was the photo, full-bleed under the theme's scrim, and one glass panel
+  reading "Photo selected." with "Choose another"; its test pinned **zero buttons**, so the screen
+  could not promise an upload that did not exist yet. E4-S1B replaces that pin with assertions on the
+  real action surface — the panel's Upload / Try again / Cancel actions — and the preview keeps
+  `loading="lazy"` and `decoding="async"` per the rendering rule.
 - The probe also found a defect the unit tests could not see: a file the client accepts by declared
   type but the browser cannot decode showed Chrome's broken-image glyph through the scrim. The
   preview is now dropped on `error` while the selection survives, and the scrim stays mounted so the
@@ -754,9 +754,121 @@ local static server.
 - A decoy (`text` bytes declared `image/png`) passed the client check and lost its preview on decode,
   while the view stayed `selected`.
 
-What this pass does **not** cover: an upload path (slice B/C), a real screen reader's announcement,
-browsers other than Chromium 152, a physical phone, and the native picker in jsdom (the component
-tests set `files` and fire `change`; the browser probe uses `DOM.setFileInputFiles`).
+What this pass does **not** cover: the upload path (the next section), a real screen reader's
+announcement, browsers other than Chromium 152, a physical phone, and the native picker in jsdom (the
+component tests set `files` and fire `change`; the browser probe uses `DOM.setFileInputFiles`).
+
+## The single upload — progress, cancel, retry — measured (E4-S1B)
+
+`POST /api/v1/photos` now sends the picked photo and reports what happens. The picker, the client
+validation and the preview behaviour above are unchanged; this section covers the request and the
+states around it.
+
+### Why `XMLHttpRequest`
+
+`api/uploadPhoto.ts` is the app's only XHR. Upload progress and in-flight cancellation are
+`XMLHttpRequest.upload` features; `fetch` has no upload-progress event, and streaming a body with
+`duplex: "half"` is Chromium-only — not acceptable for a mobile-first app that targets Safari as
+well. Safari's XHR implementation is **not measured here** (SKIPPED below); it is the browser the
+choice is meant to protect, and **E6-S4's real-device pass** is the story that closes it. MDN's
+`XMLHttpRequest.upload` page records both facts and the ordering rule the transport
+obeys: the `progress` listener is attached before `send()` (a test pins
+`progressAttachedBeforeSend`). No dependency was added. The URL composition, the `ApiError`
+classification and the RFC 9457 parsing are shared with `client.ts` (`parseProblemDetail`), so a
+failure is the same shape whichever transport carried it.
+
+The request carries one `file` part and `category=uncategorized` (the contract's required value; the
+category picker belongs to a later story), and sets a 120 s deadline — longer than the 10 s read
+deadline because a large photo on a slow phone is patience, not a hang.
+
+### Progress
+
+The panel shows a **2 px line inside the glass**, never a percentage. `role="progressbar"` carries
+`aria-valuenow` from the real `upload.onprogress` events (`loaded / total`, rounded). When the
+browser reports `lengthComputable === false`, the transport passes `total: 0` and the line becomes
+the silent `aether-breathe` pulse rather than inventing a number. The initial state is 0 % of the
+known File size, so the line does not jump into existence at the first event.
+
+### Cancel — and the one thing it must not promise
+
+Cancel calls `AbortController.abort()`, which aborts the XHR, rejects with the caller's own reason,
+and returns the view to `selected` **with the same File object retained**. The visible panel and the
+persistent status region both read "Upload cancelled." — the sentence is not sr-only (the #113
+review found a test passing on a hidden node; the test now asserts the in-panel node with
+`toBeVisible()`).
+
+The screen deliberately says only that the upload was cancelled. **It cannot promise the archive
+stored nothing.** A cancel can race the response: if the body reached the server and
+`StorageService.store` had already run, the photo is stored and appears on the next refresh. The
+probe measured both sides of that race — throttled, Cancel at 20 % left 497,664 of 2,097,444 bytes
+at the stub; unthrottled on localhost, the progress line reached 100 % within one 100 ms sample, so
+the Cancel arrived after the browser had already reported the whole body as sent. The UI never says
+"nothing was saved".
+
+### Failure and retry
+
+The File stays selected through every failure. The panel shows one quiet sentence and "Try again",
+which resends the **same `File` object** (the test asserts identity through the multipart body; no
+re-read from the input, no new object). The mappings are:
+
+| Failure                      | Sentence                                       |
+| ---------------------------- | ---------------------------------------------- |
+| 415 `unsupported-image-type` | The archive couldn't read that image.          |
+| 413 `upload-too-large`       | That photo is larger than the archive accepts. |
+| `network` / `timeout`        | The archive didn't answer. Try again.          |
+| anything else                | That photo couldn't be added.                  |
+
+The server's `detail` is never shown — it is operator prose, not the screen's vocabulary. A
+cancelled request is not a failure and never shows an error sentence.
+
+**Retry has the same race as cancel, in the other direction.** A network, timeout or unreadable-201
+failure can happen _after_ the archive stored the body; the client cannot know whether it did, so
+"Try again" may upload a second copy. The screen does not hide the action (the first failure is real
+and retrying is the right default), but it does not claim the retry is idempotent. A server-side
+idempotency key is a later story, not a client fix.
+
+### Invalidation — success only, one call by prefix
+
+`useUploadPhoto` uses `onSuccess`, not `onSettled`:
+`invalidateQueries({ queryKey: queryKeys.photos })`. `queryKeys.randomPhoto` is
+`["photos", "random"]`, so prefix matching invalidates the feed and the splash hero in one call. The
+tests pin both directions: after a 415 the spy has **not** been called and neither query is
+invalidated; after a 201 it has been called exactly once and both are invalidated. The splash's zero
+`staleTime`/`gcTime` policy stays on its query.
+
+### Measured
+
+Unit suite, from `frontend/`:
+
+```bash
+npm run test -- --run
+# Test Files 26 passed (26) · Tests 278 passed (278)
+VITE_MAX_UPLOAD_MB=20 npm run test -- --run
+# Test Files 26 passed (26) · Tests 278 passed (278)
+```
+
+The workshop test grew from 8 to 16 cases (7 picker, 8 upload, 1 axe across idle / selected /
+uploading / error), and `api/uploadPhoto.test.ts` adds 13 transport cases. The production build
+emits the workshop's lazy chunk at 5.72 kB (2.20 kB gzip).
+
+Browser probe (development-time, headless Chromium 152, 390 × 844 DPR 2, built `dist/` served by a
+local stub; scripts outside the repository):
+
+- 12 network requests, **0 off-origin** (the preview `blob:` URL is not a request).
+- Upload throttled to 512 kB/s via CDP: nine distinct `aria-valuenow` values —
+  `0 → 3 → 5 → 8 → 10 → 13 → 16 → 18 → 20` over 847 ms; the line's computed height is `2px` and its
+  fill was `64.7969px` of 324 px at 20 %.
+- Cancel at 20 %: `Network.loadingFailed` reports `net::ERR_ABORTED`, `canceled: true`, type `XHR`;
+  the stub had received 497,664 bytes of the 2,097,444-byte body and the connection closed. The view
+  returned to `selected` with the panel and the live region both reading "Upload cancelled.".
+- The next request answered 413 `upload-too-large`; the panel and the live region both read "That
+  photo is larger than the archive accepts." with "Try again" and "Choose another".
+- The third request answered 201; the view returned to `idle` with "Added to your archive." in the
+  notice and the live region.
+
+Not measured here: a real backend's `StorageService.store` timing (the stub never stores), a physical
+phone or a real network, and Safari's XHR implementation. The unit tests pin the DOM contract; the
+probe pins the browser events.
 
 ## Zero external requests — measured on the built bundle
 

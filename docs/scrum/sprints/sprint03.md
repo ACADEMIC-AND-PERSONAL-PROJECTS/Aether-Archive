@@ -28,8 +28,8 @@
 | 4 | E3-S4 | Quiet loading / empty / error states | 2 | p1 | Done | #108 |
 | 5a | E3-S5A | Accessibility — the axe gate (criteria 1, 2) | 1 | p0 | Done | #110 |
 | 5b | E3-S5B | Accessibility — contrast, `inert`, the announcement fix, the manual pass (criteria 3–5) | 2 | p0 | Done | #111 |
-| 6a | E4-S1A | Single photo upload — the picker and the validation (criterion 1) | 2 | p0 | In review | #114 |
-| 6b | E4-S1B | Single photo upload — send with progress and cancel, then retry and invalidation (criteria 2–4) | 3 | p0 | Todo | — |
+| 6a | E4-S1A | Single photo upload — the picker and the validation (criterion 1) | 2 | p0 | Done | #114 |
+| 6b | E4-S1B | Single photo upload — send with progress and cancel, then retry and invalidation (criteria 2–4) | 3 | p0 | In review | #115 |
 | 7 | E4-S2 | Multi-select (≤ 6) & client-side downscale | 5 | p0 | Todo | — |
 
 **Total: 10 slices · 28 points** (the row above them is a chore, not a story; E3-S1A/B, E3-S5A/B and
@@ -293,8 +293,9 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   alone 711. The #113 review rejected its atomic-story claim **on its own arithmetic** — it priced two
   slices at ≈450 and ≈200, both under the branch threshold, and then argued from the summed production —
   and found the suite not hermetic against `VITE_MAX_UPLOAD_MB`: the README tells developers to set the
-  key that broke two tests. Slice A measured **714 at review, 776 at its final tip** (production 350,
-  tests 328, docs 82, build/config 16) — 276 over the ~500 branch threshold — so it claims the
+  key that broke two tests. Slice A (PR #114, merged `c376404`) measured **714 at review, 776 at its
+  final tip** (production 350, tests 328, docs 82, build/config 16) — 276 over the ~500 branch
+  threshold — so it claims the
   exception, but in the E3-S3 form: **restated on a measured cut rather than on an inseparability
   claim.** The cut the review named — by *state*: keep the picker, validation and refusal notice; defer
   the selected preview, its panel and their tests — was constructed in a throwaway copy at the tip,
@@ -306,3 +307,27 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   which history cannot fix, so it is recorded here for the retrospective rather than re-cut: it belongs
   beside Sprint 2's "measure the change, not just the total", since a diff split after the fact makes
   both numbers true and the story of how they were produced false.
+- 2026-10-17 — **E4-S1B (PR #115) carries the send path**: `POST /api/v1/photos` over `XMLHttpRequest`
+  (the only transport with request progress and in-flight cancel), the quiet 2 px progress line, Cancel
+  returning to the same `File`, Try again resending that same object, and one prefix invalidation of
+  `photos` on success only — pinned in both directions, which kills the `onSuccess → onSettled` mutant
+  the #113 review found alive. It measured **1,279 hand-written** at its final tip (production 492,
+  tests 654, docs 133), 2.6× the ~500 branch threshold; the branch total is **1,326** with the 47
+  record lines.
+  Its exception is claimed on a **constructed criterion cut** — defer criterion 3's retry surface, keep
+  criteria 2 and 4 — which typechecks, lints, passes 26 of the slice's 30 tests and measures **1,157 at
+  the final tip** (1,122 at the reviewed tip; the review's independent reconstruction measured 1,115),
+  still 2.3× the threshold. The two surface sums are 588 (API) and 646 (view), and
+  neither is a viable slice (the API alone delivers nothing visible; the view alone cannot send). So no
+  cut reaches the budget, and the claim is stated as that measurement rather than as an inseparability.
+  **The review upheld the exception and found no behavioural defect**; its two blockers were a stale
+  total (the PR carried the record's net growth instead of the branch's gross; re-measured to 1,269) and
+  a missing mobile capture (four now in `reports/e4s1b-{uploading,cancelled,error,success}-390.png`).
+  Its nits found two unpinned behaviours that the author's own mutants missed — a duplicate Upload button
+  inside the uploading branch and three of the four focus transitions survived the suite — both are now
+  pinned, and the awaited-invalidation gating the success UI is pinned by a test with a deferred refetch.
+  The cancelled-upload sentence is visible now (`toBeVisible()` on the panel node, not a hidden one), and
+  the screen never claims the archive stored nothing — a cancel can race `StorageService.store`, which the
+  README and the probe record on both sides; the retry side of the same race (a lost response after a
+  store can duplicate on retry) is documented too. **The five work commits are 2–3 seconds apart** — the
+  same post-hoc partition as E4-S1A, recorded for the retrospective rather than rewritten.

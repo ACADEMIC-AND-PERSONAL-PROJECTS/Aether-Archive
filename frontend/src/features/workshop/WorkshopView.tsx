@@ -1,18 +1,23 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 
+import { ApiError } from "../../api/client";
+import { useUploadPhoto } from "../../api/photos";
 import { GlassPanel } from "../../components/GlassPanel";
-import { ENTER_FADE_BASE } from "../../lib/motion/tokens";
+import { ENTER_FADE_BASE, LOADING_PULSE } from "../../lib/motion/tokens";
 import { ACCEPT_ATTRIBUTE, validateUpload } from "../../lib/upload/validation";
 
+import type { UploadProgress } from "../../api/uploadPhoto";
+
 /**
- * `GET /curate` — the Curator's Workshop, slice A: pick and validate one photo (E4-S1A).
+ * `GET /curate` — the Curator's Workshop, slice B: send one photo, with progress, cancellation and
+ * retry (E4-S1B).
  *
  * ## The screen
  *
  * With nothing picked, the view is one display-serif sentence and one quiet action: the archive has no
  * imagery yet, so there is nothing to decorate and nothing else to say. Once a photo is picked, the
  * photo is the screen — full-bleed, under the theme's own scrim — and the only chrome is a single glass
- * panel at the bottom saying that the photo is selected, with the picker one tap away.
+ * panel at the bottom: the image-first rule, applied to a screen that is otherwise empty.
  *
  * The glass is over the scrim, never over an uncontrolled backdrop. That is §3's scrim rule and NN/g's
  * finding (DESIGN-REFERENCES §7): a translucent panel's contrast depends on what is behind it, so the
@@ -21,51 +26,87 @@ import { ACCEPT_ATTRIBUTE, validateUpload } from "../../lib/upload/validation";
  * so the panel always sits on a known tone rather than on the raw base alone. The words in the panel are
  * `--aura-text`, never `--aura-muted` (DESIGN-SYSTEM §2.2, measured in E3-S2).
  *
- * ## What this slice does not do
+ * ## The states, and what they promise
  *
- * This screen only picks, validates and shows. It sends no request and has no upload action, progress,
- * cancellation, retry or cache invalidation — those are slices B and C of E4-S1. The panel therefore
- * says "Photo selected." and nothing about adding, uploading or retrying, so it cannot promise an
- * action that does not exist yet.
+ * `idle` → `selected` → `uploading` → `idle` (success) or `error`. From `error` the same File object is
+ * retried; nothing is re-read from the input, so a failed upload cannot silently lose the selection.
+ * Cancelling returns to `selected` with the file intact — cancellation is not failure, and the visible
+ * panel says "Upload cancelled." rather than leaving the fact only in the live region.
  *
- * ## The client is an experience measure, not a boundary
+ * **Cancellation is not a rollback.** The request is aborted client-side, but a cancel can race the
+ * response: if the archive had already accepted the body and stored the photo, the photo remains and
+ * appears on the next refresh. So the screen never says "nothing was saved"; the honest sentence is the
+ * one it shows. The README states the same caveat.
  *
- * `validateUpload` mirrors the server's *declared-type* axis, its emptiness rule and its size ceiling,
- * so an obviously wrong pick gets a sentence immediately instead of after a transfer. It does not sniff
- * magic bytes: text bytes declared `image/png` pass this check and are refused by the server's sniff
- * when they are eventually uploaded, one round trip later. The server remains the authority for the
- * bytes and for the size; this check exists to avoid a pointless upload, not to replace the refusal.
+ * A refused *pick* (wrong type, too large, empty) never reaches the network: the sentence says why, in
+ * the same quiet slot, and the picker stays one tap away. The client check is an experience measure, not
+ * a boundary — the server still sniffs the bytes and enforces the ceiling.
+ *
+ * The progress bar is the app's one labelled progress element on purpose (the story asks for an upload
+ * progress indicator); everywhere else loading is the silent pulse of §7. It is a 2 px line, no
+ * percentage, no spinner, and it reports `aria-valuenow` from the real `upload.onprogress` events. When
+ * the browser cannot compute the length (`lengthComputable === false`) the line becomes the silent
+ * pulse instead of inventing a number.
+ *
+ * ## The transport
+ *
+ * `api/uploadPhoto.ts` — XHR, because only `XMLHttpRequest.upload` reports request progress and can
+ * cancel in flight in every target browser. This view owns the `AbortController`, the preview URL and
+ * the phase; the request, the `ApiError` mapping and the cache invalidation are the API layer's.
  *
  * ## The file never outlives the screen
  *
  * The preview is an object URL created from the picked File and revoked when the selection is replaced
- * or the view unmounts; nothing is written to localStorage, IndexedDB or a cache, and no file name or
- * content is logged. A file whose declared type is an image but whose bytes do not decode would show
- * the browser's broken-image glyph through the scrim, so the preview is dropped on `error` while the
- * selection survives (probed in Chromium 152, E4-S1).
+ * or the view unmounts; the File itself is React state, and **nothing is persisted** — no localStorage,
+ * no IndexedDB, no disk. TanStack's mutation cache holds the File in memory until its gc, which is a
+ * cache in RAM, not storage. An in-flight request is aborted on unmount. No file name or content is
+ * logged.
  */
 
-type Phase = "idle" | "selected";
+type Phase = "idle" | "selected" | "uploading" | "error";
+
+/** One sentence, for a failure the archive named. The server's `detail` is for the operator, never the screen. */
+function failureSentence(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.code === "unsupported-image-type") {
+      return "The archive couldn't read that image.";
+    }
+    if (error.code === "upload-too-large") {
+      return "That photo is larger than the archive accepts.";
+    }
+    if (error.kind === "network" || error.kind === "timeout") {
+      return "The archive didn't answer. Try again.";
+    }
+  }
+  return "That photo couldn't be added.";
+}
 
 /** The quiet action grammar: text, a 44 px target, a 180 ms press, an inset focus ring. */
 const QUIET_ACTION =
   "flex min-h-11 shrink-0 cursor-pointer items-center rounded-[10px] px-3 text-sm text-aura-text underline decoration-aura-text/40 underline-offset-4 transition-colors duration-[var(--motion-duration-quick)] active:bg-aura-text/6 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/50";
 
 export function WorkshopView() {
+  const [file, setFile] = useState<File | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const [notice, setNotice] = useState("");
+  const [progress, setProgress] = useState<UploadProgress>({ loaded: 0, total: 0 });
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewBroken, setPreviewBroken] = useState(false);
 
   const previewRef = useRef<string | null>(null);
+  const controllerRef = useRef<AbortController | null>(null);
   const idleInputRef = useRef<HTMLInputElement>(null);
-  const secondaryInputRef = useRef<HTMLInputElement>(null);
+  const primaryRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
   const previousPhase = useRef<Phase>("idle");
 
-  // Leaving the view releases the preview's object URL. The File itself is never held in state here:
-  // this slice only shows the image; a later slice keeps the File in its own selection state.
+  const upload = useUploadPhoto();
+
+  // Leaving the view cancels a request nobody is watching and releases the preview's object URL. The
+  // File itself needs no cleanup: it is a reference, and React drops it with the component.
   useEffect(
     () => () => {
+      controllerRef.current?.abort();
       if (previewRef.current !== null) {
         URL.revokeObjectURL(previewRef.current);
       }
@@ -75,15 +116,17 @@ export function WorkshopView() {
 
   /*
    * Focus follows the state, so a pick that replaces the picker with a panel does not strand keyboard
-   * focus on a removed element: the replace-picker action, or the picker again after a refused pick.
-   * The first render is deliberately exempt — autofocusing a file input on arrival would move a screen
-   * reader's place before the user has read the view's name.
+   * focus on a removed element: the panel's action, the cancel action, or the picker again after a
+   * refusal or a success. The first render is deliberately exempt — autofocusing a file input on
+   * arrival would move a screen reader's place before the user has read the view's name.
    */
   useEffect(() => {
     const previous = previousPhase.current;
     previousPhase.current = phase;
-    if (phase === "selected") {
-      secondaryInputRef.current?.focus();
+    if (phase === "selected" || phase === "error") {
+      primaryRef.current?.focus();
+    } else if (phase === "uploading") {
+      cancelRef.current?.focus();
     } else if (previous !== "idle") {
       idleInputRef.current?.focus();
     }
@@ -96,6 +139,7 @@ export function WorkshopView() {
     }
     setPreviewUrl(null);
     setPreviewBroken(false);
+    setFile(null);
   };
 
   const choose = (chosen: File): void => {
@@ -104,6 +148,8 @@ export function WorkshopView() {
     previewRef.current = url;
     setPreviewUrl(url);
     setPreviewBroken(false);
+    setFile(chosen);
+    setProgress({ loaded: 0, total: chosen.size });
     setNotice("");
     setPhase("selected");
   };
@@ -125,7 +171,61 @@ export function WorkshopView() {
     choose(picked);
   };
 
-  const announcement = notice !== "" ? notice : phase === "selected" ? "Photo selected." : "";
+  const startUpload = (chosen: File): void => {
+    const controller = new AbortController();
+    controllerRef.current = controller;
+    setNotice("");
+    setProgress({ loaded: 0, total: chosen.size });
+    setPhase("uploading");
+
+    upload.mutate(
+      {
+        file: chosen,
+        signal: controller.signal,
+        onProgress: setProgress,
+      },
+      {
+        onSuccess: () => {
+          controllerRef.current = null;
+          clearSelection();
+          setPhase("idle");
+          setNotice("Added to your archive.");
+        },
+        onError: (error) => {
+          controllerRef.current = null;
+          if (controller.signal.aborted) {
+            // Cancellation is the user's choice, not a failure: the same File stays selected and the
+            // panel says so visibly. It does not claim the archive stored nothing — see the header.
+            setPhase("selected");
+            setNotice("Upload cancelled.");
+            return;
+          }
+          setPhase("error");
+          setNotice(failureSentence(error));
+        },
+      },
+    );
+  };
+
+  const uploadSelected = (): void => {
+    if (file !== null) {
+      startUpload(file);
+    }
+  };
+
+  const percent =
+    progress.total > 0 ? Math.min(100, Math.round((progress.loaded / progress.total) * 100)) : null;
+
+  const announcement =
+    phase === "uploading"
+      ? "Uploading."
+      : notice !== ""
+        ? notice
+        : phase === "selected"
+          ? "Photo selected."
+          : "";
+
+  const panelSentence = notice !== "" ? notice : "Photo selected.";
 
   return (
     <>
@@ -179,21 +279,58 @@ export function WorkshopView() {
         ) : (
           <div className="absolute inset-x-4 bottom-4 z-10 mx-auto max-w-md">
             <GlassPanel className={`flex flex-col gap-3 px-4 py-3 ${ENTER_FADE_BASE}`}>
-              <p className="text-base text-aura-text">Photo selected.</p>
-              <div className="flex items-center gap-2">
-                <label className={QUIET_ACTION}>
-                  <input
-                    ref={secondaryInputRef}
-                    type="file"
-                    accept={ACCEPT_ATTRIBUTE}
-                    onChange={handlePick}
-                    className="peer sr-only"
-                  />
-                  <span className="peer-focus-visible:outline peer-focus-visible:outline-1 peer-focus-visible:-outline-offset-4 peer-focus-visible:outline-aura-text/50">
-                    Choose another
-                  </span>
-                </label>
-              </div>
+              {phase === "uploading" ? (
+                <>
+                  <p className="text-sm text-aura-text">Uploading</p>
+                  <div
+                    role="progressbar"
+                    aria-label="Upload progress"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    {...(percent === null ? {} : { "aria-valuenow": percent })}
+                    className="h-0.5 w-full overflow-hidden rounded-full bg-aura-text/15"
+                  >
+                    {percent === null ? (
+                      <div className={`h-full w-full bg-aura-text opacity-25 ${LOADING_PULSE}`} />
+                    ) : (
+                      <div className="h-full bg-aura-text" style={{ width: `${percent}%` }} />
+                    )}
+                  </div>
+                  <button
+                    ref={cancelRef}
+                    type="button"
+                    onClick={() => controllerRef.current?.abort()}
+                    className={QUIET_ACTION}
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="text-base text-aura-text">{panelSentence}</p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      ref={primaryRef}
+                      type="button"
+                      onClick={uploadSelected}
+                      className={QUIET_ACTION}
+                    >
+                      {phase === "error" ? "Try again" : "Upload"}
+                    </button>
+                    <label className={QUIET_ACTION}>
+                      <input
+                        type="file"
+                        accept={ACCEPT_ATTRIBUTE}
+                        onChange={handlePick}
+                        className="peer sr-only"
+                      />
+                      <span className="peer-focus-visible:outline peer-focus-visible:outline-1 peer-focus-visible:-outline-offset-4 peer-focus-visible:outline-aura-text/50">
+                        Choose another
+                      </span>
+                    </label>
+                  </div>
+                </>
+              )}
             </GlassPanel>
           </div>
         )}
