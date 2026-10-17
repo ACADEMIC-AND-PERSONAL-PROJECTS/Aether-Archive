@@ -41,7 +41,7 @@ const mockedDownscale = vi.mocked(downscaleForUpload);
  * the picker and announcement contracts E4-S1A/S1B/E3-S5B/A1 established, E4-S3B's gestures (the two
  * activation thresholds, the overlay, the reorder callback and the disabled state while uploading), and
  * E4-S3C's motion slice: the auto-scroll tuning, the tuned drop animation and the reduced-motion
- * reading. Keyboard moves and announcements are the other half of E4-S3C and are not asserted here.
+ * reading. Keyboard moves and announcements are E4-S3D and are not asserted here.
  *
  * Object URLs are stubbed with a counter so a test can name the URL a tile owns; the shipped code still
  * calls the real `URL.createObjectURL`/`revokeObjectURL` shape (jsdom implements both, measured in the
@@ -472,6 +472,8 @@ describe("reordering", () => {
     await act(async () => {});
     expect(tileFor("a.png")).toHaveAttribute("data-dragging", "true");
     expect(screen.getByTestId("drag-overlay")).toBeVisible();
+    // The lifted clone carries its own scrim so its state line never sits on a raw photo.
+    expect(screen.getByTestId("drag-overlay-scrim")).toBeInTheDocument();
 
     fireEvent.mouseUp(document, { clientX: 66, clientY: 56 });
     await settleDragListeners();
@@ -576,7 +578,7 @@ describe("reordering", () => {
       fileOf(16, "image/png", "b.png"),
     ]);
 
-    // The KeyboardSensor and dnd-kit's attributes are the other half of E4-S3C. Until then the
+    // The KeyboardSensor and dnd-kit's attributes are E4-S3D. Until then the
     // activator is a pointer surface only — no role, no tab index — and the remove button is the
     // tile's only control.
     const activator = dragActivators()[0];
@@ -590,6 +592,9 @@ describe("reordering", () => {
   });
 
   it("should remove the settle and the drop motion when the reader asks for reduced motion", async () => {
+    // The WAAPI drop gating is NOT asserted here: jsdom's zero geometry makes dnd-kit skip the drop
+    // animation altogether, so an `animate` assertion passes with or without the gate (verified with
+    // a mutant). The Chromium probe is the guard — one 250 ms call with motion, zero under reduce.
     const { unmount } = renderWorkshop();
     pickFiles(screen.getByLabelText("Choose photos"), [
       fileOf(16, "image/png", "a.png"),

@@ -30,10 +30,13 @@ describe("the drag envelope", () => {
     expect(DROP_ANIMATION_MS).toBeLessThanOrEqual(300);
   });
 
-  it("should give auto-scroll a visible edge band and a steady tick", () => {
-    expect(AUTO_SCROLL_OPTIONS.threshold.y).toBeGreaterThan(0);
-    expect(AUTO_SCROLL_OPTIONS.threshold.y).toBeLessThan(0.5);
-    expect(AUTO_SCROLL_OPTIONS.acceleration).toBeGreaterThan(0);
-    expect(AUTO_SCROLL_OPTIONS.interval).toBeGreaterThan(0);
+  it("should pin auto-scroll's tuned values, not merely their sign", () => {
+    // Exact values: a silent revert to dnd-kit's defaults would keep the probe's "scrolling happens"
+    // assertion true while the tuning the story measured disappeared.
+    expect(AUTO_SCROLL_OPTIONS).toEqual({
+      threshold: { x: 0.15, y: 0.18 },
+      acceleration: 8,
+      interval: 5,
+    });
   });
 });
