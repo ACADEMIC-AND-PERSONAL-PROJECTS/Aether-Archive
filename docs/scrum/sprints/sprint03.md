@@ -28,8 +28,8 @@
 | 4 | E3-S4 | Quiet loading / empty / error states | 2 | p1 | Done | #108 |
 | 5a | E3-S5A | Accessibility — the axe gate (criteria 1, 2) | 1 | p0 | Done | #110 |
 | 5b | E3-S5B | Accessibility — contrast, `inert`, the announcement fix, the manual pass (criteria 3–5) | 2 | p0 | Done | #111 |
-| 6a | E4-S1A | Single photo upload — the picker and the validation (criterion 1) | 2 | p0 | In review | #114 |
-| 6b | E4-S1B | Single photo upload — send with progress and cancel, then retry and invalidation (criteria 2–4) | 3 | p0 | Todo | — |
+| 6a | E4-S1A | Single photo upload — the picker and the validation (criterion 1) | 2 | p0 | Done | #114 |
+| 6b | E4-S1B | Single photo upload — send with progress and cancel, then retry and invalidation (criteria 2–4) | 3 | p0 | In progress | — |
 | 7 | E4-S2 | Multi-select (≤ 6) & client-side downscale | 5 | p0 | Todo | — |
 
 **Total: 10 slices · 28 points** (the row above them is a chore, not a story; E3-S1A/B, E3-S5A/B and
@@ -293,8 +293,9 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   alone 711. The #113 review rejected its atomic-story claim **on its own arithmetic** — it priced two
   slices at ≈450 and ≈200, both under the branch threshold, and then argued from the summed production —
   and found the suite not hermetic against `VITE_MAX_UPLOAD_MB`: the README tells developers to set the
-  key that broke two tests. Slice A measured **714 at review, 776 at its final tip** (production 350,
-  tests 328, docs 82, build/config 16) — 276 over the ~500 branch threshold — so it claims the
+  key that broke two tests. Slice A (PR #114, merged `c376404`) measured **714 at review, 776 at its
+  final tip** (production 350, tests 328, docs 82, build/config 16) — 276 over the ~500 branch
+  threshold — so it claims the
   exception, but in the E3-S3 form: **restated on a measured cut rather than on an inseparability
   claim.** The cut the review named — by *state*: keep the picker, validation and refusal notice; defer
   the selected preview, its panel and their tests — was constructed in a throwaway copy at the tip,
