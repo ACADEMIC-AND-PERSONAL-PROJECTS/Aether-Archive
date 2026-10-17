@@ -24,18 +24,21 @@
  *
  * ## Which files may be re-encoded
  *
- * Only JPEG/JPG, PNG and WebP. The exclusions are the point:
+ * Only JPEG/JPG and PNG. The exclusions are the point:
  *
  * - **GIF is skipped** — a canvas holds one frame, so re-encoding would silently drop the animation.
+ * - **WebP is skipped** — it can be animated and can carry alpha, and a canvas cannot tell either
+ *   case from a static opaque image without parsing the container; flattening transparency or
+ *   dropping frames is a regression, not a compression. `E6-S20` records restoring static WebP when
+ *   both can be detected.
  * - **AVIF is skipped** — canvas can decode it in current browsers but no universal encoder exists; a
  *   requested `image/avif` from `toBlob` silently falls back to PNG, which the archive would then
  *   receive under an AVIF name. Leaving the file untouched is the honest outcome.
  * - Everything else is refused by the server anyway; there is nothing to improve.
  *
- * ## The output type is the source's, except WebP
+ * ## The output type is the source's
  *
- * JPEG and JPG output JPEG; WebP output JPEG (the universally supported lossy encoder); PNG output PNG,
- * because only PNG can carry the source's alpha channel. The returned `File` carries the **encoded
+ * JPEG and JPG output JPEG; PNG outputs PNG, because only PNG can carry the source's alpha channel. The returned `File` carries the **encoded
  * blob's own type**, not merely the requested one: MDN records that an unsupported requested type
  * falls back to PNG, and `StorageService.store` refuses an upload whose declared media type
  * contradicts its magic bytes. A browser that silently produces PNG must therefore be sent as PNG.
@@ -51,6 +54,7 @@
  * The split mirrors `lib/color/decode.ts`: the decision is pure and unit-tested without React or
  * canvas, the browser edges are injected, and the real path is proven by an offline Chromium probe.
  */
+import { normaliseMediaType } from "./validation";
 
 /** The long edge an upload keeps, in pixels. Above any phone display at normal viewing distance. */
 export const MAX_LONG_EDGE = 2560;
@@ -60,6 +64,14 @@ export const MAX_BYTES_BEFORE_DOWNSCALE = 6 * 1024 * 1024;
 
 /** JPEG/WebP quality for the re-encode. PNG ignores it — see the header. */
 export const JPEG_QUALITY = 0.9;
+
+/**
+ * How long preparation may take before the original is sent instead. A decoder or encoder promise
+ * that never settles would leave the batch in `uploading` forever, and Cancel cannot abort work that
+ * has no transport yet — measured preparation is ~0.5 s for a 3.8 MB / 4000 × 3000 photo, so ten
+ * seconds is a wedge guard, not a budget.
+ */
+export const PREPARATION_TIMEOUT_MS = 10_000;
 
 /** The two media types this module produces. */
 export type DownscaleOutputType = "image/jpeg" | "image/png";
@@ -95,27 +107,24 @@ export type DownscalePlan =
       readonly reason: "long-edge" | "bytes";
     };
 
-/** The source types the re-encoder accepts, and the output each one produces. */
+/**
+ * The source types the re-encoder accepts, and the output each one produces.
+ *
+ * WebP is absent on purpose, like GIF: WebP can be **animated** (a canvas holds one frame) and can
+ * carry **alpha** (a JPEG has none, so transparent pixels would flatten, usually to black). The
+ * planner cannot tell a static opaque WebP from either without parsing the container, so the honest
+ * default is to leave every WebP untouched. `E6-S20` records restoring static WebP when animation and
+ * alpha can be detected without a second parser.
+ */
 const OUTPUT_TYPES: ReadonlyMap<string, DownscaleOutputType> = new Map([
   ["image/jpeg", "image/jpeg"],
   ["image/jpg", "image/jpeg"],
   ["image/png", "image/png"],
-  ["image/webp", "image/jpeg"],
 ]);
-
-/**
- * The archive's normalisation (`ImageFormat.forMediaType`): case-insensitive, parameters dropped.
- * The client must agree with the server about which spelling names which format.
- */
-export function normaliseImageType(type: string): string {
-  const semicolon = type.indexOf(";");
-  const base = semicolon < 0 ? type : type.slice(0, semicolon);
-  return base.trim().toLowerCase();
-}
 
 /** The type this module would encode `type` to, or `null` when the file must be left alone. */
 function outputTypeFor(type: string): DownscaleOutputType | null {
-  return OUTPUT_TYPES.get(normaliseImageType(type)) ?? null;
+  return OUTPUT_TYPES.get(normaliseMediaType(type)) ?? null;
 }
 
 /**
@@ -203,6 +212,8 @@ export interface DownscaleDependencies {
 export interface DownscaleForUploadOptions extends DownscaleOptions {
   /** Overridden in tests; browsers use the globals. */
   readonly dependencies?: DownscaleDependencies;
+  /** Defaults to {@link PREPARATION_TIMEOUT_MS}; a test states its own. */
+  readonly timeoutMs?: number;
 }
 
 /**
@@ -272,6 +283,24 @@ export async function downscaleForUpload(
     return file;
   }
 
+  // Preparation has a deadline. The work below is a browser promise; if it never settles, the queue
+  // would stay in `uploading` with nothing to cancel, so the race resolves the original instead.
+  const timeoutMs = options.timeoutMs ?? PREPARATION_TIMEOUT_MS;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<File>((resolve) => {
+    timer = setTimeout(() => resolve(file), timeoutMs);
+  });
+  try {
+    return await Promise.race([attemptDownscale(file, options), deadline]);
+  } finally {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
+  }
+}
+
+/** The decode → decide → draw → encode attempt; resolves the original on every failure. */
+async function attemptDownscale(file: File, options: DownscaleForUploadOptions): Promise<File> {
   let bitmap: BitmapLike | null = null;
   try {
     const dependencies = options.dependencies ?? browserDependencies();
@@ -294,6 +323,14 @@ export async function downscaleForUpload(
 
     const encoded = await dependencies.encode(canvas, plan.outputType, JPEG_QUALITY);
     if (encoded === null) {
+      return file;
+    }
+
+    // A re-encode that does not shrink the file is not an optimisation. Measured in the review: a
+    // 6.5 MB PNG re-encoded to 10.2 MB (1.56×) and a q50 JPEG to 1.77× at this module's own
+    // target/quality — either could push an upload past the server's ceiling for no gain. Above all,
+    // the story's promise is compression, not "a different file": the original wins ties.
+    if (encoded.size >= file.size) {
       return file;
     }
 
