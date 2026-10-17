@@ -15,6 +15,7 @@ import { useState, type CSSProperties } from "react";
 
 import { EASE_SOFT } from "../../lib/motion/tokens";
 import {
+  AUTO_SCROLL_OPTIONS,
   MOUSE_DRAG_DISTANCE_PX,
   SORT_SETTLE_MS,
   TOUCH_LONG_PRESS_DELAY_MS,
@@ -79,13 +80,13 @@ import {
  * `onMove(from, to)`. The sensors are split because the gestures are different: a mouse drag starts
  * after 8 px, a finger long-press starts after 250 ms and gives up if it travels more than 8 px — so a
  * swipe still scrolls the grid and a long press lifts the photo. `touch-action: manipulation` on the
- * activator keeps the swipe native and leaves pinch-zoom alone. `DndContext` owns auto-scroll at the
- * `overflow-y-auto` ancestor, and the `DragOverlay` carries a clone of the tile with the project's one
- * soft shadow and a hairline edge.
+ * activator keeps the swipe native and leaves pinch-zoom alone. `DndContext` auto-scrolls the nearest
+ * scrollable ancestor with the tuned band in `AUTO_SCROLL_OPTIONS` — the document at the probed
+ * 390 × 300 viewport, where the grid's own scroller has no travel — so a photo can be carried to a row
+ * that is not on screen (E4-S3C).
  *
- * The overlay's drop animation and its reduced-motion reading are E4-S3C's, together with the rest of
- * the auto-scroll tuning; this branch leaves the library's short default settle in place and adds no
- * motion of its own.
+ * The overlay's drop animation and its reduced-motion reading are E4-S3C's; this branch leaves the
+ * library's short default settle in place and adds no motion of its own.
  *
  * ## The state line
  *
@@ -304,6 +305,7 @@ export function SelectionGrid({
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
+      autoScroll={AUTO_SCROLL_OPTIONS}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveId(null)}
