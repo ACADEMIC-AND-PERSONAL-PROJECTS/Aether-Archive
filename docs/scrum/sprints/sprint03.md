@@ -27,7 +27,7 @@
 | 3 | E3-S3 | Route transitions & motion system | 3 | p0 | Done | #106 |
 | 4 | E3-S4 | Quiet loading / empty / error states | 2 | p1 | Done | #108 |
 | 5a | E3-S5A | Accessibility — the axe gate (criteria 1, 2) | 1 | p0 | Done | #110 |
-| 5b | E3-S5B | Accessibility — contrast, `inert`, the announcement fix, the manual pass (criteria 3–5) | 2 | p0 | In review | #111 |
+| 5b | E3-S5B | Accessibility — contrast, `inert`, the announcement fix, the manual pass (criteria 3–5) | 2 | p0 | Done | #111 |
 | 6 | E4-S1 | Single photo upload | 5 | p0 | Todo | — |
 | 7 | E4-S2 | Multi-select (≤ 6) & client-side downscale | 5 | p0 | Todo | — |
 
@@ -40,7 +40,7 @@ dependency chain, with the placements worth a sentence:
   `_docs/openapi.yml` — checked at planning). Two forward references are named rather than hidden: its
   "tap anywhere opens the menu" criterion completes when **E3-S2** lands, with the integrated path tested
   in **E3-S5** — **satisfied**: E3-S2 merged `e7a50d6`; and its empty-archive criterion completes with
-  **E3-S4**, still open.
+  **E3-S4** — also satisfied: E3-S4 merged `f66fad2` and its issue #29 is closed.
 - **E3-S2 next** — the menu is the tap-target the splash's first criterion names, and it is self-contained:
   glass overlay, focus trap, keyboard path. `backdrop-filter` and the glass fallback were proven from the
   shipped CSS in E2-S6 (the `@supports` branch itself is not forceable headless — E2-S6 records that
@@ -253,7 +253,24 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   cut by criterion, not by surface**. I had argued that criteria 1 and 2 each name two surfaces, so no
   surface cut could satisfy them; true and irrelevant, because the rule asks whether *a* slice fails a
   criterion, and delivering criteria 1-2 then 3-5 fails none that the whole does not also defer. The cuts
-  are ~188 and ~210 lines, both under budget. **This is the fourth time in this sprint that a "cannot be
+  were estimated at ~188 and ~210 lines; they landed at 237 and 496, both still under the ~500 branch
+  threshold (the second by four lines, and over the ~400 ideal by 96 — both numbers, because the review
+  asked for both). **This is the fourth time in this sprint that a "cannot be
   split" claim has been withdrawn** (E3-S1, E3-S3, E3-S4, here), and the lesson is now a rule rather than a
   resolution: construct the cut you did not name — by criterion, by state, by surface — before claiming the
   exception, and if the branch is under ~500 argue the arithmetic instead. E3-S5B closes #30.
+- 2026-10-17 — **E3-S5A merged (`97d258b`, PR #110) and E3-S5B (`ed5cd94`, PR #111); the E3 epic is
+  complete.** The split cost is measured rather than asserted, in both of its figures: **656 (+19%) at the
+  review tips, 733 (+33%) after the review fixes** — the extra 77 lines are the review's own findings, so
+  the two numbers answer different questions. What the extra record bought: a gate the
+  reviewer made stronger than it was opened (a loading-state run, `data-state` assertions, a dialog
+  assertion), an `inert` implementation whose failure mode is documented (a dialog nested in the inert
+  subtree is itself ignored), and a status region placed as a **sibling** of `<main>` on the strength of a
+  measurement — it would leave the accessibility tree exactly when the menu is open and it has something to
+  say.
+- 2026-10-17 — **The review's negative control is the line to keep.** In E3-S5B the reviewer mutated
+  `GLASS_ALPHA` 0.4 → 0.1 and the notice test **stayed green**, correctly — the 70 % scrim is the
+  load-bearing layer, so the test was measuring the mechanism it names. Across the last four review rounds
+  (E3-S3, E3-S4, E3-S5A, E3-S5B) a reviewer's own mutant taught more than the author's, and this is the
+  first that proved a test by *not* killing it. A mutation battery that only demonstrates killing is half
+  a battery.

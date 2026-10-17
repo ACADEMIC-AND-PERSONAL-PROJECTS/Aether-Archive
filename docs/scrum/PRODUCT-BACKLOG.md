@@ -285,8 +285,8 @@ opens on tap, feels tactile, and gets out of the way.
 | E3-S1 | Immersive splash view | p0 | 5 | 3 | Done |
 | E3-S2 | Glass menu overlay | p0 | 5 | 3 | Done |
 | E3-S3 | Route transitions & motion system | p0 | 3 | 3 | Done |
-| E3-S4 | Quiet loading / empty / error states | p1 | 2 | 3 | Todo |
-| E3-S5 | View tests & accessibility pass | p0 | 3 | 3 | Todo |
+| E3-S4 | Quiet loading / empty / error states | p1 | 2 | 3 | Done |
+| E3-S5 | View tests & accessibility pass | p0 | 3 | 3 | Done |
 
 ### E3-S1 — Immersive splash view · 5 pts · p0
 
@@ -380,14 +380,19 @@ opens on tap, feels tactile, and gets out of the way.
       comment records the trade; this is where it gets an owner.
 - [ ] Manual pass on a 390 px viewport documented in the PR.
 
-> **Delivered in two slices (Sprint 3), split at review.** **E3-S5A** (PR #110) carries criteria 1-2 — the
-> axe gate: `axe-core` 4.14.0 dev-only, five runs at zero violations of every impact, with the two buckets
-> axe cannot judge in jsdom (`incomplete`, `inapplicable`) pinned rather than tolerated. **E3-S5B** carries
-> criteria 3-5 — painted contrast, the `inert` decision, the persistent-announcement fix and the manual
-> pass — and closes #30. The story was first delivered whole at 551 hand-written lines claiming the
-> atomic-story exception; the review found **the cut I had not tested, by criterion rather than by
-> surface**, and both halves land under budget. Fourth withdrawn claim of its kind this sprint; the rule
-> now lives in the sprint notes and in `.claude/` memory rather than in a resolution.
+> **Delivered in two slices (Sprint 3), both merged** — the E3 epic is complete. **E3-S5A** (PR #110, merge
+> `97d258b`; 237 hand-written) carries criteria 1-2 — the axe gate: `axe-core` 4.14.0 dev-only, **six runs**
+> at zero violations of every impact, with the two buckets axe cannot judge in jsdom (`incomplete`,
+> `inapplicable`) pinned rather than tolerated, and the gate's subtree scope stated. **E3-S5B** (PR #111,
+> merge `ed5cd94`; 496 hand-written) carries criteria 3-5 — painted contrast (sampled at 390) and layout at
+> 320/390/430, the `inert` decision with its failure mode documented, the persistent status region as a
+> **sibling** of `<main>`, and the manual pass. The story was first delivered whole at 551 hand-written
+> lines claiming the atomic-story exception; the review **rejected the unsplit claim and offered a restated
+> claim or a split — I chose the split.** Cost, stated precisely because the two figures differ: at the
+> review tips the halves were 188 + 468 = **656 (+19% over 551)**; after the review fixes, **237 + 496 = 733
+> (+33%)**, the extra 77 lines being the review's own findings. Both go to the retrospective — including the
+> part that is mine: the 551-line whole was my delivery, and the split was a choice among the options the
+> review allowed.
 
 ---
 
