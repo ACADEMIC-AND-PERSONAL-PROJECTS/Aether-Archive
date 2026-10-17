@@ -18,11 +18,12 @@ import {
   compositeOver,
   contrastRatio,
   hexToRgb,
+  normalizeHex,
   parseColor,
   rgbaString,
   type Rgb,
 } from "./contrast";
-import { oklchToHex } from "./oklch";
+import { oklchToHex, rgbToOklch } from "./oklch";
 
 import type { Palette, PaletteColor } from "./types";
 
@@ -66,6 +67,8 @@ const GLASS_TINT: Rgb = { r: 0, g: 0, b: 0 };
 const GLASS_ALPHA = 0.4;
 const GLASS_SOLID_ALPHA = 0.72;
 const HAIRLINE = "1px solid rgba(255, 255, 255, 0.08)";
+/* The inverse hairline for the light-glass theme (`themeFromBackground` on a light page). */
+const LIGHT_HAIRLINE = "1px solid rgba(0, 0, 0, 0.08)";
 
 /* The generator's bands — the §2.1/§2.2 rules made numeric, one comment each in place. */
 const BG_L_MIN = 0.1;
@@ -262,6 +265,111 @@ export function paletteToTheme(palette: Palette): AuraTheme {
     glass: rgbaString(GLASS_TINT, GLASS_ALPHA),
     glassSolid: rgbaString(GLASS_TINT, GLASS_SOLID_ALPHA),
     hairline: HAIRLINE,
+    text,
+    muted: rgbaString(textRgb, mutedAlpha),
+    accent,
+    accentContrast,
+  };
+}
+
+/**
+ * A theme from a **chosen** background (E4-S4). Unlike `paletteToTheme`, the page keeps the user's
+ * hex exactly; every other token is derived to clear §2.2's floor.
+ *
+ * Text starts from the nearer neutral base and steps toward its extreme until it passes on the page,
+ * the surface and the glass composite. The surface steps **away from the text** (darker under light
+ * text, lighter under dark text), so it cannot eat the contrast the page just earned. A background in
+ * the narrow mid-tone band where neither near-white nor near-black passes is refused rather than
+ * silently darkened: the user picked that colour, and a preview that is not the colour they picked
+ * would be lying.
+ *
+ * The accent is the background's own hue at a usable chroma (the neutral fallback accent when the
+ * background has no hue), fitted against the two neutral bases by `fitAccent`.
+ *
+ * **The glass follows the text.** The app's glass is a black tint, which on a light page would be
+ * darker than any text that passes on that page. The tint therefore flips with the text: black under
+ * light text, white under dark text (with a dark hairline), so the glass composite stays on the same
+ * side of the background as the text it must carry. The alternative — keeping black glass and
+ * refusing every light background — would have rejected roughly half the colour cube in the test.
+ */
+export function themeFromBackground(value: string): AuraTheme {
+  const hex = normalizeHex(value);
+  if (hex === null) {
+    throw new Error(`Not a #rrggbb colour: ${value}`);
+  }
+  const bgRgb = hexToRgb(hex);
+  const bgOklch = rgbToOklch(bgRgb.r, bgRgb.g, bgRgb.b);
+  const lightText =
+    contrastRatio(hexToRgb(LIGHT_BASE), bgRgb) >= contrastRatio(hexToRgb(DARK_BASE), bgRgb);
+  const glassTint: Rgb = lightText ? GLASS_TINT : { r: 255, g: 255, b: 255 };
+  const hairline = lightText ? HAIRLINE : LIGHT_HAIRLINE;
+  const surface = oklchToHex({
+    l: clamp(bgOklch.l + (lightText ? -SURFACE_STEP : SURFACE_STEP), 0, 1),
+    c: Math.min(bgOklch.c, SURFACE_C_MAX),
+    h: bgOklch.h,
+  });
+  const surfaceRgb = hexToRgb(surface);
+  const glassOverBg = compositeOver(glassTint, GLASS_ALPHA, bgRgb);
+  const passes = (candidate: string): boolean => {
+    const rgb = hexToRgb(candidate);
+    return (
+      contrastRatio(rgb, bgRgb) >= CONTRAST_MINIMUM &&
+      contrastRatio(rgb, surfaceRgb) >= CONTRAST_MINIMUM &&
+      contrastRatio(rgb, glassOverBg) >= CONTRAST_MINIMUM
+    );
+  };
+
+  const base = lightText ? LIGHT_BASE : DARK_BASE;
+  const baseRgb = hexToRgb(base);
+  const baseOklch = rgbToOklch(baseRgb.r, baseRgb.g, baseRgb.b);
+  let textL = baseOklch.l;
+  let text = base;
+  const step = lightText ? 0.01 : -0.01;
+  // Stops short of pure white/black: the brief forbids both, and the last reachable step is enough
+  // for every background this generator accepts.
+  while (!passes(text) && (lightText ? textL < 0.99 : textL > 0.01)) {
+    textL = clamp(textL + step, 0, 1);
+    text = oklchToHex({ l: textL, c: Math.min(baseOklch.c, TEXT_C_MAX), h: baseOklch.h });
+  }
+  if (!passes(text)) {
+    throw new Error(`${hex} cannot carry 4.5:1 text: choose a lighter or a darker background.`);
+  }
+
+  const textRgb = hexToRgb(text);
+  let mutedAlpha = MUTED_ALPHA;
+  let mutedOverBg = compositeOver(textRgb, mutedAlpha, bgRgb);
+  while (contrastRatio(mutedOverBg, bgRgb) < CONTRAST_MINIMUM && mutedAlpha < 1) {
+    mutedAlpha = Math.round((mutedAlpha + MUTED_STEP) * 100) / 100;
+    mutedOverBg = compositeOver(textRgb, mutedAlpha, bgRgb);
+  }
+
+  const fallbackAccentRgb = hexToRgb(FALLBACK_THEME.accent);
+  const fallbackAccentOklch = rgbToOklch(
+    fallbackAccentRgb.r,
+    fallbackAccentRgb.g,
+    fallbackAccentRgb.b,
+  );
+  const accentOklch =
+    bgOklch.c < 0.01
+      ? fallbackAccentOklch
+      : {
+          l: lightText ? 0.72 : 0.42,
+          c: Math.max(0.08, Math.min(bgOklch.c, 0.14)),
+          h: bgOklch.h,
+        };
+  const accentSource: PaletteColor = {
+    hex: oklchToHex(accentOklch),
+    oklch: accentOklch,
+    weight: 1,
+  };
+  const { accent, accentContrast } = fitAccent(accentSource);
+
+  return {
+    bg: hex,
+    surface,
+    glass: rgbaString(glassTint, GLASS_ALPHA),
+    glassSolid: rgbaString(glassTint, GLASS_SOLID_ALPHA),
+    hairline,
     text,
     muted: rgbaString(textRgb, mutedAlpha),
     accent,

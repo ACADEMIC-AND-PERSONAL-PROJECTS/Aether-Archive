@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { hexToRgb } from "./contrast";
+import { hexToRgb, normalizeHex } from "./contrast";
 import { oklchToHex, rgbToOklch } from "./oklch";
 import {
   applyFallbackTheme,
@@ -10,6 +10,7 @@ import {
   contrastReport,
   FALLBACK_THEME,
   paletteToTheme,
+  themeFromBackground,
   THEME_PROPERTIES,
 } from "./theme";
 import globalCss from "../../styles/global.css?raw";
@@ -164,5 +165,98 @@ describe("applyTheme", () => {
 
     clearTheme();
     expect(document.documentElement.style.getPropertyValue("--aura-text")).toBe("");
+  });
+});
+
+/** OKLCh lightness of a hex, the scale both the surface and the text step along. */
+const lightness = (hex: string): number => {
+  const { r, g, b } = hexToRgb(hex);
+  return rgbToOklch(r, g, b).l;
+};
+
+describe("normalizeHex", () => {
+  it("should accept case and surrounding spaces, and return lowercase", () => {
+    expect(normalizeHex("  #1E3A5F ")).toBe("#1e3a5f");
+    expect(normalizeHex("#abcdef")).toBe("#abcdef");
+  });
+
+  it("should reject everything that is not #rrggbb", () => {
+    expect(normalizeHex("#abc")).toBeNull();
+    expect(normalizeHex("1e3a5f")).toBeNull();
+    expect(normalizeHex("#gggggg")).toBeNull();
+    expect(normalizeHex("rgba(0, 0, 0, 0.4)")).toBeNull();
+    expect(normalizeHex("")).toBeNull();
+  });
+});
+
+describe("themeFromBackground", () => {
+  it("should keep the chosen background exactly and normalise its case", () => {
+    expect(themeFromBackground("  #1E3A5F ").bg).toBe("#1e3a5f");
+  });
+
+  it("should throw on anything that is not #rrggbb", () => {
+    expect(() => themeFromBackground("#abc")).toThrow("Not a #rrggbb colour");
+  });
+
+  it("should guarantee every §2.2 pair for a sampled cube, or refuse the colour", () => {
+    let accepted = 0;
+    let refused = 0;
+    for (let r = 0; r <= 255; r += 17) {
+      for (let g = 0; g <= 255; g += 17) {
+        for (let b = 0; b <= 255; b += 17) {
+          const hex = `#${[r, g, b]
+            .map((channel) => channel.toString(16).padStart(2, "0"))
+            .join("")}`;
+          let theme;
+          try {
+            theme = themeFromBackground(hex);
+          } catch (error) {
+            // The only refusal is the mid-tone band; a syntax error here would be a defect.
+            expect(String(error)).toContain("cannot carry 4.5:1 text");
+            refused += 1;
+            continue;
+          }
+          accepted += 1;
+          expect(theme.bg).toBe(hex);
+          for (const ratio of Object.values(contrastReport(theme))) {
+            expect(ratio).toBeGreaterThanOrEqual(CONTRAST_MINIMUM);
+          }
+        }
+      }
+    }
+    // The refusal band is real, and it is a band: most backgrounds are accepted.
+    expect(refused).toBeGreaterThan(0);
+    expect(accepted).toBeGreaterThan(refused);
+  });
+
+  it("should refuse a saturated mid-tone whose page cannot carry any 4.5:1 text", () => {
+    // Measured with the cube test below: #0066ff is in the narrow refusal band, not a syntax error.
+    expect(() => themeFromBackground("#0066ff")).toThrow("cannot carry 4.5:1 text");
+  });
+
+  it("should flip the glass tint with the text so the glass pair stays legible", () => {
+    const dark = themeFromBackground("#101418");
+    const light = themeFromBackground("#f2ead8");
+    expect(dark.text).toBeTruthy();
+    expect(dark.glass).toMatch(/^rgba\(0, 0, 0, 0\.4\)$/);
+    expect(dark.hairline).toContain("255, 255, 255");
+    expect(light.glass).toMatch(/^rgba\(255, 255, 255, 0\.4\)$/);
+    expect(light.hairline).toContain("0, 0, 0");
+  });
+
+  it("should step the surface away from the text's end of the scale", () => {
+    const dark = themeFromBackground("#101418");
+    const light = themeFromBackground("#f2ead8");
+    // Light text on a dark page: the surface goes darker. Dark text on a light page: lighter.
+    expect(lightness(dark.surface)).toBeLessThan(lightness(dark.bg));
+    expect(lightness(light.surface)).toBeGreaterThan(lightness(light.bg));
+  });
+
+  it("should use the fallback accent when the background has no hue", () => {
+    expect(themeFromBackground("#141414").accent).toBe(FALLBACK_THEME.accent);
+  });
+
+  it("should be deterministic", () => {
+    expect(themeFromBackground("#2a1b3d")).toEqual(themeFromBackground("#2a1b3d"));
   });
 });
