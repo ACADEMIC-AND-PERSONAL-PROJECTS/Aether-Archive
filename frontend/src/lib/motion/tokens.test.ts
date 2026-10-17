@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import * as motion from "./tokens";
-import { DISTANCE_ENTER_PX, DURATION_MS, EASE_SOFT, MOTION_MARKER_CLASS } from "./tokens";
+import {
+  DISTANCE_ENTER_PX,
+  DURATION_MS,
+  EASE_SOFT,
+  LOADING_PULSE,
+  MOTION_MARKER_CLASS,
+} from "./tokens";
 import globalCss from "../../styles/global.css?raw";
 
 /**
@@ -70,9 +76,13 @@ function valueOf(block: string, property: string): string {
  * constant that named a phantom keyframe (or an undeclared `var(--motion-duration-nope)`) left all eight
  * tests green, because the guard's scope was the array rather than the module. Reading the exports means
  * a new constant is covered the moment it lands, which is what the sentence above this used to claim.
+ *
+ * The test is `animate-[` rather than the entry marker: the loading pulse deliberately carries no
+ * `motion-enter`, and a guard keyed on that marker would have left the one loop in the app unread —
+ * exactly the constant most likely to name a variable nobody declared.
  */
 const CLASS_STRINGS = Object.entries(motion).flatMap(([, value]) =>
-  typeof value === "string" && value.startsWith(MOTION_MARKER_CLASS) ? [value] : [],
+  typeof value === "string" && value.includes("animate-[") ? [value] : [],
 );
 
 describe("motion tokens — the stylesheet mirrors them", () => {
@@ -80,6 +90,7 @@ describe("motion tokens — the stylesheet mirrors them", () => {
     expect(valueOf(ROOT, "--motion-duration-quick")).toBe(`${DURATION_MS.quick}ms`);
     expect(valueOf(ROOT, "--motion-duration-base")).toBe(`${DURATION_MS.base}ms`);
     expect(valueOf(ROOT, "--motion-duration-slow")).toBe(`${DURATION_MS.slow}ms`);
+    expect(valueOf(ROOT, "--motion-duration-pulse")).toBe(`${DURATION_MS.pulse}ms`);
   });
 
   it("should declare §5's curve and distance as the token says", () => {
@@ -150,5 +161,18 @@ describe("motion tokens — the stylesheet mirrors them", () => {
     const fade = keyframeBlock(SOURCE, "aether-fade");
 
     expect(fade).not.toContain("transform");
+  });
+
+  it("should keep the loading pulse a still frame under reduced motion", () => {
+    // The pulse is the one permitted loop (§5, §7), and under `reduce` it must become a still frame.
+    // The global freeze rule keys on the *absence* of the entry marker, so a pulse carrying it would
+    // keep breathing on a user's phone; a transform in the keyframe would be movement the rule cannot
+    // remove. Both are asserted here because neither is visible in a jsdom render.
+    expect(LOADING_PULSE).not.toContain(MOTION_MARKER_CLASS);
+    expect(LOADING_PULSE).toContain("infinite");
+
+    const breathe = keyframeBlock(SOURCE, "aether-breathe");
+    expect(breathe).not.toContain("transform");
+    expect(breathe).toContain("opacity");
   });
 });

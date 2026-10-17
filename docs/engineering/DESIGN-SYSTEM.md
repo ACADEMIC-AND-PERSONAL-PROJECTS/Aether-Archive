@@ -77,8 +77,11 @@ review blocker.
 (E3-S2): a notice over the menu's veil renders at **4.14:1** in `--aura-muted` — under §8's floor — and
 **8.07:1** in `--aura-text`. The neutral fallback palette happens to clear it; a palette derived from a
 photo does not. So anything that has to be read *through* glass uses `--aura-text`; `--aura-muted` stays
-for quiet labels on an opaque surface. (E3-S4 owns the words the notice says; this rule is what it
-inherits.)
+for quiet labels on an opaque surface. **This is a rule for every glass notice, not a menu detail:** the
+quiet error notice (E3-S4) puts both its message and its retry in `--aura-text`, never `--aura-muted`.
+Measured on painted pixels over a white photo behind the notice's own scrim: glyph on panel **7.47:1**;
+the muted token would composite to **3.92:1** — below §8's floor. Over a dark photo the same pair is
+13.41:1 (muted 5.39:1).
 
 **Fallback values (the token layer's neutral set, E2-S3).** `--aura-bg #0b0b0d` · `--aura-surface
 #121215` · `--aura-glass rgba(0, 0, 0, 0.4)` · `--aura-glass-solid rgba(0, 0, 0, 0.72)` ·
@@ -198,6 +201,7 @@ One vocabulary, declared once as custom properties in `styles/global.css` and re
 | `--motion-duration-quick` | 180 ms | micro-feedback (tap, hover, focus) |
 | `--motion-duration-base` | 320 ms | menus, panels, reveals |
 | `--motion-duration-slow` | 600 ms | route transitions, ambient background |
+| `--motion-duration-pulse` | 2400 ms | the loading pulse — the one permitted loop |
 | `--motion-ease-soft` | `cubic-bezier(0.22, 1, 0.36, 1)` | everything by default |
 | `--motion-distance-enter` | 16 px | vertical drift on entry (the brief's 12–16 px, pinned at 16) |
 
@@ -212,6 +216,14 @@ A component names one of the three class strings in `lib/motion/tokens.ts` — `
 `ENTER_DRIFT_BASE`, `ENTER_FADE_BASE` — and writes no duration, curve or keyframe of its own. The
 strings are literal because Tailwind scans the file as text: a class built from a template literal
 compiles to nothing at all.
+
+**The one loop** is E3-S4's loading pulse: `aether-breathe`, `opacity 0.25 → 1 → 0.25` over
+`duration-pulse` (2400 ms), named only by `LOADING_PULSE`. It carries **no** `motion-enter` marker, so the
+global `reduce` freeze (§11) shrinks it to a still frame at 0.25 — the intended reduced-motion reading.
+It animates opacity only, never a transform, so it cannot become a containing block. Measured in
+Chromium over 2.6 s: 26 frames, 24 distinct opacities, **0.250008 → 0.999961**; under emulated `reduce`,
+one value (**0.250**), `animation-duration: 1e-05s`, and the animation never starts (`pending`,
+`startTime: null` — it is not "0 animations", which a later reviewer measured and corrected).
 
 - **Route transitions are entry-only.** `app/RouteTransition.tsx` keys one wrapper on the view's
   identity (`lib/motion/route.ts`), so React replaces the view and the entry replays on the new
@@ -236,7 +248,7 @@ compiles to nothing at all.
   a non-`none` transform is still a containing block, so a `position: fixed` element inside the wrapper is
   positioned against it for the entry's duration under `reduce` exactly as under `no-preference`.
   "No movement" is the accurate claim; "no transforms" is not.
-- Nothing loops unless it communicates state (a subtle pulse for loading is the only exception).
+- Nothing loops unless it communicates state — the loading pulse above is the only exception.
 
 ## 6. Layout & rhythm
 
@@ -254,6 +266,29 @@ compiles to nothing at all.
 | Empty archive | One sentence in display serif on the dark base — no illustration, no CTA chrome. |
 | Error | Discreet glass notice with a retry affordance; never a browser alert or raw message. |
 
+Implemented in `frontend/src/components/QuietState.tsx` (E3-S4) and rendered by the splash. The details
+that are rules, not taste:
+
+- **The empty sentence** is one `role="status"` paragraph in `font-display` / `--aura-text`, centred on
+  `--aura-bg`. No retry, no spinner, no illustration. Measured painted: glyph `#e5e3e0` on base
+  `#0b0b0d` — **15.35:1**.
+- **The loading pulse** is a full-bleed wash of `--aura-surface` at `opacity-25` carrying
+  `aether-breathe` (§5). It is `aria-hidden`; there is no text and no progress bar. jsdom cannot observe
+  animation, so the unit suite pins the class token and Chromium measures the frames.
+- **The error notice** is `GlassPanel` over its **own scrim**: `--aura-bg` at 70 %, the menu veil's
+  value. Glass alone is not enough over a pale photo — measured over white, the tint alone is **2.30:1**,
+  while scrim + glass + `--aura-text` is **7.47:1** (13.41:1 over a dark photo). The photo stays visible
+  outside the notice, so the scrim is local, not a full-screen veil — `error` does not imply an empty
+  screen (the E3-S1A finding).
+- **The retry** is a real `<button type="button">` named "Try again", 44 px tall, `aria-describedby` the
+  notice's message, in `--aura-text`; focus-visible draws a 1 px inset outline. Measured keyboard path:
+  one `Tab` reaches it with `:focus-visible` true; `Enter` issues the request.
+- **Placement is `absolute` against `<main>`, never `fixed`.** The route wrapper transforms during its
+  entry, making it the containing block for fixed descendants (§5, ADR-022), which re-anchors a fixed
+  notice for the entry's duration. Absolute keeps the notice with the photo it describes: measured
+  across an entry, `notice.bottom − main.bottom` stayed **−16 px in every frame** while the wrapper
+  carried `translateY(16px → 0)`. No portal, and no change to E3-S2's structure.
+
 ## 8. Accessibility (non-negotiable)
 
 - Contrast: ≥ 4.5:1 for text (≥ 3:1 for ≥ 24 px), enforced by construction in the theme generator.
@@ -269,6 +304,7 @@ compiles to nothing at all.
 | Theme generation | `frontend/src/lib/color/{theme,contrast}.ts` |
 | Tokens & typography | `frontend/src/styles/global.css` |
 | Glass material | `frontend/src/styles/glass.css` + `components/GlassPanel.tsx` |
+| Quiet states | `frontend/src/components/QuietState.tsx` (+ the splash's state machine) |
 | Motion tokens & route transition | `frontend/src/lib/motion/{tokens,route}.ts` + `frontend/src/app/RouteTransition.tsx` |
 | Tests & fixtures | `frontend/src/lib/color/__fixtures__/`, `*.test.ts` |
 | Verification page | `frontend/src/features/check/CheckView.tsx` (`/check`) |
@@ -286,6 +322,12 @@ compiles to nothing at all.
   unit suite pins the *vocabulary* (which class a component carries, what the tokens are, that the
   keyframes exist and match the tokens) and every claim about what a transition *looks like* comes from
   a Chromium probe over the built bundle (§14, `reports/e3s3-transition-strip-390.png`).
+- Quiet states (E3-S4): the unit suite pins the state machine (empty vs error vs ready, including a
+  failed re-roll over the kept photo), the exact words, the tokens, and the retry's request; Chromium
+  measures what remains — the pulse's frames and its reduced-motion still frame, painted contrast on
+  the empty base and on the notice over white and dark photos, the notice's placement through an entry,
+  and the Tab/Enter path (`reports/e3s4-*.png`). The probe's network audit reports every request
+  same-origin and none off-origin.
 
 ## 11. The CSS foundation (E2-S3)
 

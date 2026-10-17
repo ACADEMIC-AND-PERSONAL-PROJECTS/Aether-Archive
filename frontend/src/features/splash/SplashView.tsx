@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ApiError } from "../../api/client";
 import { useRandomPhoto } from "../../api/photos";
+import { QuietEmpty, QuietError, QuietLoading } from "../../components/QuietState";
 import { useHeroImage } from "../../hooks/useHeroImage";
 import { usePullToRefresh } from "../../hooks/usePullToRefresh";
 import { applyTheme, clearTheme } from "../../lib/color/theme";
@@ -24,9 +25,14 @@ import { GlassMenu } from "../menu/GlassMenu";
  *   the photo's own `#001421` 0.3 s after they land — probe output in the PR). The photo's colour is what
  *   the reveal starts from instead of a black frame. The neutral set stands in before that and again if
  *   extraction fails.
- * - **The quiet states.** `data-state` reports which of the four the splash is in, and that attribute is
- *   the seam E3-S4 renders its words into. Nothing here throws: an empty archive, a refused request and a
- *   photo that will not decode all end on the same silent screen.
+ * - **The quiet states.** `data-state` reports which of the four the splash is in, and since E3-S4 the
+ *   view renders the corresponding silence: the loading placeholder is a breathing wash of the theme's
+ *   surface tone (`QuietLoading`), the empty archive is one display-serif sentence on the base
+ *   (`QuietEmpty`), and a failure is a bottom glass notice with a retry (`QuietError`). The notice is
+ *   positioned **inside this view** — `absolute` against `<main>`, never `fixed` — so it travels with
+ *   the photo it describes and the route wrapper's temporary transform (ADR-022) cannot re-anchor it.
+ *   Nothing here throws: an empty archive, a refused request and a photo that will not decode all end
+ *   on the same silent screen.
  * - **The tap target, and what it opens.** The whole screen is one button (the E3-S1 criterion's
  *   "tap anywhere"), and since E3-S2 it opens the glass menu — the view owns the open state and the
  *   trigger the menu gives focus back to (`features/menu/GlassMenu.tsx` owns the dialog itself:
@@ -40,10 +46,9 @@ import { GlassMenu } from "../menu/GlassMenu";
  *
  * ## Not owned here — named, so this file cannot be read as claiming them
  *
- * - **The quiet states' words — E3-S4.** `data-state` says which of the four the splash is in; the
- *   visible sentence, the glass notice and the retry affordance are E3-S4's. Today `loading`, `empty`
- *   and `error` all render the same thing — the tone placeholder and the tap target — which is silent
- *   and never a crash, but is not the finished state.
+ * - **The quiet states' visual rules.** The words and the material live in `components/QuietState.tsx`
+ *   and DESIGN-SYSTEM §7; this view decides *which* state renders and hands the error notice the retry
+ *   callback. The state machine is below, deliberately dumb about markup.
  * - **Motion — E3-S3, landed.** The photo is still inserted rather than animated in: the reveal is exact
  *   because the pixels are decoded before `src` exists, and the tone placeholder is what it fades from.
  *   The menu's entry now reads `lib/motion/tokens.ts` like everything else — E3-S3 moved it out of
@@ -103,6 +108,15 @@ export function SplashView() {
     setMenuOpen(false);
   }, []);
 
+  /*
+   * The notice's retry: the same query, asked again. The view does not own the outcome — the query's
+   * state re-renders this view into loading, ready, empty or error exactly as a first visit would, and
+   * the request policy decides whether a second attempt is even worth making (`api/retryPolicy.ts`).
+   */
+  const retry = (): void => {
+    void randomPhoto.refetch();
+  };
+
   const state: SplashState = splashState(randomPhoto, hero);
 
   const tap = (): void => {
@@ -123,6 +137,9 @@ export function SplashView() {
         {/* The view's name for assistive technology. Nothing about it is visible: the photo is the view. */}
         <h1 className="sr-only">Aether Archive</h1>
 
+        {/* Under the photo and the tap target: the placeholder for a photo that is not painted yet. */}
+        {state === "loading" ? <QuietLoading /> : null}
+
         {hero.src !== null ? (
           // The archive stores no title or description for a photo (`_docs/openapi.yml`: id, url,
           // category, uploadedAt), so the alt says what can honestly be said about it: it is one of the
@@ -135,6 +152,13 @@ export function SplashView() {
             className="absolute inset-0 h-full w-full object-cover"
           />
         ) : null}
+
+        {/* Empty and error are mutually exclusive by construction (`splashState`). The error notice is
+            painted over the previous photo when a replacement failed, which is why it carries a scrim
+            of its own (`components/QuietState.tsx`). Both sit above the photo but below the tap target's
+            sibling z-indexes: the notice is z-20, the tap target z-10. */}
+        {state === "empty" ? <QuietEmpty /> : null}
+        {state === "error" ? <QuietError onRetry={retry} /> : null}
 
         {/* The whole screen, one button: ≥ 44 px by several orders of magnitude, and — while the menu
             is closed — the only tab stop. The name stays "Open the menu" while it is open;
@@ -163,14 +187,23 @@ export function SplashView() {
 /** The four states, decided once here so the view above stays a markup.
  *
  * The order of the questions is the order of what the user can see: no photo *yet* (the query is still
- * asking, or still retrying) outranks everything, because nothing else has been observed. The empty
- * archive is checked before the generic failure — it is an answer, not a fault.
+ * asking, or still retrying) outranks everything, because nothing else has been observed. On a **first
+ * fetch** the empty archive is checked before the generic failure — it is an answer, not a fault. On a
+ * **failed refetch** the kept photo means the empty answer cannot arise, because `_docs/openapi.yml` has
+ * no delete endpoint: an archive that had a photo still has it, so `isError` is the only question left.
+ * If a future story adds deletion, this is the branch that has to ask `isEmptyArchive` before answering
+ * `error` — recorded here rather than discovered then.
  *
  * A photo whose bytes arrived but will not decode is an **error even while an earlier photo is still
  * painted**: that src belongs to a photo this visit no longer offers, so reporting `ready` would tell
  * E3-S4 there is nothing to say about a failure the user has just suffered. The previous photo is left
  * on screen (unmounting it would flash the placeholder over a picture that is still perfectly good) and
  * the state is what carries the news.
+ *
+ * **A failed re-roll's request is the same case one layer up.** TanStack keeps the last successful
+ * `data` when a refetch fails, so the old photo is still a valid picture; but answering `ready` would
+ * hide the API failure and make §7's "API error → glass notice" true only on a first visit. E3-S4's
+ * notice is what makes the failure visible, over the photo it kept.
  */
 function splashState(
   randomPhoto: { data: unknown; isError: boolean; error: unknown },
@@ -183,6 +216,9 @@ function splashState(
     return isEmptyArchive(randomPhoto.error) ? "empty" : "error";
   }
   if (hero.failed) {
+    return "error";
+  }
+  if (randomPhoto.isError) {
     return "error";
   }
   if (hero.src !== null) {
