@@ -1,5 +1,6 @@
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SplashView } from "./SplashView";
@@ -109,11 +110,19 @@ function stubApi(respond: () => Response) {
   return vi.spyOn(globalThis, "fetch").mockImplementation(() => Promise.resolve(respond()));
 }
 
+/**
+ * The view under the providers it really runs under. The router joined in E3-S2: the glass menu's two
+ * destinations are `Link`s, and a `Link` outside a router throws (probed: "Cannot destructure property
+ * 'basename' of 'React.useContext(...)' as it is null"), so the splash is rendered the way
+ * `main.tsx` renders it instead of the menu being bent to fit a test.
+ */
 function renderSplash(client: QueryClient = createQueryClient()) {
   return render(
-    <QueryClientProvider client={client}>
-      <SplashView />
-    </QueryClientProvider>,
+    <MemoryRouter>
+      <QueryClientProvider client={client}>
+        <SplashView />
+      </QueryClientProvider>
+    </MemoryRouter>,
   );
 }
 
@@ -295,6 +304,98 @@ describe("SplashView — the tap target", () => {
     fireEvent.click(tapTarget());
 
     expect(tapTarget()).toHaveAttribute("aria-expanded", "true");
+  });
+});
+
+describe("SplashView — the glass menu (E3-S2)", () => {
+  it("should open the archive's dialog on the tap target", async () => {
+    stubApi(() => jsonResponse(PHOTO));
+    renderSplash();
+    await screen.findByRole("img", { name: "A photo from your archive" });
+
+    fireEvent.click(tapTarget());
+
+    // The open state `aria-expanded` has been claiming since E3-S1B is finally a screen. (The words
+    // are not final: the entries are E3-S2's, and the quiet states' sentences remain E3-S4's.)
+    expect(screen.getByRole("dialog", { name: "Menu" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "The River" })).toHaveAttribute("href", "/river");
+    expect(screen.getByRole("link", { name: "Curate" })).toHaveAttribute("href", "/curate");
+    expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
+    expect(tapTarget()).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("should give focus back to the tap target when the menu closes", async () => {
+    stubApi(() => jsonResponse(PHOTO));
+    renderSplash();
+    await screen.findByRole("img", { name: "A photo from your archive" });
+
+    // A real tap leaves the button focused in a browser (measured in E3-S1B); jsdom's `click` does not
+    // focus at all (probed), so the starting state is set explicitly rather than assumed.
+    tapTarget().focus();
+    fireEvent.click(tapTarget());
+    expect(document.activeElement).toBe(screen.getByRole("link", { name: "The River" }));
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(tapTarget()).toHaveAttribute("aria-expanded", "false");
+    expect(document.activeElement).toBe(tapTarget());
+  });
+
+  it("should leave the photo alone when the drag starts on the open menu", async () => {
+    const fetchSpy = stubApi(() => jsonResponse(PHOTO));
+    renderSplash();
+    await screen.findByRole("img", { name: "A photo from your archive" });
+
+    fireEvent.click(tapTarget());
+    // React events bubble through the React tree, and the menu is a sibling of `<main>` — where the
+    // pull handlers live. Render it *inside* the surface instead and this drag re-rolls the photo
+    // behind the open menu, which is exactly the defect this pins.
+    const dialog = screen.getByRole("dialog", { name: "Menu" });
+    fireEvent.pointerDown(dialog, { clientY: 100, pointerType: "touch" });
+    fireEvent.pointerMove(dialog, { clientY: 100 + PULL_THRESHOLD_PX + 20, pointerType: "touch" });
+    fireEvent.pointerUp(dialog, { clientY: 100 + PULL_THRESHOLD_PX + 20, pointerType: "touch" });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(tapTarget()).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("should own Escape alone, and hand the key back when the menu closes", async () => {
+    stubApi(() => jsonResponse(PHOTO));
+    const add = vi.spyOn(window, "addEventListener");
+    const remove = vi.spyOn(window, "removeEventListener");
+    // Only `keydown` matters here: it is the key this story decided to have exactly one owner of. The
+    // splash's own listener was deleted rather than kept beside the dialog's, because two listeners for
+    // one key close twice or not at all — and *nothing else in the suite could tell the difference*:
+    // measured, reinstating the old listener leaves every other test green. This census is what makes
+    // the decision checkable (the same probe run in Chromium gives the same numbers).
+    const openKeydown = (): number =>
+      add.mock.calls.filter(([type]) => type === "keydown").length -
+      remove.mock.calls.filter(([type]) => type === "keydown").length;
+
+    renderSplash();
+    await screen.findByRole("img", { name: "A photo from your archive" });
+    const idle = openKeydown();
+
+    fireEvent.click(tapTarget());
+    expect(openKeydown() - idle).toBe(1);
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(openKeydown() - idle).toBe(0);
+  });
+
+  it("should leave no scroll lock behind when the splash is left with the menu open", async () => {
+    stubApi(() => jsonResponse(PHOTO));
+    const { unmount } = renderSplash();
+    await screen.findByRole("img", { name: "A photo from your archive" });
+
+    fireEvent.click(tapTarget());
+    expect(document.documentElement.style.overflow).toBe("hidden");
+
+    // Leaving the splash is a route change in the app; the menu unmounts with the view, and this is the
+    // cleanup that has to run — a stranded `overflow: hidden` would freeze the next view's scroll.
+    unmount();
+
+    expect(document.documentElement.style.overflow).toBe("");
   });
 });
 

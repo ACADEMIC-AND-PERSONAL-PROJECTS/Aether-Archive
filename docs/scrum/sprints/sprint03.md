@@ -190,3 +190,15 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   cannot separate "stale" from "gone". The freshness test now asserts the cache is empty on the returning
   visit, and the mutant fails it. Third distinct defect in three passes on one story, and all three were
   found by executing something rather than reading it.
+- 2026-10-16 — **E3-S2 (the glass menu) built; four findings routed rather than absorbed.** The story
+  measured the glass instead of asserting it — a real touch tap, a real `Escape`, a real `Tab` walk, an
+  emulated `prefers-reduced-motion`, and the painted pixels of a white photo read back through a canvas —
+  which is how it found that the theme's **muted token paints 4.14:1 on glass** where the text token paints
+  8.07:1. That rule is now a criterion of **E3-S4** (whose glass notice would have inherited the mistake) and
+  the reason its close entry is no longer visually quieter. Three more findings have homes rather than
+  owners yet: the sheet-over-veil pattern belongs in `DESIGN-SYSTEM.md` with **E3-S3** (which centralises the
+  motion pair anyway); `GlassPanel` accepting no `ref` belongs to **E4-S3**'s drag grid; and the fact that the
+  built bundle serialises tokens as 4-/8-digit hex, which `parseColor` cannot parse, is **E6-S18** (issue
+  #103) — latent, because nothing reads a token back at runtime today, and invisible to jsdom, which never
+  runs the minifier. A stale "no font file is shipped" line in the frontend README was corrected in place
+  (five `.woff2` files, 152 kB, since E2-S3).

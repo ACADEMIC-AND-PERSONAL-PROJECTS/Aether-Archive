@@ -26,9 +26,9 @@ A story is `Done` only when the Definition of Done (`DEFINITION-OF-DONE.md`) is 
 | **E3** | Immersive Splash & Glass Menu | S3 | 5 | 18 | The signature entry experience: full-bleed random photo + glass menu. |
 | **E4** | Curator's Workshop | S3–S4 | 5 | 28 | Upload, order and publish a 6-photo dump with its aura colour. |
 | **E5** | The Time River | S5 | 4 | 21 | The chronological feed with ambient per-dump background. |
-| **E6** | Quality, Delivery & Release | S4–S6 | 17 | 57 | CI, accessibility, hardening, containerization, documentation and the v1.0 release. |
+| **E6** | Quality, Delivery & Release | S4–S6 | 18 | 59 | CI, accessibility, hardening, containerization, documentation and the v1.0 release. |
 
-**Total: 48 stories · 191 points · 6 sprints (~2 weeks each, 25–34 points per sprint).**
+**Total: 49 stories · 193 points · 6 sprints (~2 weeks each, 25–34 points per sprint).**
 
 > E6-S13…S16 were added after Sprint 1 from the release security audit (`reports/security-audit-sprint01.md`).
 > They are **not** Sprint 1 stories and are not counted in its velocity: E6-S15 is `Done` because the reachable
@@ -344,6 +344,10 @@ opens on tap, feels tactile, and gets out of the way.
       good picture for a placeholder would break the splash's own promise). So the notice needs its own
       scrim over the photo, or a separate signal, rather than the assumption that error implies bare
       background — found by E3-S1A's review.
+- [ ] **Text on the notice uses `--aura-text`, never `--aura-muted`.** Measured by E3-S2 over a white photo:
+      the theme's muted token paints **4.14:1** on the glass where the text token paints **8.07:1**. The
+      generator raises `muted` until it clears 4.5:1 *on the page background*, which is not where a glass
+      notice puts it. A one-line rule for DESIGN-SYSTEM §2.2 belongs with whichever story next edits it.
 
 ### E3-S5 — View tests & accessibility pass · 3 pts · p0
 
@@ -352,6 +356,11 @@ opens on tap, feels tactile, and gets out of the way.
 - [ ] RTL tests for splash (photo rendered, tap opens menu) and menu (a11y roles, Esc, focus return).
 - [ ] Axe (or equivalent) run on the splash and menu with no serious violations.
 - [ ] Contrast verified for every text style over glass and over images (scrim rule).
+- [ ] **Decide `inert` on what the dialog covers.** E3-S2 ships a modal that a keyboard and a pointer
+      cannot reach past, but an assistive-technology virtual cursor still can: `inert` — shipped in the
+      browsers this app targets — is what closes that, and jsdom does not implement it (`el.inert = true`
+      writes no attribute, measured), so it needs a browser check rather than a unit test. The component
+      comment records the trade; this is where it gets an owner.
 - [ ] Manual pass on a 390 px viewport documented in the PR.
 
 ---
@@ -499,6 +508,7 @@ delivery, documentation, and a clean v1.0.
 | E6-S15 | Dependency patch level from the Sprint 1 audit (SEC-03, PR #70) | p1 | 1 | — | Done |
 | E6-S16 | Low-severity hardening from the Sprint 1 audit (SEC-04…10, issue #73) | p2 | 3 | — | Todo |
 | E6-S17 | Static-serving hardening found by E1-S5's probes (issue #79) | p1 | 2 | — | Todo |
+| E6-S18 | Colour-token parsing robustness (issue #103) | p2 | 2 | — | Todo |
 
 ### E6-S1 — CI on every PR · 5 pts · p0
 
@@ -636,6 +646,26 @@ the ADR below, not a patch inside a serving story.
       its test and its written reason here. The same pass should cover a link used as a *path component*
       inside the candidate, which the guard does not resolve at all.
 - [ ] Re-run E1-S5's path battery afterwards and record the statuses that changed.
+
+### E6-S18 — Colour-token parsing robustness · 2 pts | p2
+
+*As a maintainer, I want the colour helpers to accept what browsers actually produce, so that measuring a
+rendered theme does not crash on the browser's own formatting.*
+
+Found by E3-S2 (issue #103): the built bundle serialises the `--aura-*` tokens as 4- and 8-digit hex —
+Lightning CSS rewrites `rgba(232, 230, 227, 0.62)` to `#e8e6e39e` and `rgba(0, 0, 0, 0.4)` to `#0006` — while
+`parseColor` in `lib/color/contrast.ts` accepts only `#rrggbb` or `rgba(...)`. Nothing reads a token back at
+runtime today (the check page uses them in CSS only), so this is latent rather than broken — and jsdom cannot
+catch it, because jsdom never runs the minifier. Any story that measures contrast at runtime hits it first.
+
+- [ ] `parseColor` accepts the forms `getComputedStyle` returns in this stack: `#rgb`/`#rrggbb`,
+      `#rgba`/`#rrggbbaa`, `rgb()`/`rgba()` (both comma and space syntax), and `oklab()`/`oklch()` if the
+      browser returns them — or the function says which it does not support instead of throwing on a token
+      the app itself generated.
+- [ ] Fixture tests built from strings a real browser emitted (the two above are in the report), not from
+      strings the helper already knew.
+- [ ] The check page or a future runtime check that reads a computed token has a test proving it survives
+      the minified form.
 
 ---
 

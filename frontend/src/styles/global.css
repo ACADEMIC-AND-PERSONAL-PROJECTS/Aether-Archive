@@ -7,6 +7,7 @@
  *   3. Theme          — what Tailwind knows: colour namespace, type scale, the two families.
  *   4. Runtime tokens — what CSS and JS read: the fallback palette, safe areas, spacing.
  *   5. Base           — dark page, full height, scrollbars, overscroll, reduced motion.
+ *   6. Component animation — the glass menu's entry, the one `@keyframes` pair a utility cannot carry.
  */
 
 /* ---------------------------------------------------------------- 1. Scan scope --- */
@@ -230,5 +231,41 @@ body {
 
   html {
     scroll-behavior: auto !important;
+  }
+}
+
+/* -------------------------------------------------------- 6. Component animation --- */
+
+/*
+ * The glass menu's entry (E3-S2). `@keyframes` cannot be spelled as a utility, so these two names are
+ * the declaration side of `motion-safe:animate-[aether-…]` in `features/menu/GlassMenu.tsx`; the
+ * numbers are that story's own criterion — a fade plus a 16 px drift, §5's `duration-base` (320 ms)
+ * and `ease-soft`. The motion *tokens* (durations, easings, distances as data, and the enter/exit
+ * pairing) are E3-S3's story, which takes these names with it when it lands.
+ *
+ * `motion-safe:` is the whole reduced-motion path: under `reduce` the animation is not applied at all
+ * and the menu is simply on screen — §5's "opacity only" at its floor — with no `matchMedia` involved
+ * (absent in the test environment, measured in E2-S1). The veil fades; the sheet fades *and* drifts,
+ * and the drift is on the panel so the opaque scrim never uncovers an edge for the length of the run.
+ */
+@keyframes aether-veil-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes aether-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
