@@ -310,6 +310,91 @@ query cache, so this count cannot show the per-visit policy by itself; the polic
 freshness table above — pinned by a test that dies without it, and visible in the browser on a client-side
 return (request #2).
 
+## The glass menu — measured (E3-S2)
+
+The app's only dialog (`src/features/menu/GlassMenu.tsx`). Same mechanism as E3-S1's correction — Chromium
+over CDP against the **built** bundle, `/api/**` and `/images/**` stubbed the way the container's nginx
+proxies them, probe scripts outside the repository — with two synthetic photos served in place of the hero
+for the contrast questions. Captures: `reports/e3s2-menu-390.png` (the archive's own photo) and
+`reports/e3s2-menu-over-white-390.png` (a photo that is white exactly where the sheet lands — the worst case
+the component's colour rules are written against). Every number below is copied from the probe output.
+
+**The dialog, as the browser sees it.** One real touch tap on the tap target (`Input.dispatchTouchEvent`):
+`role="dialog"`, `aria-modal="true"`, `aria-label="Menu"`, one dialog in the document, `aria-expanded`
+`false → true` on the trigger. The sheet is `x 16, y 642, 358×186, bottom 828` — 16 px clear of both sides
+and of the home indicator, capped at `max-w-md`; the three entries are `340×56` at y 651 / 707 / 763, so the
+44 px floor is met with 12 px to spare (the class is `min-h-14`, pinned by a test; the _rendered_ height is
+this measurement). Their font is `"Inter Variable"` at 19.035 px — the fluid `--text-lg` clamp at 390 px, not
+a fixed size. The material resolves as designed: `.glass` computed to `backdrop-filter: blur(15px)
+saturate(1.2)`, `background: rgba(0, 0, 0, 0.4)`, `border-radius: 20px`,
+`border: 1px solid rgba(255, 255, 255, 0.08)`; the veil is the **photo's own tone** at 70 % —
+`oklab(0.181217 -0.0215322 -0.0332196 / 0.7)` from an inline `--aura-bg: #001421`, which is the theme layer
+writing the extracted palette, not a hex in a component.
+
+**Focus in, Tab wrapping, focus out — with real keys.** The tap leaves focus on "The River" (the first
+entry); `Tab` walks `Curate → Close → The River` (the forward wrap) and `Shift+Tab` walks `Close → Curate`
+(the backward one), each with `defaultPrevented`, so the browser's own move out of the dialog never happens;
+a keyboard-focused entry matches `:focus-visible` and paints the 1 px inset ring
+(`outline: solid 1px oklab(… / 0.5)`), while a touch tap paints none. A real `Escape` press closes the dialog
+and focus lands back on the tap target (`document.activeElement` = the `absolute inset-0` BUTTON).
+
+**One listener owns the key.** The probe patches `EventTarget.prototype.addEventListener` from
+`Page.addScriptToEvaluateOnNewDocument` and reads the census back: with the menu open
+`{"live":["window:t"],"adds":1,"removes":0}` — exactly one `keydown` listener, on `window` (`t` is the
+minified handler name) — and `[]` once closed. The splash used to run one of its own; since this story it
+registers none, so an `Escape` press closes the menu once and nothing else answers it (`Escape` with nothing
+open leaves the path, `aria-expanded` and the dialog count unchanged).
+
+**The scroll lock, and what it does not claim.** Opening sets `overflow: hidden` on `document.documentElement`
+(inline and computed agree), and the splash has nothing to scroll anyway (`scrollHeight === innerHeight ===
+844`); no box changes when the menu opens (`main`, the `<img>`, the viewport and `documentElement.clientWidth`
+are identical before and after), so there is no layout shift. Two honest limits, both measured or named:
+`overflow: hidden` propagates to the viewport and blocks the _user's_ scrolling, not the script's — on a
+deliberately 3000 px-tall document `window.scrollTo(0, 500)` still moved the page while locked — and iOS
+Safari's well-known unreliability with `overflow: hidden` on the root is **not** covered here (no iOS device
+in this environment). Today the shell is `100dvh` with `overflow-hidden` on `<main>`, so the lock is defence,
+not the thing keeping a page still.
+
+**A finger on the open menu changes nothing underneath.** Synthesised touch drags (`Input.dispatchTouchEvent`:
+one move every 20 ms, 150 px) starting on the sheet — the _sibling_ of `<main>` the pull-to-refresh handlers
+live on — left `/api/v1/photos/random` at 1 request, the dialog open and the route unchanged; a drag starting
+on the veil likewise neither re-rolled the photo nor closed the menu; a tap on the sheet's own padding kept it
+open; a tap on the veil closed it and returned focus to the trigger. The sibling placement is what makes this
+true, and a test dies if the menu is ever nested inside `<main>`.
+
+**`prefers-reduced-motion`, emulated rather than assumed** (`Emulation.setEmulatedMedia`). Under `reduce`:
+`animation-name: none` for both the veil and the sheet, and the sheet's `top` is 642 px in **all 43** frames
+sampled over 700 ms. Under `no-preference`: `aether-veil-in` / `aether-sheet-in`,
+`0.32s cubic-bezier(0.22, 1, 0.36, 1) both`, and the sheet's `top` runs **658 → 642** — the criterion's
+12–16 px drift, measured over 42 frames with 9 distinct values. No `matchMedia` is needed: `motion-safe:`
+compiles to `@media (prefers-reduced-motion: no-preference)`, which is why the layer is a stylesheet
+declaration and not a hook.
+
+**The contrast model the tests use is the browser's own.** With a photo that is white in the lower half (so
+the sheet sits over pure white) and the theme coming from the dark half, the screenshot was read back as
+pixels _inside the page that painted it_:
+
+```text
+panel arithmetic rgb(45.9, 54.3, 59.8) | painted rgb(45,54,59)
+veil over white arithmetic rgb(76.5, 90.5, 99.6) | painted over white rgb(76,90,99) | over the dark band rgb(0,20,32)
+The River/Curate/Close: painted glyph rgb(197,211,221) → measured 8.07:1 | arithmetic 8.02:1
+the muted token this theme carries (rgba(197, 211, 221, 0.62)) on the painted panel: 4.14:1
+```
+
+i.e. glass-over-veil-over-photo composited by hand and by Chromium agree to within a rounding step, and the
+glyphs paint exactly the theme's text token. **The last line is the finding that changed the component:**
+`--aura-muted` is raised by the generator until it clears 4.5:1 _on the page background_ (§2.2), and over the
+veil that guarantee does not survive — 4.14:1 measured, 4.11:1 for the arithmetic worst case (the lightest
+background the generator's bands allow: L 0.18, veil at 70 %, white photo). So all three entries wear
+`--aura-text`; `GlassMenu.test.tsx` pins the token, the veil alpha and the composite for three palettes inside
+the generator's bands, with the veil removed as the control (2.29:1 for the same glass on the same white
+photo). A run with a solid white photo also showed the fallback path: near-white pixels are ignored by the
+extractor, so the tokens fall back to `#0b0b0d` / `#e8e6e3` rather than inventing a theme from a blank.
+
+**Nothing off this origin.** 18 requests across the run's two page loads (the second is the capture reload),
+every one to the probe's own origin; `off-origin (none expected): []`. The second load re-asked
+`/api/v1/photos/random` (#2) and re-used the cached `/images/**` bytes, as E3-S1 measured.
+
 ## Zero external requests — measured on the built bundle
 
 ```bash
@@ -325,7 +410,11 @@ saw is not in this build's CSS, and the router's own strings are new to it), so 
 command rather than carried forward.
 
 No `url(https://…)`, `@import` of a remote sheet, `<link href="https://…">`, `<script src="https://…">` or
-`fetch("https://…")` exists in `dist/`, no source maps are emitted, and no font file is shipped.
+`fetch("https://…")` exists in `dist/`, and no source maps are emitted. **Correction (E3-S2, measured):** the
+clause that used to end this sentence — "no font file is shipped" — was written before E2-S3 wired the
+typeface up and had gone false: `ls dist/assets/*.woff*` lists five local Fontsource files (Inter variable,
+Playfair Display 400/500 plus their `.woff` fallbacks, 152 kB on disk). They are served from this origin like any
+other asset; what the rule forbids is a font _request_ leaving the machine, and there is none.
 
 Loading the built page in headless Chromium with every non-loopback host mapped to `NOTFOUND` produced **six
 URLs — three same-origin, three browser-level**: `/`, `/assets/index-*.js` and `/assets/index-*.css` from the
