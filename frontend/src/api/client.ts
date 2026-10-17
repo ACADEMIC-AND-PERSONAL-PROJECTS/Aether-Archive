@@ -260,7 +260,7 @@ async function readProblem(response: Response): Promise<ProblemDetail | undefine
     return undefined;
   }
   try {
-    return toProblemDetail(await response.json());
+    return parseProblemDetail(await response.json());
   } catch {
     return undefined;
   }
@@ -272,8 +272,11 @@ async function readProblem(response: Response): Promise<ProblemDetail | undefine
  * Fields the contract mandates are required here (`title`, `status`); the optional ones are copied only
  * when they have the right type, so a problem that arrives without a `code` stays a problem rather than
  * becoming a crash.
+ *
+ * Exported because the upload transport reads the same bodies through `XMLHttpRequest` (E4-S1B) and must
+ * classify them the same way: a failure on either channel is one {@link ApiError}, not two vocabularies.
  */
-function toProblemDetail(value: unknown): ProblemDetail | undefined {
+export function parseProblemDetail(value: unknown): ProblemDetail | undefined {
   if (!isRecord(value)) {
     return undefined;
   }
