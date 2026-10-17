@@ -34,7 +34,8 @@ user approval; the specs are the contract the backlog is built from.
 - **Frontend**: React + Vite + TypeScript, Tailwind CSS, `@dnd-kit`, TanStack Query.
   **Framer Motion is deliberately not installed** — a substitution under this section's own rule, decided
   with four-build measurements in **ADR-022**: the smallest tree-shaken `motion` import costs +83.9 kB raw
-  / +29.2 kB gzip against +0.49 kB for the CSS token layer that does the same job. Motion is
+  / +29.2 kB gzip against +0.49 kB for the CSS token layer, which covers the motion these criteria ask
+  for but not the library's broader capabilities (exit, springs, shared layout). Motion is
   `lib/motion/tokens.ts` + the `--motion-*` properties in `global.css`. Revisit only with new numbers.
   `@dnd-kit` arrives with E4-S3's drag-and-drop.
 - **Typography**: Fontsource NPM packages only. Zero external network requests at runtime.

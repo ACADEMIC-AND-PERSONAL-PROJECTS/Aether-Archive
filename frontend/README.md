@@ -47,11 +47,13 @@ story that needs it. E2-S2's two additions were installed the way this table was
 the lockfile with **no peer warnings and 0 vulnerabilities**, and the registry's own peer ranges checked
 against the installed React 19.3.1 (`reports/verify-e2-s2-20261016.md`).
 
-**Framer Motion is deliberately not installed**, although `CLAUDE.md` §2 lists it: E3-S3 measured four
-builds of this app with and without it and shipped the motion layer as CSS instead — the smallest
-tree-shaken form costs +83.92 kB raw / +29.22 kB gzip on the shared chunk, the ergonomic one +131.78 /
-+43.09, against +0.49 / +0.15 for what shipped. The numbers, the View Transitions alternative and the
-reduced-motion policy are ADR-022; no code here imports it.
+**Framer Motion is deliberately not installed** — a divergence from `_docs/aether_archive_specs.md`
+approved by the owner and recorded with its measurements in ADR-022; `CLAUDE.md` §2 carries the same
+statement rather than listing a dependency the lockfile does not have. E3-S3 measured four builds of this
+app with and without it and shipped the motion layer as CSS instead: the smallest tree-shaken form costs
++83.92 kB raw / +29.22 kB gzip on the shared chunk, the ergonomic one +131.78 / +43.09, against
++0.49 / +0.15 for what shipped. No code here imports it. The View Transitions alternative and the
+reduced-motion policy are in the same ADR, and the motion section below does not repeat these numbers.
 
 ## Where the API lives — one origin, in every environment
 
@@ -409,10 +411,10 @@ The vocabulary lives in `lib/motion/` (tokens + the view-identity rule) with the
 Everything below was measured on the built bundle in headless Chromium 152 at 390 × 844
 (`Emulation.setDeviceMetricsOverride`), served by a stub for `/api/**` and `/images/**`.
 
-**Why no animation library.** Four variants of the same App shell, built in one tree with `motion` 14.3.0
-installed, cost **+83.92 kB raw / +29.22 kB gzip** for the smallest tree-shaken form and **+131.78 /
-+43.09** for `motion.div` on the shared chunk every route loads — the table is in ADR-022. What shipped
-instead builds to **286.69 kB / 90.37 kB gzip** and 18.08 kB / 4.65 kB of CSS, +0.49 / +0.15 on the chunk.
+**Why no animation library.** The four-build comparison lives in **ADR-022** and in the dependency note
+above, in one place: this section states what shipped rather than repeating the table. The shipped layer
+builds to **286.69 kB / 90.37 kB gzip** and 18.08 kB / 4.65 kB of CSS — **+0.49 / +0.15** on the chunk
+every route loads.
 
 **One transition, frame by frame** — the same run as `reports/e3s3-transition-strip-390.png`:
 

@@ -1,14 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  DISTANCE_ENTER_PX,
-  DURATION_MS,
-  EASE_SOFT,
-  ENTER_DRIFT_BASE,
-  ENTER_DRIFT_SLOW,
-  ENTER_FADE_BASE,
-  MOTION_MARKER_CLASS,
-} from "./tokens";
+import * as motion from "./tokens";
+import { DISTANCE_ENTER_PX, DURATION_MS, EASE_SOFT, MOTION_MARKER_CLASS } from "./tokens";
 import globalCss from "../../styles/global.css?raw";
 
 /**
@@ -70,8 +63,17 @@ function valueOf(block: string, property: string): string {
   return value.trim();
 }
 
-/** Every class string the vocabulary offers, so a new one is covered by this file the moment it lands. */
-const CLASS_STRINGS = [ENTER_DRIFT_SLOW, ENTER_DRIFT_BASE, ENTER_FADE_BASE];
+/**
+ * Every class string the vocabulary offers — **derived from the module, not listed here**.
+ *
+ * A hand-maintained list is the hole this guard exists to close: measured, adding a fourth entry
+ * constant that named a phantom keyframe (or an undeclared `var(--motion-duration-nope)`) left all eight
+ * tests green, because the guard's scope was the array rather than the module. Reading the exports means
+ * a new constant is covered the moment it lands, which is what the sentence above this used to claim.
+ */
+const CLASS_STRINGS = Object.entries(motion).flatMap(([, value]) =>
+  typeof value === "string" && value.startsWith(MOTION_MARKER_CLASS) ? [value] : [],
+);
 
 describe("motion tokens — the stylesheet mirrors them", () => {
   it("should declare every §5 duration as the token says", () => {

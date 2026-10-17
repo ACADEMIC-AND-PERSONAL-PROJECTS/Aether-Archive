@@ -825,8 +825,15 @@ and how the missing `decode` is installed by hand).
 **Date**: 2026-10-17 · **Status**: Accepted
 
 **Context.** E3-S3 is the motion story: a token set, route transitions with fade + subtle vertical
-movement, interruptibility, reduced motion. `CLAUDE.md` §2 mandates Framer Motion and it is not
-installed — E3-S2 shipped the glass menu's entry in CSS, so the mandate and the code already disagree.
+movement, interruptibility, reduced motion. **This ADR is a spec divergence, not merely a stack
+preference.** `_docs/aether_archive_specs.md` names Framer Motion three times — line 11 (the mandated
+frontend stack, "for fluid, tactile animations **and route transitions**"), line 30 (the menu's animation,
+"(Framer Motion)"), and line 95 ("Polish Framer Motion transitions between all routes", which is this
+story's criterion 2). `CLAUDE.md` §1 says a spec change requires an ADR *plus explicit user approval*, so
+this record carries both: **the owner approved the divergence on 2026-10-17**, on the measurements below,
+with the intent of the spec lines — fluid, tactile animations and route transitions — met by the CSS layer
+rather than by the library named for it. The earlier reading of this as a stale `CLAUDE.md` line was
+wrong, and a review found it. `CLAUDE.md` §2 is amended to match, so the two documents agree.
 Three further options are open and each needs a measurement rather than a preference: the library's real
 cost on a mobile-first bundle, the **View Transitions API** that React Router 8.4.0 already drives
 (`viewTransition` on a router update, `useViewTransitionState` for the styles), and where the
@@ -874,8 +881,8 @@ second language beside it.
    wrapper (`y 3, bottom 847` in an 844 px viewport) and the sheet's own 16 px drift adds to the
    wrapper's current offset (settled `top` 642 against 658 during the run). Both are bounded by the
    entry's length and by the drift distance and vanish when it ends. A portal would remove the coupling
-   entirely; that is a finding for the next story that touches the menu, not a silent change to E3-S2's
-   structure.
+   entirely; that is a finding for **E3-S4** (whose glass notice is the next thing that renders over the
+   menu), not a silent change to E3-S2's structure.
 6. **View Transitions are recorded as the future, on the same tokens.** The API is real here —
    `document.startViewTransition` is a function in the probe's Chromium 152 — and React Router 8.4.0
    wraps its updates in it (`dist/development/lib/components.js`: `typeof
@@ -895,10 +902,14 @@ second language beside it.
    `animate-[…]` makes the whole declaration invalid at computed-value time — an animation that silently
    never runs.
 
-**Consequences.** `CLAUDE.md` §2 lists Framer Motion among the mandated frontend dependencies and no code
-imports it; this record is the reason, and a later story that wants it (E4's drag-and-drop is the
-candidate) argues against these numbers rather than assuming the mandate. Any motion that needs
-orchestration — exit animations, layout animations, springs — now pays that price explicitly. The motion
+**Consequences.** `CLAUDE.md` §2 no longer lists Framer Motion as installed: the line now carries this ADR
+and its number, because a mandate and a lockfile that disagree is how a stack list stops being read. The
+divergence from `_docs/aether_archive_specs.md` is recorded above with the owner's approval, and **the
+trigger for revisiting it is explicit rather than a matter of taste**: a story that needs **exit
+animations, shared-layout transitions, springs or gesture-driven orchestration** brings the dependency in
+with that story's own measurements. Nothing in Sprints 3–6 as planned does — E4's drag-and-drop is
+`@dnd-kit` and does not need it — so the revisit point is the polish pass (E6-S9) unless a story arrives
+with the need first. The motion
 layer is one tokens file, one keyframe pair and one media query, so a second entry pattern must be a
 token and not a literal: the three class strings are the only place a duration or a curve is written
 outside `global.css`, and both consumers (`app/RouteTransition.tsx`, `features/menu/GlassMenu.tsx`) read

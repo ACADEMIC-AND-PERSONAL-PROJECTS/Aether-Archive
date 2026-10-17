@@ -228,9 +228,14 @@ compiles to nothing at all.
   `from` frame; nothing is left half-faded and nothing queues. Measured: with a second navigation 90 ms
   into a run, the first entry was at opacity 0.523 / 7.63 px when it was replaced, and the new one ran
   from 0 / 16 px to completion.
-- `prefers-reduced-motion: reduce` → **opacity only, no transforms**: `--motion-distance-enter`
+- `prefers-reduced-motion: reduce` → **opacity only, no movement**: `--motion-distance-enter`
   collapses to `0px`, so one keyframe serves both readings, and the global freeze rule (§11) exempts
   the entry classes so a screen still fades instead of appearing. Auto-scroll animation stays off.
+  Two measured details this phrasing has to carry rather than round off: the transform does not become
+  `none` — it resolves to the identity matrix, because the keyframe still declares `translateY(0)` — and
+  a non-`none` transform is still a containing block, so a `position: fixed` element inside the wrapper is
+  positioned against it for the entry's duration under `reduce` exactly as under `no-preference`.
+  "No movement" is the accurate claim; "no transforms" is not.
 - Nothing loops unless it communicates state (a subtle pulse for loading is the only exception).
 
 ## 6. Layout & rhythm
