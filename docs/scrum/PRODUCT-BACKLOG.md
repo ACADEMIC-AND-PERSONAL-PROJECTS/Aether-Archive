@@ -404,7 +404,8 @@ opens on tap, feels tactile, and gets out of the way.
 | --- | --- | --- | --- | --- | --- |
 | E4-S1A | Single photo upload — the picker and the validation (criterion 1) | p0 | 2 | 3 | Done |
 | E4-S1B | Single photo upload — send, progress, cancel, retry, invalidation (criteria 2–4) | p0 | 3 | 3 | Done |
-| E4-S2 | Multi-select (≤ 6) & client-side downscale | p0 | 5 | 3 | In progress |
+| E4-S2A | Multi-select (≤ 6), the thumbnail grid and sequential uploads (criteria 1, 3, 4) | p0 | 3 | 3 | In progress |
+| E4-S2B | Client-side downscale before upload (criterion 2) | p0 | 2 | 3 | Todo |
 | E4-S3 | Drag-and-drop ordering | p0 | 8 | 4 | Todo |
 | E4-S4 | Aura colour picker with palette suggestions | p0 | 5 | 4 | Todo |
 | E4-S5 | Publish dump with optimistic UI | p0 | 5 | 4 | Todo |
@@ -431,15 +432,21 @@ opens on tap, feels tactile, and gets out of the way.
 - [ ] **(B)** Success updates the archive without a page reload (query invalidation).
 - [ ] **(A/B)** Tests: validation rejects, error retry path, success invalidation.
 
-### E4-S2 — Multi-select (≤ 6) & client-side downscale · 5 pts · p0
+### E4-S2 — Multi-select (≤ 6) & client-side downscale · 5 pts · p0 · **split by criterion into E4-S2A (3) + E4-S2B (2)**
 
 *As the curator, I want to pick several images at once, so that building a dump is fast.*
 
-- [ ] Multi-select picker; hard cap of 6 with a quiet explanation, extra selections ignored or blocked.
-- [ ] Images downscaled/compressed client-side before upload when above a threshold (quality preserved for viewing).
-- [ ] Thumbnail grid of the selection with remove affordance and per-file state.
-- [ ] Uploads run sequentially or bounded-concurrent; one failure never aborts the others silently.
-- [ ] Tests for the cap and for the downscale decision function (pure).
+> Split at Sprint 3's start rather than at review, on the sprint's own lesson: construct the cut you
+> did not name. **E4-S2A** carries criteria 1, 3 and 4 (multi-select and the cap, the thumbnail grid,
+> the sequential queue with per-file state); **E4-S2B** carries criterion 2 (downscale) and its half of
+> criterion 5. The cut never fails a criterion — downscale is independent of selection — and it takes
+> the canvas-dependent work (ADR-018: jsdom has no canvas) out of the larger slice. Points unchanged.
+
+- [ ] **(A)** Multi-select picker; hard cap of 6 with a quiet explanation, extra selections ignored or blocked.
+- [ ] **(B)** Images downscaled/compressed client-side before upload when above a threshold (quality preserved for viewing).
+- [ ] **(A)** Thumbnail grid of the selection with remove affordance and per-file state.
+- [ ] **(A)** Uploads run sequentially or bounded-concurrent; one failure never aborts the others silently.
+- [ ] **(A/B)** Tests for the cap and for the downscale decision function (pure).
 
 ### E4-S3 — Drag-and-drop ordering · 8 pts · p0
 

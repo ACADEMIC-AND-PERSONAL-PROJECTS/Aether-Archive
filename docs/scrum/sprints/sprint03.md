@@ -30,10 +30,11 @@
 | 5b | E3-S5B | Accessibility — contrast, `inert`, the announcement fix, the manual pass (criteria 3–5) | 2 | p0 | Done | #111 |
 | 6a | E4-S1A | Single photo upload — the picker and the validation (criterion 1) | 2 | p0 | Done | #114 |
 | 6b | E4-S1B | Single photo upload — send with progress and cancel, then retry and invalidation (criteria 2–4) | 3 | p0 | Done | #115 |
-| 7 | E4-S2 | Multi-select (≤ 6) & client-side downscale | 5 | p0 | In progress | — |
+| 7a | E4-S2A | Multi-select (≤ 6), the thumbnail grid and sequential uploads (criteria 1, 3, 4) | 3 | p0 | In progress | — |
+| 7b | E4-S2B | Client-side downscale before upload (criterion 2, and criterion 5's downscale half) | 2 | p0 | Todo | — |
 
-**Total: 10 slices · 28 points** (the row above them is a chore, not a story; E3-S1A/B, E3-S5A/B and
-E4-S1A/B are each one story, split — see the notes at the end of this section). The order is the
+**Total: 12 slices · 28 points** (the row above them is a chore, not a story; E3-S1A/B, E3-S5A/B,
+E4-S1A/B and E4-S2A/B are each one story, split — see the notes at the end of this section). The order is the
 dependency chain, with the placements worth a sentence:
 
 - **E3-S1 first** — the sprint's goal made visible: the app opens on a full-bleed random photo and nothing
@@ -55,8 +56,11 @@ dependency chain, with the placements worth a sentence:
 - **E4-S1 then E4-S2** — the upload pipeline lands once (picker → validate → upload → invalidate), in **two
   slices** (see the note at the end of this section: the criteria are a dependency chain, so the first
   slice is the only one that can exist alone and it measured 714, over the branch threshold);
-  the multi-select story builds directly on it. The cap and the downscale decision are pure functions,
-  which is also how they are tested (jsdom has no canvas — ADR-018).
+  the multi-select story builds directly on it, and **E4-S2 is itself cut by criterion**: **S2A** takes
+  criteria 1, 3 and 4 (multi-select, the cap, the grid, the sequential queue) and **S2B** takes
+  criterion 2 (downscale) — the cut never fails a criterion, because downscale is independent of
+  selection. The cap and the downscale decision are pure functions, which is also how they are tested
+  (jsdom has no canvas — ADR-018).
 
 **E3-S1 was split at review, and the split is the interesting part.** The story landed 1,516 hand-written
 lines — the largest diff here — claiming the atomic-story exception. The reviewer took the claim apart with
