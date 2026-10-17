@@ -564,6 +564,7 @@ delivery, documentation, and a clean v1.0.
 | E6-S17 | Static-serving hardening found by E1-S5's probes (issue #79) | p1 | 2 | — | Todo |
 | E6-S18 | Colour-token parsing robustness (issue #103) | p2 | 2 | — | Todo |
 | E6-S19 | Upload-validation hardening from E4-S1A's review | p2 | 1 | — | Todo |
+| E6-S20 | Static-WebP downscaling, once animation and alpha are detectable | p2 | 2 | — | Todo |
 
 ### E6-S1 — CI on every PR · 5 pts · p0
 
@@ -737,6 +738,20 @@ set to one of those can be *less* strict than the server (a wasted round trip, n
       test that reads the Java source — adding a format on either side must fail a check on the other.
 - [ ] `parseMaxUploadMb` accepts only plain decimal integers (`/^\d+$/`), matching Spring's binder, with
       tests for `1e2`, `0x10`, `7.0`, signs and whitespace.
+
+### E6-S20 — Static-WebP downscaling · 2 pts · p2
+
+*As the curator, I want heavy static WebP photos to shrink like the others, without risking a lost
+animation or flattened transparency.*
+
+E4-S2B excludes WebP from re-encoding because a canvas cannot tell a static opaque WebP from an
+animated or alpha-carrying one without parsing the container; flattening alpha into JPEG or keeping one
+frame of an animation would be a regression, not a compression (PR #119's review).
+
+- [ ] Detect animation and alpha cheaply (a container-header check, no full second decoder) and
+      re-encode only static opaque WebP, keeping the no-bigger-than-source rule.
+- [ ] Tests for the decision at the animation/alpha boundaries and a Chromium probe of a real static
+      WebP; the eligible-type table in `lib/upload/downscale.ts` is the one place that changes.
 
 ---
 

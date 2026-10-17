@@ -1040,22 +1040,36 @@ exactly at either bound is untouched (tests pin 2560 vs 2561 and 6 MiB vs +1). T
 and the other axis follows the aspect ratio, rounded to the nearest pixel. When only the byte threshold
 is crossed, the dimensions are kept and the file is re-encoded.
 
-**Eligible types and output.** JPEG/JPG → JPEG; WebP → JPEG; PNG → PNG (the only output that can carry
-alpha). GIF is skipped because a canvas holds one frame and the animation would be lost; AVIF because
-canvas can decode but not universally encode it. Everything else is sent unchanged. The returned `File`
+**Eligible types and output.** JPEG/JPG → JPEG; PNG → PNG (the only output that can carry alpha).
+**GIF, WebP and AVIF are skipped**: a canvas holds one frame (GIF and animated WebP would lose their
+animation), WebP and PNG can carry alpha (a JPEG flatten would black it), AVIF has no universal
+encoder, and the planner cannot tell a static opaque WebP from an animated or transparent one without
+parsing the container. Everything else is sent unchanged. **E6-S20** records restoring static WebP
+when animation and alpha can be detected. The returned `File`
+carries the **encoded blob's own type**, not merely the requested one: MDN records that an unsupported
+requested type falls back to PNG, and `StorageService.store` refuses a declared type that contradicts
+the magic bytes, so a fallback must travel as PNG. The returned `File`
 carries the **encoded blob's own type**, not merely the requested one: MDN records that an unsupported
 requested type falls back to PNG, and `StorageService.store` refuses a declared type that contradicts
 the magic bytes, so a fallback must travel as PNG.
 
-**Failure.** `downscaleForUpload` never rejects: no `createImageBitmap` (jsdom, an old engine), a
-decode failure, no 2D context, a `null` `toBlob`, or an encoder rejection all return the **original
-`File`**. The queue catches a rejection too. Downscaling can make an upload smaller; it can never stop
-one.
+**Never a bigger upload.** A re-encode that does not shrink the file is discarded and the original is
+sent: the review measured a 6.5 MB PNG re-encoded to **10.2 MB (1.56×)** and a q50 JPEG to **1.77×**
+at this module's own target/quality. Returning either would add megabytes — and could push an upload
+past the server's ceiling — for no gain. Ties go to the original.
+
+**Failure and its deadline.** `downscaleForUpload` never rejects: no `createImageBitmap` (jsdom, an old
+engine), a decode failure, no 2D context, a `null` `toBlob`, or an encoder rejection all return the
+**original `File`**. Preparation is also raced against a **10 s deadline** (`PREPARATION_TIMEOUT_MS`):
+a decoder or encoder promise that never settles would otherwise leave the batch in `uploading` with
+nothing to cancel. The queue catches a rejection too. Downscaling can make an upload smaller; it can
+never stop one.
 
 **In the queue.** The prepared file is stored on the item (`uploadFile`) and sent, so "Try again"
 resends that same object and never encodes twice. The progress total is the sent file's size; while
 preparation runs the line is the indeterminate pulse (the total is genuinely unknown), then it becomes
-the determinate 0 % line once the request opens.
+the determinate 0 % line once the request opens. Capture of that preparation state:
+`reports/e4s2b-preparing-390.png`.
 
 ### Measured
 
