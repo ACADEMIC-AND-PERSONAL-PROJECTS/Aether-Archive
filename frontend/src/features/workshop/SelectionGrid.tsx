@@ -7,8 +7,10 @@ import {
   closestCenter,
   useSensor,
   useSensors,
+  type Announcements,
   type DragEndEvent,
   type DragStartEvent,
+  type UniqueIdentifier,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -17,10 +19,17 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
 import { prefersReducedMotion } from "../../lib/motion/reduced";
 import { EASE_SOFT } from "../../lib/motion/tokens";
+import {
+  cancelAnnouncement,
+  dropAnnouncement,
+  moveAnnouncement,
+  pickupAnnouncement,
+  SCREEN_READER_INSTRUCTIONS,
+} from "../../lib/ordering/announce";
 import {
   AUTO_SCROLL_OPTIONS,
   DROP_ANIMATION_MS,
@@ -78,9 +87,11 @@ import {
  * getter the sensor moves the overlay in 25 px steps and never changes the order. E4-S3B deliberately
  * shipped no focus stop without a sensor; the two land together here.
  *
- * The announcement copy is the follow-up slice (E4-S3D1): this branch uses dnd-kit's defaults, which
- * name the generated `selection-N` ids. Replacing them with position-based sentences is a copy change
- * over the same sensor, so it ships separately rather than doubling this PR.
+ * Announcements (`lib/ordering/announce.ts`) are built from the current array, so a reader hears
+ * "Photo 2 of 6 moved to position 4." rather than generated ids. The first `over` in a drag is the
+ * tile itself; the handler tracks the last announced destination and skips a repeat, so a return to
+ * the origin position is announced rather than swallowed. The workshop's own `role="status"` region
+ * stays silent during a drag: it narrates uploads, and a drag changes none.
  *
  * ## Reordering
  *
@@ -334,6 +345,9 @@ export function SelectionGrid({
 }: SelectionGridProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const reducedMotion = useReducedMotion();
+  // The last destination a move sentence named, so the pickup frame's self-`over` is skipped without
+  // also swallowing a genuine return to the origin position (initialised at pickup).
+  const lastAnnounced = useRef<number | null>(null);
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: MOUSE_DRAG_DISTANCE_PX } }),
@@ -345,6 +359,53 @@ export function SelectionGrid({
     }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
+
+  /*
+   * The announcements are built from the current array so they speak positions rather than ids.
+   * `positionOf` is 1-based; `null` stands for "no such tile" (an over that resolved to nothing).
+   */
+  const announcements = useMemo<Announcements>(() => {
+    const positionOf = (id: UniqueIdentifier | null | undefined): number | null => {
+      if (id === null || id === undefined) {
+        return null;
+      }
+      const index = items.findIndex((item) => item.id === id);
+      return index === -1 ? null : index + 1;
+    };
+
+    return {
+      onDragStart({ active }) {
+        const position = positionOf(active.id);
+        lastAnnounced.current = position;
+        return position === null ? undefined : pickupAnnouncement(position, items.length);
+      },
+      onDragOver({ active, over }) {
+        const position = positionOf(active.id);
+        const destination = positionOf(over?.id);
+        if (position === null || destination === null || destination === lastAnnounced.current) {
+          return undefined;
+        }
+        lastAnnounced.current = destination;
+        return moveAnnouncement(position, items.length, destination);
+      },
+      onDragEnd({ active, over }) {
+        lastAnnounced.current = null;
+        const position = positionOf(active.id);
+        if (position === null) {
+          return undefined;
+        }
+        const destination = positionOf(over?.id);
+        return destination === null
+          ? cancelAnnouncement(position, items.length)
+          : dropAnnouncement(destination, items.length);
+      },
+      onDragCancel({ active }) {
+        lastAnnounced.current = null;
+        const position = positionOf(active.id);
+        return position === null ? undefined : cancelAnnouncement(position, items.length);
+      },
+    };
+  }, [items]);
 
   const activeItem =
     activeId === null ? null : (items.find((item) => item.id === activeId) ?? null);
@@ -373,6 +434,10 @@ export function SelectionGrid({
       sensors={sensors}
       collisionDetection={closestCenter}
       autoScroll={AUTO_SCROLL_OPTIONS}
+      accessibility={{
+        announcements,
+        screenReaderInstructions: { draggable: SCREEN_READER_INSTRUCTIONS },
+      }}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveId(null)}
