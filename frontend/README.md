@@ -1117,7 +1117,7 @@ the slot a photo occupies is its index, so the future publish payload is `ordere
 
 11 unit tests state every move direction, both clamps, the no-op identity and the ordered-ids
 projection. The drag and touch surfaces that write through this reducer arrived in E4-S3B — the next
-section. A keyboard surface is the second slice of E4-S3C and is not part of this one.
+section. A keyboard surface is E4-S3D and is not part of this one.
 
 ## Gestures on the grid — measured (E4-S3B)
 
@@ -1137,7 +1137,7 @@ applies `moveItem` from the previous section. The array is still the only order.
   (`SORT_SETTLE_MS`, `EASE_SOFT`).
 - Auto-scroll, the tuned drop animation and the reduced-motion reading were **not** in S3B; they are
   E4-S3C's motion slice and are measured in the next section. The keyboard sensor, announcements and
-  screen-reader instructions are E4-S3C's second slice, not here.
+  screen-reader instructions are E4-S3D, not here.
 
 **The overlay.** `DragOverlay` renders a presentational clone — scrim, preview, state line — raised with
 the one soft shadow and a hairline edge; the source slot keeps its measured space and paints nothing
@@ -1150,7 +1150,7 @@ drop animation ran; this slice replaced it with the tuned 250 ms animation, remo
 `attributes`: they carry `tabIndex: 0`, `role="button"` and an `aria-describedby` that promises the
 space bar. Without a sensor that would put a control in the tab order that does nothing when activated
 and point a screen reader at keys the grid does not listen for, so the remove button stays the tile's
-only focusable control. E4-S3C's keyboard slice adds `attributes`, the `KeyboardSensor` and the
+only focusable control. E4-S3D adds `attributes`, the `KeyboardSensor` and the
 announcement builders together, so the promise becomes true there; this slice is pointer and touch only.
 
 **The remove button stays clickable.** It is a **sibling** of the activator, so its pointer events
@@ -1206,7 +1206,7 @@ reduced-motion drop arrived with E4-S3C's motion slice and is measured in the ne
 
 This slice keeps a long drag scrolling and stops the motion for readers who ask it to. The array is
 still the only order, and the queue sends the displayed order. Keyboard moves and announcements are
-the second half of E4-S3C and are not part of this tree.
+E4-S3D and are not part of this tree.
 
 **Auto-scroll.** `AUTO_SCROLL_OPTIONS` — edge bands at 15 % / 18 %, acceleration 8, interval 5 — is
 passed to `DndContext`. At 390 × 300 the document has 448 px of content in a 300 px viewport, so it
@@ -1226,7 +1226,8 @@ sortable settle stays 200 ms.
 **The overlay's state line.** It now sits inside the lifted square on a gradient scrim
 (`from-aura-bg/85 via-aura-bg/75 to-transparent`), not floating below it. The tile is the surface the
 user is holding; text over another photo would need its own scrim, and moving it into the clone reuses
-the one already there.
+the one already there. Measured in the review over a pure-white photo at 390 × 844 DPR 3: `#E8E6E3`
+on the composited scrim, **mean 8.57:1, worst pixel 7.45:1** — above the 4.5:1 rule at every pixel.
 
 **Reduced motion, both readings.** `Emulation.setEmulatedMedia` with `prefers-reduced-motion: reduce`:
 
@@ -1260,11 +1261,15 @@ captures stay. The keyboard slice's capture is not part of this tree.
 context and paints **under** the panel when the short viewport makes them overlap; at 390 × 844 they
 do not overlap. Not an acceptance criterion of this story — recorded so the observation has a number
 behind it. If the clone should always win, raising the scroller's stacking context is the one-class
-change, for a follow-up.
+change — recorded as **E6-S23** rather than silently changed here.
 
 Tests added or rewritten: 3 in `WorkshopView.test.tsx` (the reduced-motion reading, the queue's
 displayed order, and a StrictMode pointer reorder), 3 in `reduced.test.ts`, 2 in `interaction.test.ts`
-and 1 in `tokens.test.ts`. The full suite is **32 files / 372 tests**; the shuffled suite was run
+and 1 in `tokens.test.ts`. Two pieces are **probe-covered rather than suite-covered**, stated because
+a passing suite is not evidence for them: dnd-kit's WAAPI drop gating (jsdom's zero geometry makes
+dnd-kit skip the drop animation entirely, so a test assertion would pass with or without the gate) and
+the `autoScroll` prop's wiring (the tuned values are pinned exactly in `interaction.test.ts`; whether
+`DndContext` receives them is measured in the probe). The full suite is **32 files / 372 tests**; the shuffled suite was run
 **three times** (`npm run test -- --run --sequence.shuffle`), green each time.
 
 Bundle delta, two production builds with and without this slice in `dist/`:
@@ -1280,7 +1285,7 @@ unchanged.
 
 Not measured here: a physical phone's auto-scroll feel while a finger holds a tile at the edge (the
 probe drives a synthetic mouse pointer), and Safari/iOS's `prefers-reduced-motion` reading (the probe
-emulates it through CDP in Chromium) — **SKIPPED**. The keyboard path and announcements are E4-S3C's
+emulates it through CDP in Chromium) — **SKIPPED**. The keyboard path and announcements are E4-S3D's
 other slice.
 
 ## Zero external requests — measured on the built bundle
