@@ -229,9 +229,17 @@ body {
 }
 
 /*
- * Reduced motion (§5): the drift collapses to nothing, the fade stays, and every animation outside the
- * vocabulary freezes at its end state — a loop that only communicates state (the loading pulse)
- * becomes a still frame.
+ * Reduced motion (§5): the drift collapses to nothing, the fade stays, and every animation and
+ * transition outside the vocabulary freezes at its end state — a loop that only communicates state
+ * (the loading pulse) becomes a still frame, and the sortable grid's settle stops moving.
+ *
+ * **Transitions are frozen here too, not only keyframes (E4-S3C).** The original rule covered
+ * `animation-duration` alone, so a component transition kept moving under `reduce` — the sortable grid
+ * settles neighbours with an inline `transition`, which no animation rule reaches. The grid also
+ * passes `null` to dnd-kit when the preference is set (`lib/motion/reduced.ts`), because dnd-kit's
+ * drop is a Web Animations API animation that no stylesheet rule can touch; the two guards cover
+ * different halves. `!important` is required: the inline transition a component sets can only be
+ * overridden by an important declaration.
  *
  * The distance is what changes, not the timing: an entry is `.motion-enter` (block 6) and reads
  * `--motion-distance-enter`, so at 0 px it is an opacity fade over the same 320/600 ms and the
@@ -251,6 +259,7 @@ body {
   *:not(.motion-enter)::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 
   :root {
