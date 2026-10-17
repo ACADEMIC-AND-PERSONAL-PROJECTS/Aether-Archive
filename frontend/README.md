@@ -1136,8 +1136,8 @@ applies `moveItem` from the previous section. The array is still the only order.
 - The tiles settle with a **200 ms** inline transition on `cubic-bezier(0.22, 1, 0.36, 1)`
   (`SORT_SETTLE_MS`, `EASE_SOFT`).
 - Auto-scroll, the tuned drop animation, the keyboard sensor, announcements, screen-reader
-  instructions and the reduced-motion reading are **not** in this slice: they are E4-S3C, and this
-  branch adds no constants for them.
+  instructions and the reduced-motion reading are **not** in this slice: auto-scroll is E4-S3C1, the
+  rest E4-S3C; this branch adds no constants for them.
 
 **The overlay.** `DragOverlay` renders a presentational clone — scrim, preview, state line — raised with
 the one soft shadow and a hairline edge; the source slot keeps its measured space and paints nothing
@@ -1200,6 +1200,27 @@ has no travel).
 `reports/e4s3-drag-390.png` (lift + overlay) and `reports/e4s3-order-390.png` (settled order).
 Not measured here: a physical phone's long-press feel, Safari's `touch-action` handling, and the
 reduced-motion drop — the last is E4-S3C's by design (**SKIPPED**).
+
+## Auto-scroll — measured (E4-S3C1)
+
+`AUTO_SCROLL_OPTIONS` — edge bands at 15 % / 18 %, acceleration 8, interval 5 — is passed to
+`DndContext`; the values are pinned **exactly** in `interaction.test.ts`, because a range check would
+pass with dnd-kit's defaults and the tuning the probe measured could disappear silently. At 390 × 300
+the document has 448 px of content in a 300 px viewport, so it can travel 148 px. Holding the first
+tile 8 px above the bottom edge took the document from 0 to **148 px, its maximum, by the first
+100 ms sample**, and kept it there for the rest of the hold; the grid's own scroller stayed at 0 (its
+`scrollHeight` equals its `clientHeight` at this viewport, so the document is the only scroller with
+travel). Dropping on the last fully visible tile moved photo 1 from position 1 to position 6:
+`[1,2,3,4,5,6]` → `[2,3,4,5,6,1]`.
+
+The `autoScroll` prop's **wiring** is probe-covered rather than suite-covered: the values are pinned by
+a unit test, but whether `DndContext` receives them is not observable in jsdom — measured here
+instead. Capture: `reports/e4s3-autoscroll-390.png` (1170 × 900, 390 × 300 DPR 3). The drop animation
+and the reduced-motion reading are E4-S3C's, not this slice.
+
+Tests added: 1 in `interaction.test.ts` (the exact-value pin); the full suite is **31 files /
+364 tests** at this branch's tip. Probe: headless Chromium **153.0.8010.12**, built `dist/` on
+`vite preview`, scripts outside the repository.
 
 ## Zero external requests — measured on the built bundle
 
