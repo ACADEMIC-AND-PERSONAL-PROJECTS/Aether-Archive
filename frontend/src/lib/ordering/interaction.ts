@@ -18,7 +18,7 @@
  * and the component is where they meet the library's option types.
  *
  * **Not here, on purpose:** the overlay's drop animation is E4-S3C's. This file states only the
- * envelope a gesture in this story can feel, plus the scroll band a long drag needs (E4-S3C1).
+ * envelope a gesture in this story can feel, plus the scroll band a long drag needs (E4-S3C).
  */
 
 /** Mouse travel before the drag starts — a click is not a drag. */
@@ -34,9 +34,10 @@ export const TOUCH_LONG_PRESS_TOLERANCE_PX = 8;
 export const SORT_SETTLE_MS = 200;
 
 /**
- * Auto-scroll: the distance from the scroll container's edge, as a fraction of its height, at which
- * the grid starts moving, and how quickly it accelerates. Passed to `DndContext`'s `autoScroll`,
- * which walks up from the dragged tile to the `overflow-y-auto` grid scroller.
+ * Auto-scroll: the distance from the scroll container's edge, as a fraction of its width (`x`) and
+ * height (`y`), at which the grid starts moving, and how quickly it accelerates. Passed to
+ * `DndContext`'s `autoScroll`, which walks up from the dragged tile to the nearest scrollable
+ * ancestor — the document at the probed viewport, where the grid's own scroller has no travel.
  */
 export const AUTO_SCROLL_OPTIONS = {
   threshold: { x: 0.15, y: 0.18 },

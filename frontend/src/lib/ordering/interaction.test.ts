@@ -9,7 +9,7 @@ import {
 } from "./interaction";
 
 /**
- * The gesture envelope (E4-S3B) and auto-scroll's band (E4-S3C1). These are the numbers the Chromium
+ * The gesture envelope (E4-S3B) and auto-scroll's band (E4-S3C). These are the numbers the Chromium
  * probe measures; pinning them in a unit test means the probe and the component cannot drift apart
  * silently.
  */

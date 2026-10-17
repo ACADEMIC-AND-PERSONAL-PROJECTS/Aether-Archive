@@ -81,8 +81,9 @@ import {
  * after 8 px, a finger long-press starts after 250 ms and gives up if it travels more than 8 px — so a
  * swipe still scrolls the grid and a long press lifts the photo. `touch-action: manipulation` on the
  * activator keeps the swipe native and leaves pinch-zoom alone. `DndContext` auto-scrolls the nearest
- * `overflow-y-auto` ancestor with the tuned band in `AUTO_SCROLL_OPTIONS`, so a photo can be carried to
- * a row that is not on screen (E4-S3C1).
+ * scrollable ancestor with the tuned band in `AUTO_SCROLL_OPTIONS` — the document at the probed
+ * 390 × 300 viewport, where the grid's own scroller has no travel — so a photo can be carried to a row
+ * that is not on screen (E4-S3C).
  *
  * The overlay's drop animation and its reduced-motion reading are E4-S3C's; this branch leaves the
  * library's short default settle in place and adds no motion of its own.
