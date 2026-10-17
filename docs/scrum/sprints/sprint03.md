@@ -38,7 +38,8 @@ dependency chain, with the placements worth a sentence:
   else. It needs only the shell (E2-S2) and `GET /photos/random` (E1-S6; in the contract at
   `_docs/openapi.yml` — checked at planning). Two forward references are named rather than hidden: its
   "tap anywhere opens the menu" criterion completes when **E3-S2** lands, with the integrated path tested
-  in **E3-S5**; its empty-archive criterion completes with **E3-S4**.
+  in **E3-S5** — **satisfied**: E3-S2 merged `e7a50d6`; and its empty-archive criterion completes with
+  **E3-S4**, still open.
 - **E3-S2 next** — the menu is the tap-target the splash's first criterion names, and it is self-contained:
   glass overlay, focus trap, keyboard path. `backdrop-filter` and the glass fallback were proven from the
   shipped CSS in E2-S6 (the `@supports` branch itself is not forceable headless — E2-S6 records that
@@ -204,13 +205,23 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   (five `.woff2` files, 152 kB, since E2-S3).
 - 2026-10-17 — **E3-S2 merged (`e7a50d6`, PR #104) after APPROVE WITH NITS**, closing the state E3-S1B left
   visible. The exception claim held against four counter-cuts the reviewer built rather than the one the PR
-  argued, and the number that settled it is worth keeping: **production code alone is 418 lines**, so no
-  arrangement of tests and documentation reaches the budget while the criteria stand. That is the second
-  consecutive story at roughly twice the guideline — with E3-S1's split, the sprint has now produced two
-  data points that say the same thing about sizing, which is what the retrospective should act on.
+  argued, and the number that settled it is worth keeping, measured at the merge: **production code alone is
+  425 lines** (418 at the reviewed tip; the review fixes added 7), so no arrangement of tests and
+  documentation reaches the budget while the criteria stand. Sizing, with the multiples rather than the
+  adjective: **E3-S2 is 1,085 hand-written — 2.17× the ~500 branch budget and 2.71× the ~400 PR guideline**
+  — and E3-S1 was 1,516 unsliced (3.03× / 3.79×) or 2,296 as two slices (4.59× in total, though each slice
+  came in under the story-unit reading). Which is the honest form of the pairing: the two points do not say
+  the same thing, they say the *same direction* from different angles — E3-S1 leaves the diagnosis open
+  (documentation density, or "one story" meaning less), and E3-S2's production-only figure bears on that
+  dilemma rather than confirming it.
   The review's control found the same class of gap as E3-S1B's: **reinstating the splash's old Escape
-  listener left all 37 tests green**, so the story's most deliberate decision — one owner for the key — was
-  the least checkable thing in it. Twice now, a mutant has found an invariant that was argued in prose and
-  pinned nowhere, and both were decisions the author had called out as deliberate. If the pattern holds it
-  belongs in the next retrospective as a rule: *the more deliberately something is decided, the more likely
-  it is to be described rather than tested.*
+  listener left all 37 tests in the menu and splash files green** — that tip's suite was 203 — so the
+  story's most deliberate decision, one owner for the key, was the least checkable thing in it. Twice now, a
+  mutant has found an invariant that was argued in prose and pinned nowhere, and both were decisions the
+  author had called out as deliberate. If the pattern holds it belongs in the next retrospective as a rule:
+  *the more deliberately something is decided, the more likely it is to be described rather than tested.*
+  **One caveat to carry with it**, because it is the reviewer's own and it sharpens the rule: a mutation is
+  aimed by reading what the PR argued, so "deliberate decisions are the ones found unpinned" is partly an
+  artefact of where the mutants point — a decision made silently is equally unpinned and far less likely to
+  be hit. The rule is therefore about *testing what you bothered to argue*, not about arguing being the
+  hazard.

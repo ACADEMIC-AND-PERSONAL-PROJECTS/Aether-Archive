@@ -321,6 +321,14 @@ opens on tap, feels tactile, and gets out of the way.
 - [ ] Tap on the backdrop closes; body scroll locked while open; `prefers-reduced-motion` honoured.
 - [ ] Tests: open/close, keyboard path, focus restoration.
 
+> **Delivered in one PR (Sprint 3)**: #104, merged `e7a50d6`, **1,085 hand-written changed lines** — over both
+> budgets, so the atomic-story exception was claimed and judged, and it held against four counter-cuts. The
+> decisive measurement is that **production code alone is 425 lines**: no arrangement of tests and
+> documentation reaches the budget while the criteria stand, which makes this a sizing question rather than a
+> slicing one (`docs/scrum/sprints/sprint03.md`). Four findings were routed instead of absorbed: muted-over-
+> glass → E3-S4, the sheet-over-veil pattern → E3-S3, `GlassPanel`'s missing `ref` → E4-S3, and tokens
+> serialised as 4-/8-digit hex → E6-S18 / #103.
+
 ### E3-S3 — Route transitions & motion system · 3 pts · p0
 
 *As a mobile user, I want fluid transitions, so that moving between views feels continuous.*
