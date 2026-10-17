@@ -113,10 +113,9 @@ accent **8.46:1** — every pair ≥ 4.5:1 (§8).
 ```
 
 - Exactly **one** glass primitive component (`components/GlassPanel.tsx`); everything else composes it.
-- **The tint is per theme.** The literals above are the neutral set: a page whose aura the curator
-  chose uses `--aura-glass`/`--aura-glass-solid`/`--aura-hairline` from `themeFromBackground`
-  (ADR-023), which flips to the inverse white tint and dark hairline under dark text so the glass
-  keeps carrying 4.5:1 text on a light page.
+- **The tint is per theme.** The literals above are the neutral set; a curator-chosen page uses the
+  tokens from `themeFromBackground` (ADR-023), which flips to the inverse white tint and dark hairline
+  under dark text so the glass keeps carrying 4.5:1 text.
 - Fallback when `backdrop-filter` is unsupported: the `@supports` branch in `glass.css` swaps
   `--aura-glass` for `--aura-glass-solid` (`rgba(0, 0, 0, 0.72)`) so text stays readable.
 - No drop shadows beyond a soft `0 8px 24px rgba(0,0,0,0.24)` when elevation must be communicated.

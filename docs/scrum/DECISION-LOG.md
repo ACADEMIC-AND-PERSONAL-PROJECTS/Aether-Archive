@@ -931,53 +931,42 @@ the opacity and offset measured at that instant) and `reports/e3s3-transition-mi
 
 **Date**: 2026-10-17 · **Status**: Accepted
 
-**Context.** E4-S4 asks the curator to choose the dump's background colour (the spec's "aura") with the
-UI previewing it live, and the backlog adds palette suggestions from the selected photos, a reset, and
-persistence across reordering and refresh. The theme layer's `paletteToTheme` derives a page colour from
-a palette's darkest useful colour — it cannot serve a colour the user chose, because it would move it
-into the dark band. The design system also mandates one dark glass tint and one text token; on a light
-page, a black glass composite is darker than any text that passes on the page, so one text colour cannot
-clear 4.5:1 on both. Three options exist: refuse light backgrounds, give each surface its own text
-token, or flip the glass tint with the text.
+**Context.** E4-S4 lets the curator choose the dump's background colour (the spec's "aura") with a live
+preview, plus palette suggestions from the selected photos, a reset and persistence across refresh.
+`paletteToTheme` derives a page colour from a palette and would move a chosen colour into the dark band.
+The design system also mandates one dark glass tint and one text token; on a light page a black glass
+composite is darker than any text that passes, so one text colour cannot clear 4.5:1 on both. Options:
+refuse light backgrounds, per-surface text tokens, or flip the glass tint with the text.
 
 **Decision.**
 
 1. **`themeFromBackground(hex)` keeps the page exactly the colour the user picked.** Each text
    direction steps the surface away from the text (darker under light text, lighter under dark text)
    and the text from its neutral base toward its extreme until text-on-page, text-on-surface and
-   text-on-glass all clear 4.5:1. The surface **flips its step at the cube's edge** rather than
-   rendering pure black or pure white: `#010101` and `#fefefe` are accepted, with a non-pure surface
-   that steps toward the page. **Both directions are tried** — the nearer base is only a preference
-   — before a page is refused, and the search never returns pure black or pure white text. Pure black
-   and pure white **pages** are refused by policy, because the brief's bases stop at
-   `#0B0B0D`/`#121215`. Measured on a 16³ sRGB cube: **4,094 of 4,096 backgrounds accepted; the two
-   refusals are `#000000` and `#ffffff`**, both by that policy. (The first cut committed to one
-   direction and refused 90 colours, claiming none had a legible text; #133's review falsified the
-   claim by carrying every one of them with the other direction, and this ADR records the corrected
-   design.)
+   text-on-glass all clear 4.5:1; the surface **flips its step at the cube's edge** rather than
+   rendering pure black or white (`#010101`/`#fefefe` accepted, with a non-pure surface). **Both
+   directions are tried** before a page is refused, and the search never returns pure black or white
+   text. Pure **pages** are refused by policy (the brief's bases stop at `#0B0B0D`/`#121215`):
+   measured on a 16³ sRGB cube, **4,094 of 4,096 backgrounds are accepted; only `#000000` and
+   `#ffffff` are refused**. (The first cut's single-direction 90-colour refusal band was an artifact;
+   #133's review carried every one of those colours with the other direction.)
 2. **The glass tint flips with the text.** Black tint and white hairline under light text; white tint
-   and black hairline under dark text. This is a deliberate extension of the design language's dark
-   glass, recorded here rather than improvised: with black glass on every page and both text directions
-   tried, **1,799 of 4,096 backgrounds (43.9%)** could not carry one text colour on the page and the
-   glass — the black composite is darker than any dark text that passes on a light page. The token
-   layer already owns `--aura-glass`, `--aura-glass-solid` and `--aura-hairline` per theme, so the
-   flip is data, not a second component.
-3. **Suggestions merge across the selected photos.** Each photo's palette is extracted (the E2-S4
-   pipeline, 64 px edge); colours are pooled, deduplicated by normalised hex and ranked by the sum of
-   their weights across the images — confidence is the colour's share of the selected pixels. The top
-   eight are offered. A photo whose extraction fails is skipped; if every extraction fails there are no
-   swatches and the hex input remains.
-4. **The chosen aura persists for the browsing session, nothing else does.** It lives in
-   `sessionStorage` under one key and is restored on refresh; the picked `File`s cannot be persisted and
-   still never are. The preview applies the theme on the workshop's root and clears it on unmount, as
-   the splash does.
+   and black hairline under dark text. With black glass on every page and both directions tried,
+   **1,799 of 4,096 backgrounds (43.9%)** could not carry one text colour on the page and the glass;
+   the token layer already owns the tint tokens per theme, so the flip is data, not a component.
+3. **Suggestions merge across the selected photos.** Each palette is extracted (E2-S4, 64 px edge);
+   colours are pooled, deduped by normalised hex and ranked by summed weight — confidence is the
+   colour's share of the selected pixels. The top eight are offered; a failed extraction is skipped,
+   and if all fail there are no swatches (the hex input remains).
+4. **The aura persists for the browsing session, nothing else.** It lives in `sessionStorage` under
+   one key and is restored on refresh; the picked `File`s never persist. The preview applies the theme
+   on the workshop's root and clears it on unmount, as the splash does.
 
-**Consequences.** A chosen colour is never modified behind the user's back, and every accepted page
-has a legible text colour in at least one direction. The light-glass variant means "dark glassmorphism"
-becomes "contrast-directed glassmorphism" for user-chosen pages; `.claude/rules/design-language.md` and
-`docs/engineering/DESIGN-SYSTEM.md` §3 point at this ADR for that case. A further divergence (per-surface
-text tokens, pure white/black pages or text, dark glass on light pages, or persisting the aura across
-sessions) needs a new ADR.
+**Consequences.** A chosen colour is never modified behind the user's back, and every accepted page has
+a legible text colour. The light-glass variant makes "dark glassmorphism" "contrast-directed
+glassmorphism" for user-chosen pages; `.claude/rules/design-language.md` and `DESIGN-SYSTEM.md` §3 point
+at this ADR. Further divergence (per-surface text tokens, pure pages/text, dark glass on light pages,
+cross-session persistence) needs a new ADR.
 
 ---
 
