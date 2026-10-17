@@ -582,6 +582,7 @@ delivery, documentation, and a clean v1.0.
 | E6-S20 | Static-WebP downscaling, once animation and alpha are detectable | p2 | 2 | — | Todo |
 | E6-S21 | Splash hero URL origin validation | p2 | 1 | — | Todo |
 | E6-S22 | GitHub Actions majors and Dependabot | p2 | 1 | — | Todo |
+| E6-S23 | Drag overlay stacking at short viewports | p2 | 1 | — | Todo |
 
 ### E6-S1 — CI on every PR · 5 pts · p0
 
@@ -797,6 +798,18 @@ Node 24; current majors are checkout v7, setup-java v6, setup-node v7 and upload
 - [ ] Migrate the workflow to the current major of each action, pinned by SHA, and re-run the suite.
 - [ ] Add `.github/dependabot.yml` for `github-actions` (and optionally `npm`/`maven`) with a weekly
       schedule; review the first PR it opens rather than auto-merging.
+
+### E6-S23 — Drag overlay stacking at short viewports · 1 pt · p2
+
+*As the curator on a short screen, I want the lifted tile to stay above the panel, so the photo I am
+holding is never cut by the control surface.*
+
+E4-S3C's probe (390 × 300): the grid's scroll container and the upload panel are both `relative z-10`
+siblings, so the fixed drag clone (z-index 999) lives inside the earlier stacking context and paints
+**under** the panel; at 390 × 844 they do not overlap. Recorded rather than changed inside the story.
+
+- [ ] Raise the scroller's stacking context (or portal the overlay) so the clone always wins; a probe
+      at 390 × 300 pins it, and the existing dnd geometry tests stay green.
 
 ---
 
