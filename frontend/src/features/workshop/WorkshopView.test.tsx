@@ -152,7 +152,7 @@ function selectedTiles(): readonly HTMLElement[] {
   return within(screen.getByRole("list", { name: "Selected photos" })).getAllByRole("listitem");
 }
 
-/** The drag surfaces, in display order. They are not focusable in this slice: see `SelectionGrid`. */
+/** The drag surfaces, in display order. Since E4-S3D they are the tile's keyboard affordance too. */
 function dragActivators(): readonly HTMLElement[] {
   return screen.getAllByTestId("drag-activator");
 }

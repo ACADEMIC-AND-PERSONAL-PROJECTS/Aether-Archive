@@ -1146,12 +1146,12 @@ finds it once during the lift and zero times after the drop. At the S3B tip dnd-
 drop animation ran; this slice replaced it with the tuned 250 ms animation, removed it under
 `prefers-reduced-motion`, and moved the state line inside the lifted square — see below.
 
-**The dead focus stop, still deliberately absent.** The activator does not spread dnd-kit's
-`attributes`: they carry `tabIndex: 0`, `role="button"` and an `aria-describedby` that promises the
-space bar. Without a sensor that would put a control in the tab order that does nothing when activated
-and point a screen reader at keys the grid does not listen for, so the remove button stays the tile's
-only focusable control. E4-S3D adds `attributes`, the `KeyboardSensor` and the
-announcement builders together, so the promise becomes true there; this slice is pointer and touch only.
+**No dead focus stop (S3B's reasoning, now satisfied).** In S3B the activator deliberately did not
+spread dnd-kit's `attributes`: they carry `tabIndex: 0`, `role="button"` and an `aria-describedby` that
+promises the space bar, and without a sensor that would have been a control in the tab order that does
+nothing when activated. **E4-S3D** adds `attributes` and the `KeyboardSensor` together, so the promise
+is now true — measured in the keyboard section below; at the S3B tip this slice was pointer and touch
+only.
 
 **The remove button stays clickable.** It is a **sibling** of the activator, so its pointer events
 never reach a sensor; tests pin both the gesture (a 300 ms press on it lifts nothing) and the click
