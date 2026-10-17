@@ -1116,7 +1116,89 @@ the slot a photo occupies is its index, so the future publish payload is `ordere
   id → photo UUID) before `orderedIds` can produce a valid `DumpCreate.photoIds`.
 
 11 unit tests state every move direction, both clamps, the no-op identity and the ordered-ids
-projection. The drag, touch and keyboard surfaces that write through this reducer are E4-S3B/C.
+projection. The drag and touch surfaces that write through this reducer arrive in E4-S3B — the next
+section — and the keyboard surface in E4-S3C.
+
+## Gestures on the grid — measured (E4-S3B)
+
+The grid is sortable by pointer and by finger. `DndContext` owns the sensors, `SortableContext` uses
+`rectSortingStrategy` and `closestCenter`, and a drop reports `onMove(from, to)` to the workshop, which
+applies `moveItem` from the previous section. The array is still the only order.
+
+**Sensors and their constraints** (`lib/ordering/interaction.ts`, pinned by `interaction.test.ts`):
+
+- `MouseSensor` with a **distance: 8** constraint — a click, or a 4 px wobble, is not a drag.
+- `TouchSensor` with **delay: 250** and **tolerance: 8** — a finger must stay still for a quarter of a
+  second; moving 8 px before that cancels the pending drag, so the same touch reaches the browser as a
+  scroll. The activator carries `touch-action: manipulation` (Tailwind's `touch-manipulation`), which
+  leaves vertical panning and pinch-zoom native; the sensor only takes the gesture over once the press
+  has actually started a drag.
+- The tiles settle with a **200 ms** inline transition on `cubic-bezier(0.22, 1, 0.36, 1)`
+  (`SORT_SETTLE_MS`, `EASE_SOFT`).
+- Auto-scroll, the tuned drop animation, the keyboard sensor, announcements, screen-reader
+  instructions and the reduced-motion reading are **not** in this slice: they are E4-S3C, and this
+  branch adds no constants for them.
+
+**The overlay.** `DragOverlay` renders a presentational clone — scrim, preview, state line — raised with
+the one soft shadow and a hairline edge; the source slot keeps its measured space and paints nothing
+(`opacity-0`) so nothing shifts. The clone is `aria-hidden` paint, not a second tile, and the probe
+finds it once during the lift and zero times after the drop. dnd-kit's default short drop animation
+runs; tuning it and removing it under `prefers-reduced-motion` is E4-S3C's.
+
+**No dead focus stop.** The keyboard path does not exist yet, so the activator deliberately does not
+spread dnd-kit's `attributes`: they carry `tabIndex: 0`, `role="button"` and an `aria-describedby` that
+promises the space bar. Spreading them now would put a control in the tab order that does nothing and
+point a screen reader at keys the grid does not listen for. The activator is a pointer surface
+(`data-testid="drag-activator"`); the remove button is the tile's only focusable control. E4-S3C adds
+`attributes`, the `KeyboardSensor` and the announcement builders together, when they become true.
+
+**The remove button stays clickable.** It is a **sibling** of the activator, so its pointer events
+never reach a sensor; tests pin both the gesture (a 300 ms press on it lifts nothing) and the click
+path. While a batch uploads, `useSortable` and `SortableContext` are both `disabled`: the queue captured
+the array when it started, and a reorder mid-batch would make the grid disagree with the requests on
+the wire. The tile's removal is disabled here too, as it was in E4-S2A.
+
+**The flakiness fix (PR #124's review, a real defect).** dnd-kit removes its capture-phase document
+listeners on a **50 ms timer** after a drag detaches — they exist to swallow the click that follows a
+drag. A test that activated a drag and returned before that timer fired left the listener on the shared
+jsdom document, where it swallowed the next test's first click. Every activated drag in this suite now
+ends with a drop or a cancel and then awaits `settleDragListeners()` (60 ms) before returning; the
+shuffled suite was run **five times**, green each time.
+
+**Three packages, justified.** `@dnd-kit/core` (sensors, context, overlay), `@dnd-kit/sortable`
+(the sortable context and rect strategy) and `@dnd-kit/utilities` (the transform serialiser
+`useSortable` styles with); `@dnd-kit/accessibility` arrives transitively. A hand-rolled pointer/touch
+stack would have to re-earn the same activation thresholds and overlay behaviour.
+
+Bundle delta, two production builds with and without the imports in `dist/`:
+
+| Chunk                 | Before                    | After                     | Delta                          |
+| --------------------- | ------------------------- | ------------------------- | ------------------------------ |
+| `WorkshopView` (lazy) | 11.48 kB / 4.25 kB gzip   | 59.70 kB / 19.63 kB gzip  | **+48.22 kB / +15.38 kB gzip** |
+| `index`               | 278.56 kB / 87.78 kB gzip | 278.61 kB / 87.83 kB gzip | +0.05 kB / +0.05 kB gzip       |
+| CSS                   | 21.39 kB / 5.17 kB gzip   | 22.15 kB / 5.32 kB gzip   | +0.76 kB / +0.15 kB gzip       |
+
+The cost lands in the lazily loaded workshop chunk, not in the first paint.
+
+Tests added: 6 gesture tests in `WorkshopView.test.tsx` (mouse threshold, reorder through the callback,
+long-press vs short swipe, the remove control's pointer isolation and click path, the focus-stop
+decision, and the disabled state while uploading) and 2 envelope tests in `interaction.test.ts`. The
+full suite is **31 files / 363 tests**.
+
+Probe: headless Chromium **153.0.8010.12**, built `dist/` on `vite preview`, scripts outside the
+repository, 390 × 844 DPR 3 (390 × 300 where scrolling matters; at 844 six tiles fit and the document
+has no travel).
+
+| Scenario                                          | Evidence                                                                                                                                                                                                                                |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mouse drag tile 1 → tile 3                        | order `[1,2,3,4,5,6]` → `[2,3,1,4,5,6]`; overlay present (1) during the lift and gone (0) after the drop; source slot `data-dragging="true"` during, absent after; neighbour transition `transform 0.2s cubic-bezier(0.22, 1, 0.36, 1)` |
+| Touch long-press (CDP `Input.dispatchTouchEvent`) | lifted tile 1 and overlay present; order `[1,2,3,4,5,6]` → `[2,3,1,4,5,6]`; overlay gone after; page scroll 0 during the hold                                                                                                           |
+| Short swipe, 390 × 300                            | page `scrollTop` 0 → **148** (its maximum), order unchanged, no tile in the dragging state, no overlay                                                                                                                                  |
+
+0 off-origin requests and 0 page/console exceptions in every scenario. Captures:
+`reports/e4s3-drag-390.png` (lift + overlay) and `reports/e4s3-order-390.png` (settled order).
+Not measured here: a physical phone's long-press feel, Safari's `touch-action` handling, and the
+reduced-motion drop — the last is E4-S3C's by design (**SKIPPED**).
 
 ## Zero external requests — measured on the built bundle
 
