@@ -30,10 +30,12 @@
 | 5b | E3-S5B | Accessibility — contrast, `inert`, the announcement fix, the manual pass (criteria 3–5) | 2 | p0 | Done | #111 |
 | 6a | E4-S1A | Single photo upload — the picker and the validation (criterion 1) | 2 | p0 | Done | #114 |
 | 6b | E4-S1B | Single photo upload — send with progress and cancel, then retry and invalidation (criteria 2–4) | 3 | p0 | In review | #115 |
-| 7 | E4-S2 | Multi-select (≤ 6) & client-side downscale | 5 | p0 | Todo | — |
+| 7a | E4-S2A1 | The selection grid surface — one tile, its state and its remove action (criterion 3) | 1 | p0 | In progress | — |
+| 7b | E4-S2A2 | Multi-select (≤ 6) and the sequential queue (criteria 1, 4) | 2 | p0 | Todo | — |
+| 7c | E4-S2B | Client-side downscale before upload (criterion 2) | 2 | p0 | Todo | — |
 
-**Total: 10 slices · 28 points** (the row above them is a chore, not a story; E3-S1A/B, E3-S5A/B and
-E4-S1A/B are each one story, split — see the notes at the end of this section). The order is the
+**Total: 13 slices · 28 points** (the row above them is a chore, not a story; E3-S1A/B, E3-S5A/B,
+E4-S1A/B and E4-S2A1/A2/B are each one story, split — see the notes at the end of this section). The order is the
 dependency chain, with the placements worth a sentence:
 
 - **E3-S1 first** — the sprint's goal made visible: the app opens on a full-bleed random photo and nothing
@@ -55,8 +57,12 @@ dependency chain, with the placements worth a sentence:
 - **E4-S1 then E4-S2** — the upload pipeline lands once (picker → validate → upload → invalidate), in **two
   slices** (see the note at the end of this section: the criteria are a dependency chain, so the first
   slice is the only one that can exist alone and it measured 714, over the branch threshold);
-  the multi-select story builds directly on it. The cap and the downscale decision are pure functions,
-  which is also how they are tested (jsdom has no canvas — ADR-018).
+  the multi-select story builds directly on it. **E4-S2 is cut in three**, after the #116 review
+  constructed a criterion-3-only cut that reached the budget: **S2A1** the grid surface (criterion 3),
+  **S2A2** multi-select and the queue (criteria 1 and 4, coupled: a queue of one is E4-S1B and a
+  selection the app cannot send is not the story), **S2B** downscale (criterion 2). The cap and the
+  downscale decision are pure functions, which is also how they are tested (jsdom has no canvas —
+  ADR-018).
 
 **E3-S1 was split at review, and the split is the interesting part.** The story landed 1,516 hand-written
 lines — the largest diff here — claiming the atomic-story exception. The reviewer took the claim apart with
@@ -331,3 +337,16 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   README and the probe record on both sides; the retry side of the same race (a lost response after a
   store can duplicate on retry) is documented too. **The five work commits are 2–3 seconds apart** — the
   same post-hoc partition as E4-S1A, recorded for the retrospective rather than rewritten.
+- 2026-10-17 — **E4-S2 was re-cut at PR #116's review, not defended.** The story had been split by
+  criterion at its start (S2A = criteria 1, 3, 4; S2B = 2), but the review constructed the cut I did
+  not name — criterion 3 alone, on top of E4-S1B — and it is green in every gate at **244 hand-written**,
+  under both budgets. Five "cannot be split" claims have already been withdrawn this sprint; the sixth
+  is not attempted against a measured, tested cut. The story is now **S2A1** (the grid surface, 1 pt,
+  normal budget), **S2A2** (multi-select and the queue, 2 pts, the exception claimed on coupling: a
+  queue of one is E4-S1B and a selection the app cannot send is not the story) and **S2B** (downscale,
+  2 pts). #116 measured **1,742** at its tip (production 810, tests 794, README 82, records 56); its
+  "1,273" cut was author-run and not green, so it is recorded as such. The review's other finding is a
+  real defect, not a record one: `aliveRef` was set false by the effect cleanup and never re-armed, so
+  **uploads died under `StrictMode` in `npm run dev` while the built-bundle probe stayed green** — fixed
+  in S2A2 with a StrictMode-wrapped test. The generalisable form: a probe of the built bundle cannot
+  see development-only double-invocation, and a lifetime ref set only in cleanup is armed by accident.
