@@ -873,7 +873,7 @@ probe pins the browser events.
 ## The selection grid — the tile surface (E4-S2A1)
 
 The picked photo is now a **tile in a selection grid** instead of a full-bleed preview; the send path
-above is unchanged. This is the surface E4-S2A2 grows into multi-select, so the tile is where the
+above is unchanged. This is the surface E4-S2A2's multi-select is built on, so the tile is where the
 per-file state, the remove action and the always-mounted scrim live.
 
 - `<ul aria-label="Selected photos">` with one `<li data-state>` per file; the state line reads
@@ -888,6 +888,137 @@ per-file state, the remove action and the always-mounted scrim live.
   (the E4-S1A fix, carried).
 - The glass panel now sits over the theme's base rather than over a full-bleed photo, so its backdrop
   is `--aura-bg`; the contrast measurements above (E3-S2/E3-S4) remain the worst-case reference.
+
+## The multi-select grid and the batch queue — measured (E4-S2A2)
+
+The picker now takes several photos in one change (capped at six) and uploads them sequentially on top
+of E4-S2A1's tile surface. The single-upload transport, the tile component and the panel's material are
+unchanged; this section covers the cap, the queue and the batch's own states.
+
+### The cap
+
+Six is the dump's size, so six is the most a selection may hold. `planSelection` in
+`lib/upload/selection.ts` counts the tiles already in the grid plus this pick; every picked file still
+runs through `validateUpload`. A refused file (empty, wrong declared type, too large) is reported **per
+file, by name** — "photo.png: That photo is larger than 15 MB." (the client sentence; the archive's own
+`upload-too-large` mapping is for the server side, E4-S1B) — and does not consume a
+slot. A valid file past the cap is ignored, once, with exactly:
+
+> You can add up to 6 photos at a time — 1 wasn't added.
+
+The cap, the refusal sentences and the batch summaries are pure functions with 11 unit tests; the
+component does not own a second grammar. The client validation remains an experience measure, not a
+boundary: the server sniffs the bytes and enforces the ceiling (E4-S1A).
+
+### The grid on A1's surface
+
+Each selected file becomes a list item in `<ul aria-label="Selected photos">`: a square object-URL
+preview, an always-mounted `data-testid="tile-scrim"` backdrop (a preview that cannot decode drops the
+`<img>` but not the tile), a real `<button>` whose accessible name is "Remove <file name>" (or "Remove
+photo" when the file has none), a 44 × 44 hit area with a smaller visible disc, and one short sentence
+under the tile prefixed `sr-only` by the file's own name. Remove buttons are disabled while a batch is
+running, not removed: the queue holds a snapshot of the files, and a tile vanishing mid-batch would
+leave the summary counting something invisible. The scroll container keeps A1's measured centring
+(`justify-center` on the scroller; the tile's top lands on the computed centre). Preview URLs are
+revoked on removal, **on success** and on unmount; the `File`s are state and nothing is persisted.
+
+### The queue — one request at a time, failures isolated
+
+"Upload" sends every waiting or failed tile **in selection order, concurrency one**. One at a time is a
+decision: the single progress line describes the request actually in flight, the server sees a phone's
+uplink as it would see a single upload, and a failure has one unambiguous owner. A failure marks its
+tile `error`, says one quiet sentence, and the loop continues — it never aborts the files behind it.
+Successful files leave the grid. When the queue settles the panel reports this batch: "Added 2 photos.
+1 photo couldn't be added.", or the matching singular. If everything succeeded the view returns to
+`idle`.
+
+"Try again" resends the **same `File` objects** — identity is asserted in the test through the multipart
+body — so a failure cannot lose the selection. Invalidation stays where E4-S1B put it, on `onSuccess`:
+`queryKeys.photos` by prefix (feed and splash hero) after each success, never after a failure or a
+cancel, and the hook does not await it, so the queue is never gated on a refetch.
+
+Cancel is the **batch's** cancel: it aborts the request in flight and stops the queue. The not-yet-sent
+files stay waiting, what was already added stays added, the current file returns to waiting, and the
+panel (asserted with `toBeVisible()` on the panel node, not just a test id) and the live region both say
+"Upload cancelled." The E4-S1B caveat stands unchanged: a cancel can race a response that the server
+already stored, so the screen never claims the archive stored nothing.
+
+**A cancel that lands after the last response says so honestly.** The review measured the interleaving:
+a 201 arrives, Cancel is clicked before the continuation renders, the transport's abort is a no-op and
+the photo IS stored. The post-loop check now compares how many files the batch actually processed: when
+every queued file was processed, the batch summary wins ("Added 1 photo."), because the cancel had
+nothing to stop; only a cancel that stopped the loop says "Upload cancelled." A test pins the
+interleaving, and restoring the old check fails it.
+
+While the queue runs, the persistent status region reads the constant "Uploading." — a test pins it,
+including across a mid-batch failure; the settled summary is what carries the failure to assistive tech.
+
+### The StrictMode defect the built bundle could not see
+
+The first cut set `aliveRef.current = false` in the effect cleanup and never re-armed it. `main.tsx`
+renders under `<StrictMode>`, whose dev-only setup → cleanup → setup sequence left the ref false before
+the first interaction: in `npm run dev`, Upload stuck at `uploading` with **0 requests**. A built bundle
+cannot reproduce it (the double invocation is development-only), which is why the Chromium probe missed
+it and the #116 review found it. The fix re-arms the ref in the **effect setup**, and a
+`<StrictMode>`-wrapped test proves the first request opens and the batch completes; removing the re-arm
+fails that test with `expected 0 to be greater than 0`. The progress callback shares the same guard
+(`lib/upload/progress.ts`): a late event from a settled request must not move the next file's line, and
+an event after unmount must not set state.
+
+### Measured
+
+Unit suite, from `frontend/`:
+
+```bash
+npm run test -- --run
+# Test Files 28 passed (28) · Tests 309 passed (309)
+npm run test -- --run --sequence.shuffle
+# Test Files 28 passed (28) · Tests 309 passed (309)
+```
+
+`VITE_MAX_UPLOAD_MB=20 npm run test` was also run green (309) — but the suite pins that key to `"15"` in
+`vite.config.ts` for hermeticity (the E4-S1 fix), so it exercises the pin rather than the value; the
+shuffled run above is the real second condition.
+
+`WorkshopView.test.tsx` covers the picker, the grid, the queue and the accessibility states in **34
+cases**; `selection.test.ts` adds **11** pure cases and `progress.test.ts` **2**. Ten deliberate
+mutants were each applied, observed red, and reverted:
+
+| Mutant                                               | Result                                                                                    |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| cap removed (`room = Infinity`)                      | 6 failed — `expected [ …(7) ] to have a length of 6 but got 7`                            |
+| `Promise.all` instead of the sequential loop         | 6 failed — `expected [ …(3) ] to have a length of 1 but got 3`                            |
+| `return` instead of `continue` in the failure branch | 8 failed — `Unable to find role="button" and name "Try again"`                            |
+| retry re-wraps the `File`                            | 4 failed — `expected File{} to be File{ size: 4096 }`                                     |
+| invalidation moved to `onSettled`                    | 1 failed — `expected "invalidateQueries" to be called 1 times, but got 2 times`           |
+| StrictMode re-arm removed                            | 1 failed — `expected 0 to be greater than 0`                                              |
+| success-path `revokePreview` deleted                 | 1 failed — `expected "revokeObjectURL" to be called with arguments: [ 'blob:preview-1' ]` |
+| `cancelledRef.current = false` deleted               | 1 failed — `expected 1 to be greater than 1` (the second batch opened no request)         |
+| `alive` half of the progress gate defeated           | 1 failed — `expected true to be false`                                                    |
+| old post-loop cancel check restored                  | 1 failed — "Upload cancelled." overwrote "Added 1 photo." after a stored 201              |
+
+Browser probe (development-time, headless Chromium 152, 390 × 844 DPR 3, built `dist/` served by a
+local stub; scripts outside the repository; the stub answers every second upload with 415
+`unsupported-image-type` after 400 ms):
+
+- Six files picked: 6 tiles, panel and live region both "6 photos selected."; 0 upload requests before
+  the action.
+- Request arrival order on the stub: `a.png`, `b.png`, `c.png`, `d.png`, `e.png`, `f.png`;
+  `activeAtStart` was 1 for every one and `maxActive` was **1** — never two requests open at once.
+- After the batch: the panel and the live region both read "Added 3 photos. 3 photos couldn't be
+  added."; the surviving tiles were `b.png`, `d.png` and `f.png`, each `data-state="error"` with "The
+  archive couldn't read that image."; `<main>` was `data-state="error"`; the successes were sent around
+  the failures, not after a retry.
+- The only URLs the probe flagged outside the base prefix were six `blob:http://127.0.0.1:4174/…`
+  preview object URLs — same origin, local to the page, not network requests; **no external host**, 0
+  page exceptions.
+- Captures: `reports/e4s2a2-grid-390.png` (six tiles, "6 photos selected.") and
+  `reports/e4s2a2-summary-390.png` (three failed tiles and the batch summary), both 1170 × 2532 —
+  390 × 844 at DPR 3.
+
+Not measured here: a physical phone, Safari, a screen reader, and a real backend's `StorageService.store`
+timing (the stub never stores). Downscaling is E4-S2B and is not in this slice — the picked `File` is
+sent as-is.
 
 ## Zero external requests — measured on the built bundle
 

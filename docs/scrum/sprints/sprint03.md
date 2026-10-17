@@ -30,8 +30,8 @@
 | 5b | E3-S5B | Accessibility — contrast, `inert`, the announcement fix, the manual pass (criteria 3–5) | 2 | p0 | Done | #111 |
 | 6a | E4-S1A | Single photo upload — the picker and the validation (criterion 1) | 2 | p0 | Done | #114 |
 | 6b | E4-S1B | Single photo upload — send with progress and cancel, then retry and invalidation (criteria 2–4) | 3 | p0 | Done | #115 |
-| 7a | E4-S2A1 | The selection grid surface — one tile, its state and its remove action (criterion 3) | 1 | p0 | In review | #117 |
-| 7b | E4-S2A2 | Multi-select (≤ 6) and the sequential queue (criteria 1, 4) | 2 | p0 | Todo | — |
+| 7a | E4-S2A1 | The selection grid surface — one tile, its state and its remove action (criterion 3) | 1 | p0 | Done | #117 |
+| 7b | E4-S2A2 | Multi-select (≤ 6) and the sequential queue (criteria 1, 4) | 2 | p0 | In review | #118 |
 | 7c | E4-S2B | Client-side downscale before upload (criterion 2) | 2 | p0 | Todo | — |
 
 **Total: 12 slices · 28 points** (the row above them is a chore, not a story; E3-S1A/B, E3-S5A/B,
@@ -350,3 +350,30 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   **uploads died under `StrictMode` in `npm run dev` while the built-bundle probe stayed green** — fixed
   in S2A2 with a StrictMode-wrapped test. The generalisable form: a probe of the built bundle cannot
   see development-only double-invocation, and a lifetime ref set only in cleanup is armed by accident.
+- 2026-10-17 — **E4-S2A1 (PR #117, merged `abf514d`) delivered the tile surface.** The picked photo is
+  now one tile with its scrim, named remove and per-file state, on E4-S1B's unchanged send path;
+  **455 hand-written**, under the story threshold. Its review's two blockers were another measured
+  falsification — `min-h-full` "centred" the grid only in the comment: the tile sat at y=24, and the
+  committed capture itself was the evidence — fixed with `justify-center` on the scroll container
+  (301.30 against a computed 301.31) and recaptured; and the slice count (12, not 13). The nits were
+  turned into tests (tile `data-state="error"` on every failure path, URL revocation on replace and
+  remove, the empty-name fallback, focus after a refused replacement).
+- 2026-10-17 — **E4-S2A2 (PR #118) carries multi-select and the queue**, and with it the fix for the
+  defect #116's review found: `aliveRef` is re-armed in the effect setup, so `npm run dev` uploads again,
+  and a **StrictMode-wrapped test** pins it. It measured **1,721 hand-written** at its tip (production
+  631, tests 970, docs 120) — **1,751** on the branch with the 30 record lines. Its exception is claimed
+  on the **coupling** of criteria 1 and 4, with the cut constructed twice. The author's cut (multi-select,
+  cap and grid, no queue) is green at 24 tests and measures 1,252, but it deletes E4-S1B's send path and
+  its tests; the **review's non-regressing cut** — first tile only, E4-S1B's single-photo send path kept
+  and its tests kept — is green at 28 tests and measures **1,108**, still 2.2× the ~500 threshold (and a
+  real slice would also carry its own docs, so that is a lower bound). The summary's sentence "a
+  regression rather than a slice" was false as a general claim; the conclusion stands on the 1,108. The
+  queue is concurrency one (`maxActive: 1` over six files, every second answered 415), the loop carries
+  on (`continue` mutant killed), retry resends the same objects, and the nine mutants include the
+  StrictMode re-arm, the success-path revocation, the cancel-reset and the alive half of the progress
+  gate. The progress gate is a pure predicate (`lib/upload/progress.ts`) because React 19 no-ops a
+  post-unmount `setState` silently — measured as 0 `console.error`. The review's last real finding was a
+  race: a Cancel landing after the last 201 overwrote the summary with "Upload cancelled." while the
+  transport's abort was a no-op and the photo was stored. The post-loop now compares processed files to
+  the queue length — when every file was processed the summary wins — and a test pins the interleaving
+  (restoring the old check fails it).

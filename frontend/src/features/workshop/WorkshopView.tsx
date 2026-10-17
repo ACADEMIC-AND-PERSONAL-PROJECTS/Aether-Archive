@@ -5,60 +5,79 @@ import { ApiError } from "../../api/client";
 import { useUploadPhoto } from "../../api/photos";
 import { GlassPanel } from "../../components/GlassPanel";
 import { ENTER_FADE_BASE, LOADING_PULSE } from "../../lib/motion/tokens";
-import { ACCEPT_ATTRIBUTE, validateUpload } from "../../lib/upload/validation";
+import { isCurrentProgress } from "../../lib/upload/progress";
+import {
+  planSelection,
+  queueSummary,
+  selectionNotices,
+  selectionSentence,
+} from "../../lib/upload/selection";
+import { ACCEPT_ATTRIBUTE } from "../../lib/upload/validation";
 
 import type { UploadProgress } from "../../api/uploadPhoto";
 
 /**
- * `GET /curate` — the Curator's Workshop, grid slice: the picked photo as a tile (E4-S2A1).
+ * `GET /curate` — the Curator's Workshop, multi-select and queue slice (E4-S2A2).
  *
  * ## The screen
  *
- * With nothing picked, the view is one display-serif sentence and one quiet action: the archive has no
- * imagery yet, so there is nothing to decorate and nothing else to say. Once a photo is picked, it
- * becomes a **tile in a selection grid** — the surface multi-select will grow into in E4-S2A2 — and the
- * only chrome is a single glass panel at the bottom. The send path (progress, cancel, retry,
- * invalidation) is E4-S1B's and is unchanged.
+ * With nothing picked, the view is one display-serif sentence and one quiet action. Once photos are
+ * picked, the photos are the screen: a grid of square thumbnails, with one glass panel at the bottom for
+ * the summary and the actions. The grid is the focal point; the panel is the only chrome, and everything
+ * in it is `--aura-text` because it sits on glass (DESIGN-SYSTEM §2.2, the E3-S2 measurement). Each tile
+ * carries its own scrim, so a remove control and a failed preview always have a known backdrop. There is
+ * no spinner and no per-tile progress: the only progress signal is E4-S1B's one 2 px line, which always
+ * describes the request actually in flight (Apple HIG's one aggregate indicator per batch; fetched as a
+ * reference during this story, nothing loaded at runtime).
  *
- * The tile carries its own scrim, so its remove button and state line always sit on a known tone; the
- * panel sits over the theme's base, where its glass composites over `--aura-bg` rather than over a
- * photo. The words are `--aura-text`, never `--aura-muted` (DESIGN-SYSTEM §2.2, measured in E3-S2).
+ * ## The cap
  *
- * ## The states, and what they promise
+ * At most six photos can be selected at once — a dump is six, so six is the most a queue can be building
+ * toward. The cap counts the tiles already in the grid plus the picked files; a valid file past it is
+ * ignored and the screen says how many in one quiet sentence ("You can add up to 6 photos at a time — 1
+ * wasn't added."). A file the client refuses (empty, wrong declared type, too large) is reported **per
+ * file**, by name, and does not consume a slot — it was never eligible. The rules and the wording live in
+ * `lib/upload/selection.ts`, unit-tested without React; `validateUpload` is still an **experience
+ * measure, not a boundary**: the server sniffs the bytes and enforces the ceiling.
  *
- * `idle` → `selected` → `uploading` → `idle` (success) or `error`. From `error` the same File object is
- * retried; nothing is re-read from the input, so a failed upload cannot silently lose the selection.
- * Cancelling returns to `selected` with the file intact — cancellation is not failure, and the visible
- * panel says "Upload cancelled." rather than leaving the fact only in the live region.
+ * ## The queue
  *
- * **Cancellation is not a rollback.** The request is aborted client-side, but a cancel can race the
- * response: if the archive had already accepted the body and stored the photo, the photo remains and
- * appears on the next refresh. So the screen never says "nothing was saved"; the honest sentence is the
- * one it shows. The README states the same caveat.
+ * One action uploads every waiting or failed tile **in selection order, one request at a time**. The
+ * concurrency is one on purpose: the progress line describes the request actually in flight, the server
+ * sees a phone's uplink the way it would see a single upload, and a failure has an unambiguous owner —
+ * the tile that was uploading. A failure marks its tile `error` with the quiet sentence and the queue
+ * continues; it never aborts the files behind it. Failed files stay in the grid, and "Try again" resends
+ * the **same `File` objects** (identity asserted in the tests) — nothing is re-read from the input, so a
+ * failure cannot lose the selection.
  *
- * A refused *pick* (wrong type, too large, empty) never reaches the network: the sentence says why, in
- * the same quiet slot, and the picker stays one tap away. The client check is an experience measure, not
- * a boundary — the server still sniffs the bytes and enforces the ceiling.
+ * Invalidation is the API layer's and stays on `onSuccess` (`api/photos.ts`): each successful file marks
+ * `queryKeys.photos` stale by prefix, which covers the splash hero. A failure and a cancellation never
+ * invalidate. Because the hook fires the invalidation without returning its promise, the queue is never
+ * gated on a refetch.
  *
- * The progress bar is the app's one labelled progress element on purpose (the story asks for an upload
- * progress indicator); everywhere else loading is the silent pulse of §7. It is a 2 px line, no
- * percentage, no spinner, and it reports `aria-valuenow` from the real `upload.onprogress` events. When
- * the browser cannot compute the length (`lengthComputable === false`) the line becomes the silent
- * pulse instead of inventing a number.
+ * ## Settling, and cancelling the batch
  *
- * ## The transport
+ * When the queue settles, the panel says what this batch did — "Added 3 photos.", "2 photos couldn't be
+ * added.", or both halves when both happened. If every file succeeded the tiles are gone and the view
+ * returns to `idle`; otherwise it stays `error` while any failed tile remains.
  *
- * `api/uploadPhoto.ts` — XHR, because only `XMLHttpRequest.upload` reports request progress and can
- * cancel in flight in every target browser. This view owns the `AbortController`, the preview URL and
- * the phase; the request, the `ApiError` mapping and the cache invalidation are the API layer's.
+ * Cancel is the **batch's** cancel: it aborts the request in flight and stops the queue. The files
+ * already uploaded are gone, the files not yet sent stay in the grid as waiting, and the current file
+ * returns to waiting (it was not stored as far as this client knows). The panel says "Upload cancelled."
+ * visibly.
  *
- * ## The file never outlives the screen
+ * **Cancellation is not a rollback**, and the E4-S1B caveat stands: an abort can race a response that
+ * already reached `StorageService.store`. The screen says only that the upload was cancelled, never that
+ * the archive stored nothing. Retrying a file that landed before the abort may add a second copy; a
+ * server-side idempotency key is a later story, not a client fix.
  *
- * The preview is an object URL created from the picked File and revoked when the selection is replaced
- * or the view unmounts; the File itself is React state, and **nothing is persisted** — no localStorage,
- * no IndexedDB, no disk. TanStack's mutation cache holds the File in memory until its gc, which is a
- * cache in RAM, not storage. An in-flight request is aborted on unmount. No file name or content is
- * logged.
+ * ## The files never outlive the screen
+ *
+ * Each preview is an object URL created from the picked `File`; it is revoked when its tile is removed,
+ * when its upload succeeds, and for everything still held when the view unmounts. The `File`s are React
+ * state and **nothing is persisted** — no localStorage, no IndexedDB, no disk. An in-flight request is
+ * aborted on unmount, and no file name or content is logged. Downscaling is E4-S2B: no canvas work is in
+ * this slice.
  */
 
 type Phase = "idle" | "selected" | "uploading" | "error";
@@ -83,16 +102,24 @@ function failureSentence(error: unknown): string {
 const QUIET_ACTION =
   "flex min-h-11 shrink-0 cursor-pointer items-center rounded-[10px] px-3 text-sm text-aura-text underline decoration-aura-text/40 underline-offset-4 transition-colors duration-[var(--motion-duration-quick)] active:bg-aura-text/6 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/50";
 
+/** The hidden-input label's focus ring, shared by the idle picker and the panel's "Add photos". */
+const PICKER_LABEL_FOCUS =
+  "peer-focus-visible:outline peer-focus-visible:outline-1 peer-focus-visible:-outline-offset-4 peer-focus-visible:outline-aura-text/50";
+
 export function WorkshopView() {
-  const [file, setFile] = useState<File | null>(null);
-  const [phase, setPhase] = useState<Phase>("idle");
+  const [items, setItems] = useState<SelectionItem[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [notice, setNotice] = useState("");
   const [progress, setProgress] = useState<UploadProgress>({ loaded: 0, total: 0 });
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewBroken, setPreviewBroken] = useState(false);
 
-  const previewRef = useRef<string | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
+  /** Set by Cancel; the loop checks it before starting each file, and after a response wins the race. */
+  const cancelledRef = useRef(false);
+  /** False after unmount, so an in-flight rejection or a late progress event cannot set state on a dead tree. */
+  const aliveRef = useRef(true);
+  const nextIdRef = useRef(0);
+  /** Every live preview URL, for the unmount sweep. */
+  const previewUrlsRef = useRef(new Set<string>());
   const idleInputRef = useRef<HTMLInputElement>(null);
   const primaryRef = useRef<HTMLButtonElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
@@ -100,152 +127,254 @@ export function WorkshopView() {
 
   const upload = useUploadPhoto();
 
-  // Leaving the view cancels a request nobody is watching and releases the preview's object URL. The
-  // File itself needs no cleanup: it is a reference, and React drops it with the component.
-  useEffect(
-    () => () => {
+  /*
+   * One phase, derived rather than stored: `uploading` wins, then a failed tile, then a non-empty grid,
+   * then idle. Deriving it means an empty grid can never be called `selected`, and "everything succeeded
+   * → idle" needs no extra branch.
+   */
+  const phase: Phase = uploading
+    ? "uploading"
+    : items.some((item) => item.state === "error")
+      ? "error"
+      : items.length > 0
+        ? "selected"
+        : "idle";
+
+  // Leaving the view cancels the request nobody is watching and releases every preview URL. The File
+  // objects need no cleanup: they are references, and React drops them with the component.
+  //
+  // `aliveRef` is re-armed in the **setup**, not only cleared in the teardown: StrictMode runs every
+  // effect setup → cleanup → setup on mount, so a cleanup-only reset leaves the ref false before the
+  // first interaction and the queue never starts (`npm run dev` only — a built bundle cannot see it).
+  useEffect(() => {
+    aliveRef.current = true;
+    // The Set is created once and mutated in place, so capturing the object here is the same set the
+    // rest of the component writes to — and it is the form the exhaustive-deps rule can read.
+    const previewUrls = previewUrlsRef.current;
+    return () => {
+      aliveRef.current = false;
       controllerRef.current?.abort();
-      if (previewRef.current !== null) {
-        URL.revokeObjectURL(previewRef.current);
+      for (const url of previewUrls) {
+        URL.revokeObjectURL(url);
       }
-    },
-    [],
-  );
+      previewUrls.clear();
+    };
+  }, []);
 
   /*
-   * Focus follows the state, so a pick that replaces the picker with a panel does not strand keyboard
-   * focus on a removed element: the panel's action, the cancel action, or the picker again after a
-   * refusal or a success. The first render is deliberately exempt — autofocusing a file input on
-   * arrival would move a screen reader's place before the user has read the view's name.
+   * Focus follows the phase, so a pick that replaces the picker with the grid does not strand keyboard
+   * focus on a removed element: Cancel while uploading, the primary action after a selection or a
+   * failure, the picker again after everything succeeded. The first render is deliberately exempt —
+   * autofocusing a file input on arrival would move a screen reader's place before it has read the view.
    */
   useEffect(() => {
     const previous = previousPhase.current;
     previousPhase.current = phase;
-    if (phase === "selected" || phase === "error") {
-      primaryRef.current?.focus();
-    } else if (phase === "uploading") {
+    if (phase === previous) {
+      return;
+    }
+    if (phase === "uploading") {
       cancelRef.current?.focus();
-    } else if (previous !== "idle") {
+    } else if (phase === "idle") {
       idleInputRef.current?.focus();
+    } else {
+      primaryRef.current?.focus();
     }
   }, [phase]);
 
-  const clearSelection = (): void => {
-    if (previewRef.current !== null) {
-      URL.revokeObjectURL(previewRef.current);
-      previewRef.current = null;
-    }
-    setPreviewUrl(null);
-    setPreviewBroken(false);
-    setFile(null);
+  const revokePreview = (url: string): void => {
+    URL.revokeObjectURL(url);
+    previewUrlsRef.current.delete(url);
   };
 
-  const choose = (chosen: File): void => {
-    clearSelection();
-    const url = URL.createObjectURL(chosen);
-    previewRef.current = url;
-    setPreviewUrl(url);
-    setPreviewBroken(false);
-    setFile(chosen);
-    setProgress({ loaded: 0, total: chosen.size });
-    setNotice("");
-    setPhase("selected");
-  };
+  /** Turns accepted files into tiles, creating and tracking one object URL each. */
+  const addItems = (accepted: readonly File[]): SelectionItem[] =>
+    accepted.map((file) => {
+      const previewUrl = URL.createObjectURL(file);
+      previewUrlsRef.current.add(previewUrl);
+      const item: SelectionItem = {
+        id: `selection-${nextIdRef.current}`,
+        file,
+        previewUrl,
+        state: "waiting",
+        message: null,
+        previewBroken: false,
+      };
+      nextIdRef.current += 1;
+      return item;
+    });
 
   const handlePick = (event: ChangeEvent<HTMLInputElement>): void => {
-    const picked = event.target.files?.[0];
-    if (picked === undefined) {
+    const picked = event.target.files === null ? [] : Array.from(event.target.files);
+    // Clear the native value on every pick, not only on a refusal: a multi-select input otherwise keeps
+    // its old FileList, and picking the same photos again (after removing a tile) fires no `change`.
+    event.target.value = "";
+    if (picked.length === 0) {
       return;
     }
-    const validation = validateUpload(picked);
-    if (!validation.ok) {
-      clearSelection();
-      setPhase("idle");
-      setNotice(validation.message);
-      // Clear the native value, or picking the same file again would fire no `change` event.
-      event.target.value = "";
-      return;
+
+    const plan = planSelection(items.length, picked);
+    if (plan.accepted.length > 0) {
+      const added = addItems(plan.accepted);
+      setItems((previous) => [...previous, ...added]);
     }
-    choose(picked);
+    // Every refusal is named and every overflow is counted; an empty plan clears the previous sentence.
+    setNotice(selectionNotices(plan).join(" "));
   };
 
-  const startUpload = (chosen: File): void => {
-    const controller = new AbortController();
-    controllerRef.current = controller;
+  const removeItem = (id: string): void => {
+    if (uploading) {
+      return;
+    }
+    const item = items.find((candidate) => candidate.id === id);
+    if (item === undefined) {
+      return;
+    }
+    revokePreview(item.previewUrl);
+    setItems((previous) => previous.filter((candidate) => candidate.id !== id));
     setNotice("");
-    setProgress({ loaded: 0, total: chosen.size });
-    setPhase("uploading");
+  };
 
-    upload.mutate(
-      {
-        file: chosen,
-        signal: controller.signal,
-        onProgress: setProgress,
-      },
-      {
-        onSuccess: () => {
-          controllerRef.current = null;
-          clearSelection();
-          setPhase("idle");
-          setNotice("Added to your archive.");
-        },
-        onError: (error) => {
-          controllerRef.current = null;
-          if (controller.signal.aborted) {
-            // Cancellation is the user's choice, not a failure: the same File stays selected and the
-            // panel says so visibly. It does not claim the archive stored nothing — see the header.
-            setPhase("selected");
-            setNotice("Upload cancelled.");
-            return;
-          }
-          setPhase("error");
-          setNotice(failureSentence(error));
-        },
-      },
+  const markPreviewBroken = (id: string): void => {
+    setItems((previous) =>
+      previous.map((item) => (item.id === id ? { ...item, previewBroken: true } : item)),
     );
   };
 
-  const uploadSelected = (): void => {
-    if (file !== null) {
-      startUpload(file);
+  /**
+   * Sends the given tiles in order, one request at a time. A failure is recorded on its own tile and the
+   * loop continues; an abort stops the loop and returns the current tile to waiting.
+   */
+  const runQueue = async (queue: readonly SelectionItem[]): Promise<void> => {
+    let added = 0;
+    let failed = 0;
+
+    for (const entry of queue) {
+      if (!aliveRef.current || cancelledRef.current) {
+        break;
+      }
+
+      const controller = new AbortController();
+      controllerRef.current = controller;
+      setProgress({ loaded: 0, total: entry.file.size });
+      setItems((previous) =>
+        previous.map((item) =>
+          item.id === entry.id ? { ...item, state: "uploading", message: null } : item,
+        ),
+      );
+
+      try {
+        await upload.mutateAsync({
+          file: entry.file,
+          signal: controller.signal,
+          onProgress: (next) => {
+            // Two races, one gate: the request must still be the one on screen (a late event from a
+            // settled request must not move the next file's line), and the view must still exist (an
+            // event after unmount must not set state on a dead tree). The decision is pure and tested
+            // in `lib/upload/progress.ts`.
+            if (isCurrentProgress(aliveRef.current, controllerRef.current, controller)) {
+              setProgress(next);
+            }
+          },
+        });
+      } catch (error) {
+        if (!aliveRef.current) {
+          return;
+        }
+        controllerRef.current = null;
+        if (controller.signal.aborted) {
+          // Cancellation is the user's choice, not a failure: the file goes back to waiting and the
+          // queue stops here. It does not claim the archive stored nothing — see the header.
+          setItems((previous) =>
+            previous.map((item) =>
+              item.id === entry.id ? { ...item, state: "waiting", message: null } : item,
+            ),
+          );
+          setProgress({ loaded: 0, total: 0 });
+          setUploading(false);
+          setNotice("Upload cancelled.");
+          return;
+        }
+        failed += 1;
+        setItems((previous) =>
+          previous.map((item) =>
+            item.id === entry.id
+              ? { ...item, state: "error", message: failureSentence(error) }
+              : item,
+          ),
+        );
+        continue;
+      }
+
+      if (!aliveRef.current) {
+        return;
+      }
+      controllerRef.current = null;
+      added += 1;
+      revokePreview(entry.previewUrl);
+      // The success is the tile leaving the grid; the batch summary below reports the count.
+      setItems((previous) => previous.filter((item) => item.id !== entry.id));
     }
+
+    if (!aliveRef.current) {
+      return;
+    }
+    controllerRef.current = null;
+    setUploading(false);
+
+    // A Cancel that landed after the last response had nothing to stop: the queue processed every
+    // file, and the summary — which counts the stored photo — is the honest sentence. Only a cancel
+    // that actually stopped the loop says "cancelled". Measured in review: the old check overwrote a
+    // summary whose 201 the client had already received, while the transport's abort was a no-op.
+    if (cancelledRef.current && added + failed < queue.length) {
+      setNotice("Upload cancelled.");
+      return;
+    }
+    setNotice(queueSummary(added, failed));
+  };
+
+  const startUpload = (): void => {
+    if (uploading) {
+      return;
+    }
+    const queue = items.filter((item) => item.state === "waiting" || item.state === "error");
+    if (queue.length === 0) {
+      return;
+    }
+
+    const queuedIds = new Set(queue.map((item) => item.id));
+    // Each batch starts un-cancelled. Without this reset a batch after a cancelled one stops at its
+    // first check and says "Upload cancelled." without opening a request.
+    cancelledRef.current = false;
+    setNotice("");
+    setUploading(true);
+    setProgress({ loaded: 0, total: queue[0]?.file.size ?? 0 });
+    // A retry re-queues failed tiles; they are waiting again until their own request opens.
+    setItems((previous) =>
+      previous.map((item) =>
+        queuedIds.has(item.id) ? { ...item, state: "waiting", message: null } : item,
+      ),
+    );
+    void runQueue(queue);
+  };
+
+  const cancelUpload = (): void => {
+    // The queue checks the flag before each file and after the last one; the abort covers the request
+    // in flight. With no controller the queue has settled (or is between files), and its own post-loop
+    // sentence — the summary when nothing was stopped — is the right one. Writing "cancelled" here
+    // would overwrite a summary whose photo the archive already stored (the review's measured race).
+    cancelledRef.current = true;
+    controllerRef.current?.abort();
   };
 
   const percent =
     progress.total > 0 ? Math.min(100, Math.round((progress.loaded / progress.total) * 100)) : null;
 
+  const panelSentence = notice !== "" ? notice : selectionSentence(items.length);
+  // The constant "Uploading." is the batch's announcement: the persistent region is the only thing
+  // announced while the queue runs, and a mid-batch failure is carried by the settled summary.
   const announcement =
-    phase === "uploading"
-      ? "Uploading."
-      : notice !== ""
-        ? notice
-        : phase === "selected"
-          ? "Photo selected."
-          : "";
-
-  const panelSentence = notice !== "" ? notice : "Photo selected.";
-
-  /** The one selected file as a grid tile; the grid grows to many in E4-S2A2. */
-  const selection: SelectionItem | null =
-    file === null || previewUrl === null
-      ? null
-      : {
-          id: "selection",
-          file,
-          previewUrl,
-          state: phase === "uploading" ? "uploading" : phase === "error" ? "error" : "waiting",
-          message: phase === "error" ? notice : null,
-          previewBroken,
-        };
-
-  const removeSelected = (): void => {
-    if (phase === "uploading") {
-      return;
-    }
-    clearSelection();
-    setPhase("idle");
-    setNotice("");
-  };
+    phase === "uploading" ? "Uploading." : phase === "idle" ? notice : panelSentence;
 
   return (
     <>
@@ -255,19 +384,19 @@ export function WorkshopView() {
         {phase === "idle" ? (
           <div className="relative z-10 flex flex-1 flex-col items-center justify-center gap-6 px-8 text-center">
             <p className="max-w-xs font-display text-xl font-normal tracking-display text-aura-text">
-              Add a photo to your archive.
+              Add photos to your archive.
             </p>
             <label className={QUIET_ACTION}>
               <input
                 ref={idleInputRef}
                 type="file"
+                // Multi-select: the picker may hand back up to the whole selection in one change.
+                multiple
                 accept={ACCEPT_ATTRIBUTE}
                 onChange={handlePick}
                 className="peer sr-only"
               />
-              <span className="peer-focus-visible:outline peer-focus-visible:outline-1 peer-focus-visible:-outline-offset-4 peer-focus-visible:outline-aura-text/50">
-                Choose a photo
-              </span>
+              <span className={PICKER_LABEL_FOCUS}>Choose photos</span>
             </label>
             {notice !== "" ? (
               <p data-testid="workshop-notice" className="max-w-xs text-sm text-aura-text">
@@ -278,14 +407,14 @@ export function WorkshopView() {
         ) : (
           <>
             {/* The grid scrolls; the panel does not. The scroll container itself centres a short grid —
-                measured at the review: the tile's top lands on the computed centre (a `min-h-full`
+                measured at E4-S2A1's review: the tile's top lands on the computed centre (a `min-h-full`
                 percentage does not resolve inside a flex-sized scroller, which put it at the top). */}
             <div className="relative z-10 flex flex-1 flex-col justify-center overflow-y-auto px-4 py-6">
               <SelectionGrid
-                items={selection === null ? [] : [selection]}
-                busy={phase === "uploading"}
-                onRemove={removeSelected}
-                onPreviewError={() => setPreviewBroken(true)}
+                items={items}
+                busy={uploading}
+                onRemove={removeItem}
+                onPreviewError={markPreviewBroken}
               />
             </div>
 
@@ -311,7 +440,7 @@ export function WorkshopView() {
                     <button
                       ref={cancelRef}
                       type="button"
-                      onClick={() => controllerRef.current?.abort()}
+                      onClick={cancelUpload}
                       className={QUIET_ACTION}
                     >
                       Cancel
@@ -319,14 +448,17 @@ export function WorkshopView() {
                   </>
                 ) : (
                   <>
-                    <p data-testid="workshop-notice" className="text-base text-aura-text">
+                    <p
+                      data-testid="workshop-notice"
+                      className="text-base break-words text-aura-text"
+                    >
                       {panelSentence}
                     </p>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         ref={primaryRef}
                         type="button"
-                        onClick={uploadSelected}
+                        onClick={startUpload}
                         className={QUIET_ACTION}
                       >
                         {phase === "error" ? "Try again" : "Upload"}
@@ -334,13 +466,12 @@ export function WorkshopView() {
                       <label className={QUIET_ACTION}>
                         <input
                           type="file"
+                          multiple
                           accept={ACCEPT_ATTRIBUTE}
                           onChange={handlePick}
                           className="peer sr-only"
                         />
-                        <span className="peer-focus-visible:outline peer-focus-visible:outline-1 peer-focus-visible:-outline-offset-4 peer-focus-visible:outline-aura-text/50">
-                          Choose another
-                        </span>
+                        <span className={PICKER_LABEL_FOCUS}>Add photos</span>
                       </label>
                     </div>
                   </>
