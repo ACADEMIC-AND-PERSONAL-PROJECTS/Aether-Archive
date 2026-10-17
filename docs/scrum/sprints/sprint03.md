@@ -228,8 +228,9 @@ in `.claude/` in S03-C1; the practice is checked in every story:
 - 2026-10-17 — **E3-S3 merged (`f84063a`, PR #106) after REQUEST CHANGES whose three blockers were all
   records, not code.** The first is the most consequential finding of the sprint: the ADR declining Framer
   Motion cited `CLAUDE.md`, but the mandate is in `_docs/aether_archive_specs.md` three times — line 11, the
-  menu at line 30, and line 95, *"Polish Framer Motion transitions between all routes"*, which is this
-  story's own criterion 2. `CLAUDE.md` requires an ADR **plus explicit user approval** for a spec change;
+  menu at line 30, and line 95, *"Polish Framer Motion transitions between all routes"* — the spec line
+  this story's criterion 2 implements. `CLAUDE.md` requires an ADR **plus explicit user approval** for a
+  spec change;
   the ADR had the measurements and no approval, because the mandate had been read from the summary rather
   than the contract. The owner approved the divergence on the four-build numbers, and the ADR now records
   it as a divergence with a named revisit trigger. **The generalisable form is the sprint's recurring
@@ -237,8 +238,11 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   against the pointer is a decision recorded against the wrong source.
 - 2026-10-17 — **The sizing signal now has a mechanism, and it is not "decisions are expensive".** The
   review decomposed E3-S3 as 663 lines of product against 561 of record, and E3-S2 as 137 of record with
-  no committed verify report. The difference between two stories of similar scope is therefore largely a
+  no committed verify report (`reports/verify-e3-s3-20261017.md` has the classification). The difference
+  between two stories with a similar **total** diff — 1,224 against 1,085, on 3 and 5 points respectively —
+  is therefore largely a
   **documentation choice nobody estimates**: the DoD asks for the verify report *pasted in the PR*, and a
   story that commits it adds a few hundred lines to its own diff. That reframing — **documentation is
   unbounded by estimation** — is the actionable form for the retrospective, and it is why the three data
-  points (5 pts → 1,516; 5 pts → 1,085; 3 pts → 1,190/1,224) say nothing about the point estimates.
+  points (5 pts → 1,516; 5 pts → 1,085; 3 pts → 1,190 at review, 1,224 merged) say nothing about the point
+  estimates.
