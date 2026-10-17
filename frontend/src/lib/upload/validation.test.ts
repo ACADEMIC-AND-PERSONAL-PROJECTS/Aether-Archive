@@ -13,7 +13,7 @@ import {
 } from "./validation";
 
 /**
- * The client's boundary, pinned against the server's measured one (E4-S1 probe).
+ * The client's boundary, pinned against the server's measured one (E4-S1A probe).
  *
  * The probe uploaded one file of each accepted format to the running backend: all five answered 201.
  * `image/jpg` (the non-standard spelling) also answered 201; a text file, an empty file, a declared
@@ -21,9 +21,14 @@ import {
  * 201 and 15 MiB + 1 answered 413 `upload-too-large`. These tests hold the client to exactly that
  * vocabulary, so it cannot drift into refusing what the archive keeps or accepting what it refuses on
  * the one axis it can decide locally.
+ *
+ * The size-boundary tests pass `maxBytes` explicitly, so they measure the validator rather than this
+ * machine's environment. The configured default is pinned separately below, and `vite.config.ts` pins
+ * `VITE_MAX_UPLOAD_MB` for the whole suite — a machine-set value cannot change either result.
  */
 
 const MB = 1024 * 1024;
+const LIMIT_BYTES = 15 * MB;
 
 /** A file-shaped object: the validator reads only these two fields. */
 function pick(size: number, type: string): { size: number; type: string } {
@@ -83,15 +88,23 @@ describe("the accepted vocabulary", () => {
 
 describe("the size boundary, measured against the server", () => {
   it("should accept a file exactly at the limit", () => {
-    expect(validateUpload(pick(MAX_UPLOAD_BYTES, "image/png"))).toEqual({ ok: true });
+    expect(validateUpload(pick(LIMIT_BYTES, "image/png"), LIMIT_BYTES)).toEqual({ ok: true });
   });
 
   it("should refuse the first byte over the limit", () => {
-    const verdict = validateUpload(pick(MAX_UPLOAD_BYTES + 1, "image/png"));
+    const verdict = validateUpload(pick(LIMIT_BYTES + 1, "image/png"), LIMIT_BYTES);
     expect(verdict).toMatchObject({ ok: false, reason: "size" });
     if (!verdict.ok) {
-      expect(verdict.message).toBe(`That photo is larger than ${MAX_UPLOAD_MB} MB.`);
+      expect(verdict.message).toBe("That photo is larger than 15 MB.");
     }
+  });
+
+  it("should honour an explicit limit rather than the build default", () => {
+    expect(validateUpload(pick(7 * MB, "image/png"), 5 * MB)).toMatchObject({
+      ok: false,
+      reason: "size",
+    });
+    expect(validateUpload(pick(5 * MB, "image/png"), 5 * MB)).toEqual({ ok: true });
   });
 
   it("should refuse an empty file before asking the server", () => {
