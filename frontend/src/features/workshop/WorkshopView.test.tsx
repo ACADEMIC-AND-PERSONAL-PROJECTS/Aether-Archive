@@ -38,7 +38,9 @@ const mockedDownscale = vi.mocked(downscaleForUpload);
  * shipped component, the real mutation hook and a real `QueryClient`. The tests pin this slice's criteria
  * — the cap and its explanation, a tile per file with a real remove button, one request at a time in
  * selection order, per-file failure isolation, retry identity, batch cancellation and its reset — plus
- * the picker and announcement contracts E4-S1A/S1B/E3-S5B/A1 established.
+ * the picker and announcement contracts E4-S1A/S1B/E3-S5B/A1 established, and E4-S3B's gestures: the two
+ * activation thresholds, the overlay, the reorder callback and the disabled state while uploading.
+ * Keyboard moves and announcements are E4-S3C and are not asserted here.
  *
  * Object URLs are stubbed with a counter so a test can name the URL a tile owns; the shipped code still
  * calls the real `URL.createObjectURL`/`revokeObjectURL` shape (jsdom implements both, measured in the
@@ -138,6 +140,59 @@ function selectedTiles(): readonly HTMLElement[] {
   return within(screen.getByRole("list", { name: "Selected photos" })).getAllByRole("listitem");
 }
 
+/** The drag surfaces, in display order. They are not focusable in E4-S3B: see `SelectionGrid`. */
+function dragActivators(): readonly HTMLElement[] {
+  return screen.getAllByTestId("drag-activator");
+}
+
+/** The visible order, as each tile's state line reads it ("a.png: Waiting"). */
+function tileLines(): readonly (string | null)[] {
+  return selectedTiles().map((tile) => tile.textContent);
+}
+
+/**
+ * jsdom has no layout: every rect is 0×0, so `closestCenter` would see every tile stacked at the
+ * origin and no pointer position could resolve to a destination. Give each tile the three-column
+ * 120 px pitch a phone supplies — on the droppable (the `<li>`) and on the activator dnd-kit measures
+ * the lifted node from. The Chromium probe repeats the same gesture against real layout.
+ */
+function stubGridRects(): void {
+  const rectAt = (index: number): DOMRect => {
+    const left = (index % 3) * 120;
+    const top = Math.floor(index / 3) * 120;
+    return {
+      x: left,
+      y: top,
+      width: 112,
+      height: 112,
+      top,
+      left,
+      right: left + 112,
+      bottom: top + 112,
+      toJSON: () => ({}),
+    } as DOMRect;
+  };
+  selectedTiles().forEach((tile, index) => {
+    tile.getBoundingClientRect = () => rectAt(index);
+  });
+  dragActivators().forEach((activator, index) => {
+    activator.getBoundingClientRect = () => rectAt(index);
+  });
+}
+
+/**
+ * dnd-kit removes its capture-phase document listeners on a **50 ms timer** after a drag detaches —
+ * they exist to swallow the click that follows a drag. A test that activated a drag and returned
+ * before that timer fired left the listener on the shared jsdom document, and it swallowed the next
+ * test's first click: the flake PR #124's review measured. Every activated drag below ends with a
+ * drop or a cancel and then waits here, past the timer, before the test returns.
+ */
+async function settleDragListeners(): Promise<void> {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 60));
+  });
+}
+
 beforeEach(() => {
   FakeXhr.reset();
   vi.stubGlobal("XMLHttpRequest", FakeXhr);
@@ -165,7 +220,7 @@ describe("the picker", () => {
     expect(input).toHaveAttribute("accept", ACCEPT_ATTRIBUTE);
     expect(input).toHaveAttribute("multiple");
     expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle");
-    expect(screen.getByRole("status")).toHaveTextContent("");
+    expect(screen.getByTestId("workshop-status")).toHaveTextContent("");
     // No request exists before a file is chosen, and the idle screen has no action yet.
     expect(screen.queryAllByRole("button")).toHaveLength(0);
     expect(screen.queryByRole("progressbar")).toBeNull();
@@ -184,7 +239,7 @@ describe("the picker", () => {
     expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle");
     expect(screen.queryAllByRole("button")).toHaveLength(0);
     expect(FakeXhr.instances).toHaveLength(0);
-    expect(screen.getByRole("status")).toHaveTextContent(notice.textContent ?? "");
+    expect(screen.getByTestId("workshop-status")).toHaveTextContent(notice.textContent ?? "");
   });
 
   it("should refuse an oversize file, and accept the limit exactly", () => {
@@ -214,7 +269,7 @@ describe("the picker", () => {
     expect(screen.getByTestId("workshop-notice")).toHaveTextContent(
       "You can add up to 6 photos at a time — 1 wasn't added.",
     );
-    expect(screen.getByRole("status")).toHaveTextContent(
+    expect(screen.getByTestId("workshop-status")).toHaveTextContent(
       "You can add up to 6 photos at a time — 1 wasn't added.",
     );
     expect(FakeXhr.instances).toHaveLength(0);
@@ -279,7 +334,7 @@ describe("the picker", () => {
     const notice = screen.getByTestId("workshop-notice");
     expect(notice).toHaveTextContent("1 photo selected.");
     expect(notice).not.toHaveTextContent("notes.txt");
-    expect(screen.getByRole("status")).toHaveTextContent("1 photo selected.");
+    expect(screen.getByTestId("workshop-status")).toHaveTextContent("1 photo selected.");
   });
 
   it("should load every preview lazily and decode it off the main thread", () => {
@@ -338,14 +393,14 @@ describe("the grid", () => {
     expect(tileFor("a.png")).toHaveTextContent("a.png: Waiting");
     // One message, two roles: the panel's count sentence and the persistent status region.
     expect(screen.getByTestId("workshop-notice")).toHaveTextContent("3 photos selected.");
-    expect(screen.getByRole("status")).toHaveTextContent("3 photos selected.");
+    expect(screen.getByTestId("workshop-status")).toHaveTextContent("3 photos selected.");
 
     fireEvent.click(removeB);
 
     expect(revoke).toHaveBeenCalledWith("blob:preview-2");
     expect(within(list).getAllByRole("listitem")).toHaveLength(2);
     expect(screen.getByTestId("workshop-notice")).toHaveTextContent("2 photos selected.");
-    expect(screen.getByRole("status")).toHaveTextContent("2 photos selected.");
+    expect(screen.getByTestId("workshop-status")).toHaveTextContent("2 photos selected.");
     expect(screen.queryByRole("button", { name: "Remove b.png" })).toBeNull();
   });
 
@@ -392,6 +447,176 @@ describe("the grid", () => {
   });
 });
 
+describe("reordering", () => {
+  it("should start a mouse drag only after 8 px of travel", async () => {
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [
+      fileOf(16, "image/png", "a.png"),
+      fileOf(16, "image/png", "b.png"),
+    ]);
+    stubGridRects();
+
+    const first = dragActivators()[0];
+    if (first === undefined) {
+      throw new Error("the first tile has no drag activator");
+    }
+    fireEvent.mouseDown(first, { clientX: 56, clientY: 56, button: 0 });
+    fireEvent.mouseMove(document, { clientX: 60, clientY: 56 });
+    await act(async () => {});
+    // A click (or a 4 px wobble) is not a drag: the tile stays in the grid.
+    expect(document.querySelector('[data-dragging="true"]')).toBeNull();
+    expect(screen.queryByTestId("drag-overlay")).toBeNull();
+
+    fireEvent.mouseMove(document, { clientX: 66, clientY: 56 });
+    await act(async () => {});
+    expect(tileFor("a.png")).toHaveAttribute("data-dragging", "true");
+    expect(screen.getByTestId("drag-overlay")).toBeVisible();
+
+    fireEvent.mouseUp(document, { clientX: 66, clientY: 56 });
+    await settleDragListeners();
+    // The overlay is the drag, not a permanent clone: it is gone once the pointer is released.
+    expect(screen.queryByTestId("drag-overlay")).toBeNull();
+    expect(document.querySelector('[data-dragging="true"]')).toBeNull();
+  });
+
+  it("should reorder the selection when a drag ends on another tile", async () => {
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [
+      fileOf(16, "image/png", "a.png"),
+      fileOf(16, "image/png", "b.png"),
+      fileOf(16, "image/png", "c.png"),
+    ]);
+    stubGridRects();
+
+    const first = dragActivators()[0];
+    if (first === undefined) {
+      throw new Error("the first tile has no drag activator");
+    }
+    // Tile 1's centre to tile 3's centre in the stubbed 120 px pitch: (56, 56) → (296, 56).
+    fireEvent.mouseDown(first, { clientX: 56, clientY: 56, button: 0 });
+    fireEvent.mouseMove(document, { clientX: 66, clientY: 56 });
+    await act(async () => {});
+    fireEvent.mouseMove(document, { clientX: 296, clientY: 56 });
+    await act(async () => {});
+    fireEvent.mouseUp(document, { clientX: 296, clientY: 56 });
+    await act(async () => {});
+
+    // The array is the order: dropping through the grid's callback moved `a.png` to the third slot.
+    expect(tileLines()).toEqual(["b.png: Waiting", "c.png: Waiting", "a.png: Waiting"]);
+    await settleDragListeners();
+  });
+
+  it("should lift on a long press and leave a short swipe to the browser", async () => {
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [
+      fileOf(16, "image/png", "a.png"),
+      fileOf(16, "image/png", "b.png"),
+    ]);
+    stubGridRects();
+
+    const first = dragActivators()[0];
+    if (first === undefined) {
+      throw new Error("the first tile has no drag activator");
+    }
+    fireEvent.touchStart(first, { touches: [{ clientX: 56, clientY: 56 }] });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 270));
+    });
+    expect(tileFor("a.png")).toHaveAttribute("data-dragging", "true");
+    expect(screen.getByTestId("drag-overlay")).toBeVisible();
+    fireEvent.touchEnd(first, { touches: [] });
+    await settleDragListeners();
+    expect(screen.queryByTestId("drag-overlay")).toBeNull();
+
+    // A swipe that travels past the 8 px tolerance before the 250 ms elapses cancels the pending drag,
+    // which is what lets the same touch scroll the grid instead of lifting a tile. `touch-manipulation`
+    // on the activator is what keeps panning native for the browser in the first place.
+    fireEvent.touchStart(first, { touches: [{ clientX: 56, clientY: 56 }] });
+    fireEvent.touchMove(first, { touches: [{ clientX: 56, clientY: 76 }] });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 270));
+    });
+    expect(document.querySelector('[data-dragging="true"]')).toBeNull();
+    expect(screen.queryByTestId("drag-overlay")).toBeNull();
+    fireEvent.touchEnd(first, { touches: [] });
+    await settleDragListeners();
+  });
+
+  it("should keep a pointer on the remove control out of the sensors, and its click working", async () => {
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [
+      fileOf(16, "image/png", "a.png"),
+      fileOf(16, "image/png", "b.png"),
+    ]);
+    stubGridRects();
+
+    const remove = screen.getByRole("button", { name: "Remove a.png" });
+    fireEvent.touchStart(remove, { touches: [{ clientX: 0, clientY: 0 }] });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
+
+    // The button is a sibling of the activator, so the gesture never reaches a sensor.
+    expect(document.querySelector('[data-dragging="true"]')).toBeNull();
+    expect(screen.queryByTestId("drag-overlay")).toBeNull();
+    fireEvent.touchEnd(remove, { touches: [] });
+    await settleDragListeners();
+
+    // …and the click path it was built for still removes the tile.
+    fireEvent.click(remove);
+    expect(screen.queryByRole("button", { name: "Remove a.png" })).toBeNull();
+    expect(selectedTiles()).toHaveLength(1);
+  });
+
+  it("should not add a dead focus stop before the keyboard path exists", () => {
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [
+      fileOf(16, "image/png", "a.png"),
+      fileOf(16, "image/png", "b.png"),
+    ]);
+
+    // E4-S3C adds the KeyboardSensor and dnd-kit's attributes together. Until then the activator is a
+    // pointer surface only — no role, no tab index — and the remove button is the tile's only control.
+    const activator = dragActivators()[0];
+    expect(activator).toHaveClass("touch-manipulation");
+    expect(activator).not.toHaveAttribute("tabindex");
+    expect(activator).not.toHaveAttribute("role");
+
+    const tile = tileFor("a.png");
+    expect(within(tile).getAllByRole("button")).toHaveLength(1);
+    expect(within(tile).getByRole("button")).toHaveAccessibleName("Remove a.png");
+  });
+
+  it("should refuse a drag while the batch is uploading", async () => {
+    const { unmount } = renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [
+      fileOf(16, "image/png", "a.png"),
+      fileOf(16, "image/png", "b.png"),
+    ]);
+    // The queue captured the array when it started; a move now would make the grid disagree with the
+    // requests already on the wire, so the sortable context and every tile are disabled.
+    const request = await startUpload();
+    stubGridRects();
+    const first = dragActivators()[0];
+    if (first === undefined) {
+      throw new Error("the first tile has no drag activator");
+    }
+
+    fireEvent.mouseDown(first, { clientX: 56, clientY: 56, button: 0 });
+    fireEvent.mouseMove(document, { clientX: 116, clientY: 56 });
+    await act(async () => {});
+
+    expect(document.querySelector('[data-dragging="true"]')).toBeNull();
+    expect(screen.queryByTestId("drag-overlay")).toBeNull();
+    expect(tileLines()).toEqual(["a.png: Uploading", "b.png: Waiting"]);
+
+    fireEvent.mouseUp(document, { clientX: 116, clientY: 56 });
+    await settleDragListeners();
+    unmount();
+    expect(request.aborted).toBe(true);
+  });
+});
+
 describe("the queue", () => {
   it("should upload one file at a time in selection order and remove each success", async () => {
     renderWorkshop();
@@ -424,7 +649,7 @@ describe("the queue", () => {
     await respond(third, 201, UPLOADED);
     await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle"));
     expect(screen.getByTestId("workshop-notice")).toHaveTextContent("Added 3 photos.");
-    expect(screen.getByRole("status")).toHaveTextContent("Added 3 photos.");
+    expect(screen.getByTestId("workshop-status")).toHaveTextContent("Added 3 photos.");
     expect(screen.queryByRole("list", { name: "Selected photos" })).toBeNull();
     // Focus returns to the picker after a full success, so the next batch is one keystroke away.
     await waitFor(() => expect(screen.getByLabelText("Choose photos")).toHaveFocus());
@@ -438,15 +663,15 @@ describe("the queue", () => {
     ]);
 
     const first = await startUpload();
-    expect(screen.getByRole("status")).toHaveTextContent("Uploading.");
+    expect(screen.getByTestId("workshop-status")).toHaveTextContent("Uploading.");
 
     // A mid-batch failure is not announced: the persistent region stays on the batch's own state, and
     // the settled summary carries the failure to assistive tech. Removing the special case would make
     // this read the selection count instead.
     await respond(first, 415, PROBLEM_415_UNSUPPORTED, "application/problem+json");
     await requestAt(1);
-    expect(screen.getByRole("status")).toHaveTextContent("Uploading.");
-    expect(screen.getByRole("status")).not.toHaveTextContent("photos selected");
+    expect(screen.getByTestId("workshop-status")).toHaveTextContent("Uploading.");
+    expect(screen.getByTestId("workshop-status")).not.toHaveTextContent("photos selected");
   });
 
   it("should keep going after a failure and name the file that failed", async () => {
@@ -475,7 +700,7 @@ describe("the queue", () => {
     expect(screen.getByTestId("workshop-notice")).toHaveTextContent(
       "Added 2 photos. 1 photo couldn't be added.",
     );
-    expect(screen.getByRole("status")).toHaveTextContent(
+    expect(screen.getByTestId("workshop-status")).toHaveTextContent(
       "Added 2 photos. 1 photo couldn't be added.",
     );
     expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
@@ -559,7 +784,7 @@ describe("the queue", () => {
     expect(screen.getByRole("main")).toHaveAttribute("data-state", "error");
     expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
     expect(screen.getByTestId("workshop-notice")).toHaveTextContent("1 photo couldn't be added.");
-    expect(screen.getByRole("status")).toHaveTextContent("1 photo couldn't be added.");
+    expect(screen.getByTestId("workshop-status")).toHaveTextContent("1 photo couldn't be added.");
   });
 
   it.each([
@@ -577,7 +802,7 @@ describe("the queue", () => {
     await waitFor(() => expect(tileFor("photo.png")).toHaveAttribute("data-state", "error"));
     expect(tileFor("photo.png")).toHaveTextContent("The archive didn't answer. Try again.");
     expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
-    expect(screen.getByRole("status")).toHaveTextContent("1 photo couldn't be added.");
+    expect(screen.getByTestId("workshop-status")).toHaveTextContent("1 photo couldn't be added.");
   });
 
   it("should cancel the batch visibly, abort the request and leave the remaining files waiting", async () => {
@@ -606,7 +831,7 @@ describe("the queue", () => {
     for (const name of ["a.png", "b.png", "c.png"]) {
       expect(tileFor(name)).toHaveAttribute("data-state", "waiting");
     }
-    expect(screen.getByRole("status")).toHaveTextContent("Upload cancelled.");
+    expect(screen.getByTestId("workshop-status")).toHaveTextContent("Upload cancelled.");
     expect(screen.getByRole("button", { name: "Upload" })).toBeVisible();
   });
 
