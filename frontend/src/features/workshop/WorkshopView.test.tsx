@@ -32,7 +32,9 @@ function pickFile(input: HTMLElement, file: File): void {
 }
 
 function expectNoUploadAction(): void {
-  expect(screen.queryByRole("button", { name: /upload/i })).toBeNull();
+  // "Nothing to press" is the contract, not "nothing upload-named": any button added to this slice
+  // would mean an action exists before slices B and C ship it, whatever its label says.
+  expect(screen.queryAllByRole("button")).toHaveLength(0);
   expect(screen.queryByRole("progressbar")).toBeNull();
   expect(screen.queryByText(/upload/i)).toBeNull();
 }
@@ -94,6 +96,21 @@ describe("the picker", () => {
     await waitFor(() => expect(replace).toHaveFocus());
   });
 
+  it("should load the preview lazily and decode it off the main thread", () => {
+    render(<WorkshopView />);
+
+    pickFile(screen.getByLabelText("Choose a photo"), fileOf(2048));
+    const preview = document.querySelector("main img");
+    if (!(preview instanceof HTMLImageElement)) {
+      throw new Error("the picked file has no preview");
+    }
+
+    // `.claude/rules/frontend.md`: every image except the splash hero. The preview is full-bleed, so
+    // `lazy` costs nothing here and keeps the rule uniform for the grid and dump images that follow.
+    expect(preview).toHaveAttribute("loading", "lazy");
+    expect(preview).toHaveAttribute("decoding", "async");
+  });
+
   it("should return to the picker when a replacement pick is refused", () => {
     render(<WorkshopView />);
     pickFile(screen.getByLabelText("Choose a photo"), fileOf(2048));
@@ -123,6 +140,11 @@ describe("the picker", () => {
     await waitFor(() => expect(document.querySelector("main img")).toBeNull());
     // The broken glyph is gone, but the selection is not: only the server can judge the bytes.
     expect(screen.getByRole("main")).toHaveAttribute("data-state", "selected");
+    // The scrim stays behind the panel when the preview is dropped, so the glass still composites
+    // over a known backdrop rather than the raw base alone.
+    const backdrops = document.querySelectorAll('main [aria-hidden="true"]');
+    expect(backdrops).toHaveLength(1);
+    expect(backdrops[0]?.tagName).toBe("DIV");
     expect(within(screen.getByRole("main")).getByText("Photo selected.")).toBeVisible();
     expect(screen.getByLabelText("Choose another")).toBeVisible();
     expectNoUploadAction();

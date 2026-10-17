@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   ACCEPTED_FORMATS_SENTENCE,
@@ -24,15 +24,24 @@ import {
  *
  * The size-boundary tests pass `maxBytes` explicitly, so they measure the validator rather than this
  * machine's environment. The configured default is pinned separately below, and `vite.config.ts` pins
- * `VITE_MAX_UPLOAD_MB` for the whole suite — a machine-set value cannot change either result.
+ * `VITE_MAX_UPLOAD_MB` for the whole suite — a machine-set value cannot change either result. Because
+ * that pin also hides a hardcoded default, one test re-loads the module under a stubbed `20` (a value
+ * the default cannot produce) and would fail against `MAX_UPLOAD_MB = DEFAULT_MAX_UPLOAD_MB`.
  */
 
 const MB = 1024 * 1024;
 const LIMIT_BYTES = 15 * MB;
 
-/** A file-shaped object: the validator reads only these two fields. */
-function pick(size: number, type: string): { size: number; type: string } {
-  return { size, type };
+/**
+ * A file-shaped object. The validator reads `size` and `type`; `name` is carried so a test that names
+ * the file-name axis really exercises it — a helper without a name cannot show that the name is ignored.
+ */
+function pick(
+  size: number,
+  type: string,
+  name = "photo.png",
+): { size: number; type: string; name: string } {
+  return { size, type, name };
 }
 
 describe("the accepted vocabulary", () => {
@@ -66,9 +75,13 @@ describe("the accepted vocabulary", () => {
 
   it("should not consult the file name: the server discards it", () => {
     // A `.png` name with a non-image declaration is refused; a `.txt` name with a real image
-    // declaration is accepted, because bytes and declared type are all the archive reads.
-    expect(validateUpload(pick(4, "text/plain"))).toMatchObject({ ok: false, reason: "type" });
-    expect(validateUpload(pick(4, "image/png"))).toEqual({ ok: true });
+    // declaration is accepted, because the declared type is what the client can decide and the bytes
+    // are what the server sniffs. If the name ever became an input, one of these two would flip.
+    expect(validateUpload(pick(4, "text/plain", "photo.png"))).toMatchObject({
+      ok: false,
+      reason: "type",
+    });
+    expect(validateUpload(pick(4, "image/png", "notes.txt"))).toEqual({ ok: true });
   });
 
   it("should describe the formats in the same list the server reports", () => {
@@ -117,6 +130,23 @@ describe("the configured limit", () => {
     expect(DEFAULT_MAX_UPLOAD_MB).toBe(15);
     expect(MAX_UPLOAD_MB).toBe(DEFAULT_MAX_UPLOAD_MB);
     expect(MAX_UPLOAD_BYTES).toBe(15 * MB);
+  });
+
+  it("should read the limit from the environment when the module loads", async () => {
+    // The suite pins VITE_MAX_UPLOAD_MB to 15, so the assertion above would also pass if the module
+    // ignored the environment and hardcoded the default. This test re-loads it under a stubbed value
+    // the default cannot produce: it fails against `MAX_UPLOAD_MB = DEFAULT_MAX_UPLOAD_MB` (mutant
+    // measured in the E4-S1A review round).
+    vi.stubEnv("VITE_MAX_UPLOAD_MB", "20");
+    vi.resetModules();
+    try {
+      const fresh = await import("./validation");
+      expect(fresh.MAX_UPLOAD_MB).toBe(20);
+      expect(fresh.MAX_UPLOAD_BYTES).toBe(20 * MB);
+    } finally {
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    }
   });
 
   it("should read a whole number inside the backend's bounds", () => {

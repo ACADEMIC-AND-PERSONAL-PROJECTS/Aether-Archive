@@ -14,10 +14,12 @@ import { ACCEPT_ATTRIBUTE, validateUpload } from "../../lib/upload/validation";
  * photo is the screen — full-bleed, under the theme's own scrim — and the only chrome is a single glass
  * panel at the bottom saying that the photo is selected, with the picker one tap away.
  *
- * The glass is over the preview, never over the flat base. That is §3's scrim rule and NN/g's finding
- * (DESIGN-REFERENCES §7): a translucent panel's contrast depends on what is behind it, so the preview is
- * scrimmed with `--aura-bg` at 70 % — the menu veil's value — before the panel composites over it. The
- * words in the panel are `--aura-text`, never `--aura-muted` (DESIGN-SYSTEM §2.2, measured in E3-S2).
+ * The glass is over the scrim, never over an uncontrolled backdrop. That is §3's scrim rule and NN/g's
+ * finding (DESIGN-REFERENCES §7): a translucent panel's contrast depends on what is behind it, so the
+ * preview is scrimmed with `--aura-bg` at 70 % — the menu veil's value — before the panel composites
+ * over it. When a preview cannot decode it is dropped, but the same scrim remains over the theme's base,
+ * so the panel always sits on a known tone rather than on the raw base alone. The words in the panel are
+ * `--aura-text`, never `--aura-muted` (DESIGN-SYSTEM §2.2, measured in E3-S2).
  *
  * ## What this slice does not do
  *
@@ -130,21 +132,23 @@ export function WorkshopView() {
       <main data-state={phase} className="relative flex flex-1 flex-col overflow-hidden bg-aura-bg">
         <h1 className="sr-only">Curator&rsquo;s Workshop</h1>
 
-        {previewUrl !== null && !previewBroken ? (
+        {previewUrl !== null ? (
           <>
-            {/* The picked photo is the screen. Decorative: the panel describes the state, and the file
-                has no title in the contract. A file whose declared type is an image but whose bytes do
-                not decode would otherwise show the browser's broken-image glyph through the scrim; the
-                selection survives, the preview is simply dropped. */}
-            <img
-              src={previewUrl}
-              alt=""
-              aria-hidden="true"
-              onError={() => setPreviewBroken(true)}
-              className={`absolute inset-0 h-full w-full object-cover ${ENTER_FADE_BASE}`}
-            />
+            {previewBroken ? null : (
+              <img
+                src={previewUrl}
+                alt=""
+                aria-hidden="true"
+                decoding="async"
+                loading="lazy"
+                onError={() => setPreviewBroken(true)}
+                className={`absolute inset-0 h-full w-full object-cover ${ENTER_FADE_BASE}`}
+              />
+            )}
             {/* §3's scrim: the glass panel needs a known backdrop, and the theme's own tone is the one
-                the user is already inside. 70 % is the menu veil's value. */}
+                the user is already inside. 70 % is the menu veil's value. It stays when the preview is
+                dropped, so a browser that cannot decode the bytes does not leave the panel over the raw
+                base alone — the backdrop is the same known scrim either way. */}
             <div aria-hidden="true" className="absolute inset-0 bg-aura-bg/70" />
           </>
         ) : null}
