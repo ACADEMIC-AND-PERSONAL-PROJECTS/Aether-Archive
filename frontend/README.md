@@ -768,8 +768,10 @@ states around it.
 
 `api/uploadPhoto.ts` is the app's only XHR. Upload progress and in-flight cancellation are
 `XMLHttpRequest.upload` features; `fetch` has no upload-progress event, and streaming a body with
-`duplex: "half"` is Chromium-only — not acceptable for a mobile-first app that must also work in
-Safari. MDN's `XMLHttpRequest.upload` page records both facts and the ordering rule the transport
+`duplex: "half"` is Chromium-only — not acceptable for a mobile-first app that targets Safari as
+well. Safari's XHR implementation is **not measured here** (SKIPPED below); it is the browser the
+choice is meant to protect, and **E6-S4's real-device pass** is the story that closes it. MDN's
+`XMLHttpRequest.upload` page records both facts and the ordering rule the transport
 obeys: the `progress` listener is attached before `send()` (a test pins
 `progressAttachedBeforeSend`). No dependency was added. The URL composition, the `ApiError`
 classification and the RFC 9457 parsing are shared with `client.ts` (`parseProblemDetail`), so a
@@ -818,6 +820,12 @@ re-read from the input, no new object). The mappings are:
 
 The server's `detail` is never shown — it is operator prose, not the screen's vocabulary. A
 cancelled request is not a failure and never shows an error sentence.
+
+**Retry has the same race as cancel, in the other direction.** A network, timeout or unreadable-201
+failure can happen _after_ the archive stored the body; the client cannot know whether it did, so
+"Try again" may upload a second copy. The screen does not hide the action (the first failure is real
+and retrying is the right default), but it does not claim the retry is idempotent. A server-side
+idempotency key is a later story, not a client fix.
 
 ### Invalidation — success only, one call by prefix
 
