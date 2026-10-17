@@ -1,7 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiRequest } from "./client";
 import { queryKeys } from "./queryKeys";
+import { uploadPhoto, type UploadProgress } from "./uploadPhoto";
 
 import type { Photo } from "../types/api";
 
@@ -54,5 +55,45 @@ export function useRandomPhoto() {
     queryFn: ({ signal }) => fetchRandomPhoto(signal),
     staleTime: RANDOM_PHOTO_STALE_TIME_MS,
     gcTime: RANDOM_PHOTO_GC_TIME_MS,
+  });
+}
+
+/** One upload in flight: the file, the caller's cancellation, and the progress callback. */
+export interface UploadPhotoRequest {
+  readonly file: File;
+  readonly signal: AbortSignal;
+  readonly onProgress: (progress: UploadProgress) => void;
+}
+
+/**
+ * `POST /api/v1/photos`, with the cache update the story's fourth criterion names.
+ *
+ * **One invalidation covers both consumers.** `queryKeys.randomPhoto` is `["photos", "random"]`, a child
+ * of `queryKeys.photos`, and TanStack matches invalidation by prefix — so a successful upload marks the
+ * feed *and* the splash hero stale without a second call. That is the intended meaning of the key
+ * layout (`api/queryKeys.ts`): an upload changes what the archive holds, and the two views must never
+ * disagree about it.
+ *
+ * **The splash's per-visit policy is untouched.** It lives on the query (zero `staleTime`, zero
+ * `gcTime`), not on the key; invalidation does not resurrect an entry the splash dropped on unmount.
+ * While the workshop is mounted the splash is not, so there is usually nothing to mark — and when the
+ * splash returns it asks again either way.
+ *
+ * **`retry: false` comes from the app-wide mutation defaults** (`app/queryClient.ts`): an upload is not
+ * idempotent from the client's point of view, and the user watching a failure is the one who chooses to
+ * retry. The workshop's "Try again" is that explicit choice.
+ */
+export function useUploadPhoto() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (request: UploadPhotoRequest) =>
+      uploadPhoto(request.file, {
+        signal: request.signal,
+        onProgress: request.onProgress,
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.photos });
+    },
   });
 }
