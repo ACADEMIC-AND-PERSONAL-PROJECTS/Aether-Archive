@@ -870,6 +870,88 @@ Not measured here: a real backend's `StorageService.store` timing (the stub neve
 phone or a real network, and Safari's XHR implementation. The unit tests pin the DOM contract; the
 probe pins the browser events.
 
+## The multi-select grid and the batch queue — measured (E4-S2A)
+
+The picker now takes several photos in one change (capped at six) and uploads them sequentially.
+
+### The cap
+
+Six is the dump's size, so six is the most a selection may hold. `planSelection` in
+`lib/upload/selection.ts` counts the tiles already in the grid plus this pick; every picked file still
+runs through `validateUpload`. A refused file (empty, wrong declared type, too large) is reported **per
+file, by name** — "photo.png: That photo is larger than the archive accepts." — and does not consume a
+slot. A valid file past the cap is ignored, once, with exactly:
+
+> You can add up to 6 photos at a time — 1 wasn't added.
+
+The cap, the refusal sentences and the batch summaries are pure functions with 11 unit tests; the
+component does not own a second grammar. The client validation remains an experience measure, not a
+boundary: the server sniffs the bytes and enforces the ceiling (E4-S1A).
+
+### The grid
+
+Each selected file becomes a list item in `<ul aria-label="Selected photos">`: a square object-URL
+preview, an always-mounted scrim (the E4-S1A fix — a preview that cannot decode drops the `<img>` but
+not the tile), a real `<button>` whose accessible name is "Remove <file name>", a 44 × 44 hit area with a
+smaller visible disc, and one short sentence under the tile ("Waiting", "Uploading", or the failure
+sentence, with the file name for screen readers). Remove buttons are disabled while a batch is running,
+not removed: the queue holds a snapshot of the files, and a tile vanishing mid-batch would leave the
+summary counting something invisible. Preview URLs are revoked on removal, on success and on unmount;
+the `File`s are state and nothing is persisted.
+
+### The queue — one request at a time, failures isolated
+
+"Upload" sends every waiting or failed tile **in selection order, concurrency one**. One at a time is a
+decision: the progress line describes the request actually in flight, the server sees a phone's uplink
+as it would see a single upload, and a failure has one unambiguous owner. A failure marks its tile
+`error`, says one quiet sentence, and the loop continues — it never aborts the files behind it.
+Successful files leave the grid. When the queue settles the panel reports this batch: "Added 2 photos.
+1 photo couldn't be added.", or the matching singular. If everything succeeded the view returns to
+`idle`.
+
+"Try again" resends the **same `File` objects** — identity is asserted in the test through the multipart
+body — so a failure cannot lose the selection. Invalidation stays where E4-S1B put it, on `onSuccess`:
+`queryKeys.photos` by prefix (feed and splash hero) after each success, never after a failure or a
+cancel, and the hook does not await it, so the queue is never gated on a refetch.
+
+Cancel is now the batch's cancel: it aborts the request in flight and stops the queue. The not-yet-sent
+files stay waiting, what was already added stays added, the current file returns to waiting, and the
+panel and live region both say "Upload cancelled." The E4-S1B caveat stands unchanged: a cancel can
+race a response that the server already stored, so the screen never claims the archive stored nothing.
+
+### Measured
+
+Unit suite, from `frontend/`:
+
+```bash
+npm run test -- --run
+# Test Files 27 passed (27) · Tests 300 passed (300)
+VITE_MAX_UPLOAD_MB=20 npm run test -- --run
+# Test Files 27 passed (27) · Tests 300 passed (300)
+```
+
+`WorkshopView.test.tsx` covers the picker, the grid and the queue in 27 cases (including two axe runs
+across idle / selected / uploading / error), and `selection.test.ts` adds 11 pure cases. Five
+deliberate mutants were each applied, observed red, and reverted: deleting the cap, replacing the
+sequential loop with `Promise.all`, replacing the per-file `continue` with `return`, re-wrapping the
+`File` on retry, and moving invalidation to `onSettled`.
+
+Browser probe (development-time, headless Chromium 152, 390 × 844 DPR 3, built `dist/` served by a
+local stub; scripts outside the repository; the stub answers the 2nd upload with 415
+`unsupported-image-type` after 400 ms):
+
+- Before the action: 0 upload requests.
+- Request arrival order on the stub: `a.png`, `b.png`, `c.png`; `activeAtStart` was 1 for every one and
+  `maxActive` was **1** — never two requests open at once.
+- After the batch: the panel and the live region both read "Added 2 photos. 1 photo couldn't be
+  added."; the surviving tile was `b.png` with `data-state="error"` and "The archive couldn't read that
+  image."; `<main>` was `data-state="error"`; `c.png` had been sent **after** the 415 and succeeded.
+- 0 off-origin network requests (the three `blob:` URLs are the local preview object URLs), 0 page
+  exceptions. Screenshot: `reports/e4s2a-grid-390.png`.
+
+Not measured here: a physical phone, Safari, and a real backend's store timing. Downscaling is
+E4-S2B and is not in this slice — the picked `File` is sent as-is.
+
 ## Zero external requests — measured on the built bundle
 
 ```bash
