@@ -926,6 +926,53 @@ the opacity and offset measured at that instant) and `reports/e3s3-transition-mi
 
 ---
 
+## ADR-023 — The aura picker: the chosen page colour is kept, the glass flips, suggestions merge by pixel share
+
+**Date**: 2026-10-17 · **Status**: Accepted
+
+**Context.** E4-S4 asks the curator to choose the dump's background colour (the spec's "aura") with the
+UI previewing it live, and the backlog adds palette suggestions from the selected photos, a reset, and
+persistence across reordering and refresh. The theme layer's `paletteToTheme` derives a page colour from
+a palette's darkest useful colour — it cannot serve a colour the user chose, because it would move it
+into the dark band. The design system also mandates one dark glass tint and one text token; on a light
+page, a black glass composite is darker than any text that passes on the page, so one text colour cannot
+clear 4.5:1 on both. Three options exist: refuse light backgrounds, give each surface its own text
+token, or flip the glass tint with the text.
+
+**Decision.**
+
+1. **`themeFromBackground(hex)` keeps the page exactly the colour the user picked.** The surface steps
+   away from the text (darker under light text, lighter under dark text); text starts from the nearer
+   neutral base and steps toward its extreme until text-on-page, text-on-surface and text-on-glass all
+   clear 4.5:1; muted raises its alpha until it clears on the page; the accent is the background's own
+   hue at a usable chroma (the fallback sand when the background has no hue), fitted by `fitAccent`.
+   The text stops short of pure white/black, per the brief. A narrow band of saturated mid-tones where
+   no such text exists is **refused with a message** rather than silently darkened: measured on a 16³
+   sRGB cube, **90 of 4096 backgrounds (2.2%) are refused**, e.g. `#0066ff`.
+2. **The glass tint flips with the text.** Black tint and white hairline under light text; white tint
+   and black hairline under dark text. This is a deliberate extension of the design language's dark
+   glass, recorded here rather than improvised: keeping black glass on every page was measured at
+   **1,930 of 4,096 backgrounds (47.1%) refused**, because the black composite is darker than any dark
+   text that passes on a light page. The token layer already owns `--aura-glass`, `--aura-glass-solid`
+   and `--aura-hairline` per theme, so the flip is data, not a second component.
+3. **Suggestions merge across the selected photos.** Each photo's palette is extracted (the E2-S4
+   pipeline, 64 px edge); colours are pooled, deduplicated by normalised hex and ranked by the sum of
+   their weights across the images — confidence is the colour's share of the selected pixels. The top
+   eight are offered. A photo whose extraction fails is skipped; if every extraction fails there are no
+   swatches and the hex input remains.
+4. **The chosen aura persists for the browsing session, nothing else does.** It lives in
+   `sessionStorage` under one key and is restored on refresh; the picked `File`s cannot be persisted and
+   still never are. The preview applies the theme on the workshop's root and clears it on unmount, as
+   the splash does.
+
+**Consequences.** A chosen colour is never modified behind the user's back; the refusal band is small,
+measured and explainable. The light-glass variant means "dark glassmorphism" becomes
+"contrast-directed glassmorphism" for user-chosen pages — a further divergence (per-surface text
+tokens, pure white/black text, dark glass on light pages, or persisting the aura across sessions) needs
+a new ADR.
+
+---
+
 ## Template for new ADRs
 
 ```markdown
