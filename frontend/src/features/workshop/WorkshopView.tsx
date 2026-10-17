@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 
+import { SelectionGrid, type SelectionItem } from "./SelectionGrid";
 import { ApiError } from "../../api/client";
 import { useUploadPhoto } from "../../api/photos";
 import { GlassPanel } from "../../components/GlassPanel";
@@ -9,22 +10,19 @@ import { ACCEPT_ATTRIBUTE, validateUpload } from "../../lib/upload/validation";
 import type { UploadProgress } from "../../api/uploadPhoto";
 
 /**
- * `GET /curate` — the Curator's Workshop, slice B: send one photo, with progress, cancellation and
- * retry (E4-S1B).
+ * `GET /curate` — the Curator's Workshop, grid slice: the picked photo as a tile (E4-S2A1).
  *
  * ## The screen
  *
  * With nothing picked, the view is one display-serif sentence and one quiet action: the archive has no
- * imagery yet, so there is nothing to decorate and nothing else to say. Once a photo is picked, the
- * photo is the screen — full-bleed, under the theme's own scrim — and the only chrome is a single glass
- * panel at the bottom: the image-first rule, applied to a screen that is otherwise empty.
+ * imagery yet, so there is nothing to decorate and nothing else to say. Once a photo is picked, it
+ * becomes a **tile in a selection grid** — the surface multi-select will grow into in E4-S2A2 — and the
+ * only chrome is a single glass panel at the bottom. The send path (progress, cancel, retry,
+ * invalidation) is E4-S1B's and is unchanged.
  *
- * The glass is over the scrim, never over an uncontrolled backdrop. That is §3's scrim rule and NN/g's
- * finding (DESIGN-REFERENCES §7): a translucent panel's contrast depends on what is behind it, so the
- * preview is scrimmed with `--aura-bg` at 70 % — the menu veil's value — before the panel composites
- * over it. When a preview cannot decode it is dropped, but the same scrim remains over the theme's base,
- * so the panel always sits on a known tone rather than on the raw base alone. The words in the panel are
- * `--aura-text`, never `--aura-muted` (DESIGN-SYSTEM §2.2, measured in E3-S2).
+ * The tile carries its own scrim, so its remove button and state line always sit on a known tone; the
+ * panel sits over the theme's base, where its glass composites over `--aura-bg` rather than over a
+ * photo. The words are `--aura-text`, never `--aura-muted` (DESIGN-SYSTEM §2.2, measured in E3-S2).
  *
  * ## The states, and what they promise
  *
@@ -227,31 +225,32 @@ export function WorkshopView() {
 
   const panelSentence = notice !== "" ? notice : "Photo selected.";
 
+  /** The one selected file as a grid tile; the grid grows to many in E4-S2A2. */
+  const selection: SelectionItem | null =
+    file === null || previewUrl === null
+      ? null
+      : {
+          id: "selection",
+          file,
+          previewUrl,
+          state: phase === "uploading" ? "uploading" : phase === "error" ? "error" : "waiting",
+          message: phase === "error" ? notice : null,
+          previewBroken,
+        };
+
+  const removeSelected = (): void => {
+    if (phase === "uploading") {
+      return;
+    }
+    clearSelection();
+    setPhase("idle");
+    setNotice("");
+  };
+
   return (
     <>
       <main data-state={phase} className="relative flex flex-1 flex-col overflow-hidden bg-aura-bg">
         <h1 className="sr-only">Curator&rsquo;s Workshop</h1>
-
-        {previewUrl !== null ? (
-          <>
-            {previewBroken ? null : (
-              <img
-                src={previewUrl}
-                alt=""
-                aria-hidden="true"
-                decoding="async"
-                loading="lazy"
-                onError={() => setPreviewBroken(true)}
-                className={`absolute inset-0 h-full w-full object-cover ${ENTER_FADE_BASE}`}
-              />
-            )}
-            {/* §3's scrim: the glass panel needs a known backdrop, and the theme's own tone is the one
-                the user is already inside. 70 % is the menu veil's value. It stays when the preview is
-                dropped, so a browser that cannot decode the bytes does not leave the panel over the raw
-                base alone — the backdrop is the same known scrim either way. */}
-            <div aria-hidden="true" className="absolute inset-0 bg-aura-bg/70" />
-          </>
-        ) : null}
 
         {phase === "idle" ? (
           <div className="relative z-10 flex flex-1 flex-col items-center justify-center gap-6 px-8 text-center">
@@ -277,62 +276,78 @@ export function WorkshopView() {
             ) : null}
           </div>
         ) : (
-          <div className="absolute inset-x-4 bottom-4 z-10 mx-auto max-w-md">
-            <GlassPanel className={`flex flex-col gap-3 px-4 py-3 ${ENTER_FADE_BASE}`}>
-              {phase === "uploading" ? (
-                <>
-                  <p className="text-sm text-aura-text">Uploading</p>
-                  <div
-                    role="progressbar"
-                    aria-label="Upload progress"
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    {...(percent === null ? {} : { "aria-valuenow": percent })}
-                    className="h-0.5 w-full overflow-hidden rounded-full bg-aura-text/15"
-                  >
-                    {percent === null ? (
-                      <div className={`h-full w-full bg-aura-text opacity-25 ${LOADING_PULSE}`} />
-                    ) : (
-                      <div className="h-full bg-aura-text" style={{ width: `${percent}%` }} />
-                    )}
-                  </div>
-                  <button
-                    ref={cancelRef}
-                    type="button"
-                    onClick={() => controllerRef.current?.abort()}
-                    className={QUIET_ACTION}
-                  >
-                    Cancel
-                  </button>
-                </>
-              ) : (
-                <>
-                  <p className="text-base text-aura-text">{panelSentence}</p>
-                  <div className="flex items-center gap-2">
+          <>
+            {/* The grid scrolls; the panel does not. The scroll container itself centres a short grid —
+                measured at the review: the tile's top lands on the computed centre (a `min-h-full`
+                percentage does not resolve inside a flex-sized scroller, which put it at the top). */}
+            <div className="relative z-10 flex flex-1 flex-col justify-center overflow-y-auto px-4 py-6">
+              <SelectionGrid
+                items={selection === null ? [] : [selection]}
+                busy={phase === "uploading"}
+                onRemove={removeSelected}
+                onPreviewError={() => setPreviewBroken(true)}
+              />
+            </div>
+
+            <div className="relative z-10 mx-auto w-full max-w-md shrink-0 px-4 pb-4">
+              <GlassPanel className={`flex flex-col gap-3 px-4 py-3 ${ENTER_FADE_BASE}`}>
+                {phase === "uploading" ? (
+                  <>
+                    <p className="text-sm text-aura-text">Uploading</p>
+                    <div
+                      role="progressbar"
+                      aria-label="Upload progress"
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      {...(percent === null ? {} : { "aria-valuenow": percent })}
+                      className="h-0.5 w-full overflow-hidden rounded-full bg-aura-text/15"
+                    >
+                      {percent === null ? (
+                        <div className={`h-full w-full bg-aura-text opacity-25 ${LOADING_PULSE}`} />
+                      ) : (
+                        <div className="h-full bg-aura-text" style={{ width: `${percent}%` }} />
+                      )}
+                    </div>
                     <button
-                      ref={primaryRef}
+                      ref={cancelRef}
                       type="button"
-                      onClick={uploadSelected}
+                      onClick={() => controllerRef.current?.abort()}
                       className={QUIET_ACTION}
                     >
-                      {phase === "error" ? "Try again" : "Upload"}
+                      Cancel
                     </button>
-                    <label className={QUIET_ACTION}>
-                      <input
-                        type="file"
-                        accept={ACCEPT_ATTRIBUTE}
-                        onChange={handlePick}
-                        className="peer sr-only"
-                      />
-                      <span className="peer-focus-visible:outline peer-focus-visible:outline-1 peer-focus-visible:-outline-offset-4 peer-focus-visible:outline-aura-text/50">
-                        Choose another
-                      </span>
-                    </label>
-                  </div>
-                </>
-              )}
-            </GlassPanel>
-          </div>
+                  </>
+                ) : (
+                  <>
+                    <p data-testid="workshop-notice" className="text-base text-aura-text">
+                      {panelSentence}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        ref={primaryRef}
+                        type="button"
+                        onClick={uploadSelected}
+                        className={QUIET_ACTION}
+                      >
+                        {phase === "error" ? "Try again" : "Upload"}
+                      </button>
+                      <label className={QUIET_ACTION}>
+                        <input
+                          type="file"
+                          accept={ACCEPT_ATTRIBUTE}
+                          onChange={handlePick}
+                          className="peer sr-only"
+                        />
+                        <span className="peer-focus-visible:outline peer-focus-visible:outline-1 peer-focus-visible:-outline-offset-4 peer-focus-visible:outline-aura-text/50">
+                          Choose another
+                        </span>
+                      </label>
+                    </div>
+                  </>
+                )}
+              </GlassPanel>
+            </div>
+          </>
         )}
       </main>
 

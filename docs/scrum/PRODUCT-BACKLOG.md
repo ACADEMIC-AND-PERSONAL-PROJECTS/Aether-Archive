@@ -403,8 +403,10 @@ opens on tap, feels tactile, and gets out of the way.
 | ID | Story | P | Pts | Sprint | Status |
 | --- | --- | --- | --- | --- | --- |
 | E4-S1A | Single photo upload — the picker and the validation (criterion 1) | p0 | 2 | 3 | Done |
-| E4-S1B | Single photo upload — send, progress, cancel, retry, invalidation (criteria 2–4) | p0 | 3 | 3 | In review |
-| E4-S2 | Multi-select (≤ 6) & client-side downscale | p0 | 5 | 3 | Todo |
+| E4-S1B | Single photo upload — send, progress, cancel, retry, invalidation (criteria 2–4) | p0 | 3 | 3 | Done |
+| E4-S2A1 | The selection grid surface (criterion 3) | p0 | 1 | 3 | In review |
+| E4-S2A2 | Multi-select (≤ 6) and the sequential queue (criteria 1, 4) | p0 | 2 | 3 | Todo |
+| E4-S2B | Client-side downscale before upload (criterion 2) | p0 | 2 | 3 | Todo |
 | E4-S3 | Drag-and-drop ordering | p0 | 8 | 4 | Todo |
 | E4-S4 | Aura colour picker with palette suggestions | p0 | 5 | 4 | Todo |
 | E4-S5 | Publish dump with optimistic UI | p0 | 5 | 4 | Todo |
@@ -419,7 +421,7 @@ opens on tap, feels tactile, and gets out of the way.
 > was not hermetic against `VITE_MAX_UPLOAD_MB`). **E4-S1A** (2 pts, PR #114, merge `c376404`) carries criterion 1 — the
 > picker and the validation; measured **776 hand-written** at its tip, and its exception is claimed on a
 > **measured state cut** at **555**, still over the ~500 branch threshold, so no cut reaches the budget.
-> **E4-S1B** (3 pts, PR #115) carries criteria 2–4 — send with progress and cancel, then retry and
+> **E4-S1B** (3 pts, PR #115, merge `eced081`) carries criteria 2–4 — send with progress and cancel, then retry and
 > invalidation; it closes #31. It measured **1,279 hand-written** at its final tip (branch total 1,326
 > with the records) and claims the exception on a **constructed criterion cut** at **1,157** — 1,122 at
 > the reviewed tip, 1,115 in the reviewer's reconstruction — still 2.3× the ~500 threshold. Points are
@@ -431,15 +433,23 @@ opens on tap, feels tactile, and gets out of the way.
 - [ ] **(B)** Success updates the archive without a page reload (query invalidation).
 - [ ] **(A/B)** Tests: validation rejects, error retry path, success invalidation.
 
-### E4-S2 — Multi-select (≤ 6) & client-side downscale · 5 pts · p0
+### E4-S2 — Multi-select (≤ 6) & client-side downscale · 5 pts · p0 · **cut in three: A1 (1) + A2 (2) + B (2)**
 
 *As the curator, I want to pick several images at once, so that building a dump is fast.*
 
-- [ ] Multi-select picker; hard cap of 6 with a quiet explanation, extra selections ignored or blocked.
-- [ ] Images downscaled/compressed client-side before upload when above a threshold (quality preserved for viewing).
-- [ ] Thumbnail grid of the selection with remove affordance and per-file state.
-- [ ] Uploads run sequentially or bounded-concurrent; one failure never aborts the others silently.
-- [ ] Tests for the cap and for the downscale decision function (pure).
+> The first cut (S2A = criteria 1, 3, 4; S2B = criterion 2) was recorded at the story's start but did not
+> survive PR #116's review: the reviewer constructed a criterion-3-only cut on top of E4-S1B that is
+> green and measures **244 hand-written**, under both budgets. The story is therefore cut in three:
+> **S2A1** the grid surface (criterion 3, normal budget), **S2A2** multi-select and the queue
+> (criteria 1 and 4, coupled — a queue of one is E4-S1B and a selection the app cannot send is not the
+> story; its exception is claimed on that coupling), **S2B** downscale (criterion 2). #116 was closed
+> unmerged; its review also found a StrictMode defect (`aliveRef` never re-armed), fixed in A2.
+
+- [ ] **(A2)** Multi-select picker; hard cap of 6 with a quiet explanation, extra selections ignored or blocked.
+- [ ] **(B)** Images downscaled/compressed client-side before upload when above a threshold (quality preserved for viewing).
+- [ ] **(A1)** Thumbnail grid of the selection with remove affordance and per-file state.
+- [ ] **(A2)** Uploads run sequentially or bounded-concurrent; one failure never aborts the others silently.
+- [ ] **(A2/B)** Tests for the cap and for the downscale decision function (pure).
 
 ### E4-S3 — Drag-and-drop ordering · 8 pts · p0
 

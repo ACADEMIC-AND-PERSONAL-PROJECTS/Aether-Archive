@@ -159,7 +159,7 @@ describe("the picker", () => {
     expect(preview).toHaveAttribute("decoding", "async");
   });
 
-  it("should return to the picker when a replacement pick is refused", () => {
+  it("should return to the picker when a replacement pick is refused", async () => {
     renderWorkshop();
     pickFile(screen.getByLabelText("Choose a photo"), fileOf(2048));
     expect(document.querySelector("main img")).not.toBeNull();
@@ -172,6 +172,7 @@ describe("the picker", () => {
       "isn't an image the archive can keep",
     );
     expect(screen.queryAllByRole("button")).toHaveLength(0);
+    await waitFor(() => expect(screen.getByLabelText("Choose a photo")).toHaveFocus());
   });
 
   it("should drop a preview the browser cannot decode, keeping the file selected", async () => {
@@ -188,14 +189,79 @@ describe("the picker", () => {
     await waitFor(() => expect(document.querySelector("main img")).toBeNull());
     // The broken glyph is gone, but the selection is not: the server still gets to judge the bytes.
     expect(screen.getByRole("main")).toHaveAttribute("data-state", "selected");
-    // The scrim stays behind the panel when the preview is dropped, so the glass still composites
-    // over a known backdrop rather than the raw base alone.
-    const backdrops = document.querySelectorAll('main [aria-hidden="true"]');
-    expect(backdrops).toHaveLength(1);
-    expect(backdrops[0]?.tagName).toBe("DIV");
+    // The tile's scrim stays mounted when the preview is dropped, so the remove button and the state
+    // line still sit on a known tone rather than the raw base.
+    expect(screen.getByTestId("tile-scrim")).toBeInTheDocument();
+    expect(screen.getByRole("listitem")).toHaveTextContent("Waiting");
     expect(within(screen.getByRole("main")).getByText("Photo selected.")).toBeVisible();
     expect(screen.getByLabelText("Choose another")).toBeVisible();
     expect(screen.getByRole("button", { name: "Upload" })).toBeVisible();
+  });
+});
+
+describe("the grid surface", () => {
+  it("should list the picked photo as a tile with a named remove button and its state", () => {
+    renderWorkshop();
+
+    pickFile(screen.getByLabelText("Choose a photo"), fileOf(2048, "image/png", "notes.png"));
+
+    const list = screen.getByRole("list", { name: "Selected photos" });
+    expect(within(list).getAllByRole("listitem")).toHaveLength(1);
+    const remove = within(list).getByRole("button", { name: "Remove notes.png" });
+    expect(remove).toHaveClass("h-11", "w-11");
+    expect(within(list).getByRole("listitem")).toHaveAttribute("data-state", "waiting");
+    // The file's name is the tile's accessible prefix, so six "Waiting" lines never become anonymous.
+    expect(within(list).getByRole("listitem")).toHaveTextContent("notes.png: Waiting");
+  });
+
+  it("should remove the selection and return to the picker when the tile is removed", async () => {
+    renderWorkshop();
+    pickFile(screen.getByLabelText("Choose a photo"), fileOf(2048, "image/png", "notes.png"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove notes.png" }));
+
+    expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle");
+    expect(screen.queryByRole("list", { name: "Selected photos" })).toBeNull();
+    await waitFor(() => expect(screen.getByLabelText("Choose a photo")).toHaveFocus());
+  });
+
+  it("should disable removal while the request is in flight", async () => {
+    renderWorkshop();
+    pickFile(screen.getByLabelText("Choose a photo"), fileOf(2048, "image/png", "notes.png"));
+
+    await startUpload();
+
+    expect(screen.getByRole("button", { name: "Remove notes.png" })).toBeDisabled();
+    expect(screen.getByRole("listitem")).toHaveAttribute("data-state", "uploading");
+    expect(screen.getByRole("listitem")).toHaveTextContent("Uploading");
+  });
+
+  it("should revoke the replaced and the removed preview URLs", () => {
+    const revoke = vi.spyOn(URL, "revokeObjectURL");
+    renderWorkshop();
+
+    pickFile(screen.getByLabelText("Choose a photo"), fileOf(16, "image/png", "a.png"));
+    const firstSrc = document.querySelector("main img")?.getAttribute("src") ?? "";
+    expect(firstSrc).not.toBe("");
+
+    pickFile(screen.getByLabelText("Choose another"), fileOf(16, "image/png", "b.png"));
+    expect(revoke).toHaveBeenCalledWith(firstSrc);
+
+    const secondSrc = document.querySelector("main img")?.getAttribute("src") ?? "";
+    expect(secondSrc).not.toBe(firstSrc);
+    fireEvent.click(screen.getByRole("button", { name: "Remove b.png" }));
+    expect(revoke).toHaveBeenCalledWith(secondSrc);
+  });
+
+  it("should keep a usable name when a file has none", () => {
+    renderWorkshop();
+    pickFile(
+      screen.getByLabelText("Choose a photo"),
+      new File([new Uint8Array(4)], "", { type: "image/png" }),
+    );
+
+    expect(screen.getByRole("button", { name: "Remove photo" })).toBeVisible();
+    expect(screen.getByRole("listitem")).toHaveTextContent("Photo: Waiting");
   });
 });
 
@@ -206,9 +272,14 @@ describe("uploading", () => {
     pickFile(screen.getByLabelText("Choose a photo"), picked);
     const first = await startUpload();
 
-    // A duplicate-submit guard: while the request is in flight, Cancel is the ONLY action. The
-    // reviewing pass added a second Upload button inside this branch and the suite stayed green.
-    expect(within(screen.getByRole("main")).getAllByRole("button")).toHaveLength(1);
+    // A duplicate-submit guard: while the request is in flight, Cancel is the ONLY enabled action —
+    // the tile's remove button is disabled, not removed. The reviewing pass added a second Upload
+    // button inside this branch and the suite stayed green.
+    const enabled = within(screen.getByRole("main"))
+      .getAllByRole("button")
+      .filter((button) => !(button as HTMLButtonElement).disabled);
+    expect(enabled).toHaveLength(1);
+    expect(enabled[0]).toHaveTextContent("Cancel");
     expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
 
     expect(multipartBody(first).get("category")).toBe("uncategorized");
@@ -264,10 +335,13 @@ describe("uploading", () => {
 
     // The sentence is shown in the panel and announced in the status region — one message, two roles.
     await waitFor(() =>
-      expect(
-        within(screen.getByRole("main")).getByText("The archive couldn't read that image."),
-      ).toBeVisible(),
+      expect(screen.getByTestId("workshop-notice")).toHaveTextContent(
+        "The archive couldn't read that image.",
+      ),
     );
+    // The same sentence lives on the tile, so the failure has an owner even after the panel changes.
+    expect(screen.getByRole("listitem")).toHaveAttribute("data-state", "error");
+    expect(screen.getByRole("listitem")).toHaveTextContent("The archive couldn't read that image.");
     expect(screen.getByRole("main")).toHaveAttribute("data-state", "error");
     expect(screen.getByLabelText("Choose another")).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent("The archive couldn't read that image.");
@@ -301,11 +375,13 @@ describe("uploading", () => {
     });
 
     await waitFor(() =>
-      expect(
-        within(screen.getByRole("main")).getByText(
-          "That photo is larger than the archive accepts.",
-        ),
-      ).toBeVisible(),
+      expect(screen.getByTestId("workshop-notice")).toHaveTextContent(
+        "That photo is larger than the archive accepts.",
+      ),
+    );
+    expect(screen.getByRole("listitem")).toHaveAttribute("data-state", "error");
+    expect(screen.getByRole("listitem")).toHaveTextContent(
+      "That photo is larger than the archive accepts.",
     );
     expect(screen.getByRole("main")).toHaveAttribute("data-state", "error");
     expect(screen.getByRole("status")).toHaveTextContent(
@@ -326,10 +402,12 @@ describe("uploading", () => {
     });
 
     await waitFor(() =>
-      expect(
-        within(screen.getByRole("main")).getByText("The archive didn't answer. Try again."),
-      ).toBeVisible(),
+      expect(screen.getByTestId("workshop-notice")).toHaveTextContent(
+        "The archive didn't answer. Try again.",
+      ),
     );
+    expect(screen.getByRole("listitem")).toHaveAttribute("data-state", "error");
+    expect(screen.getByRole("listitem")).toHaveTextContent("The archive didn't answer. Try again.");
     expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent("The archive didn't answer. Try again.");
   });
