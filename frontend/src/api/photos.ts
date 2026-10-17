@@ -98,10 +98,10 @@ export function useUploadPhoto() {
         signal: request.signal,
         onProgress: request.onProgress,
       }),
-    // Deliberately not returned as a promise: the mutation's per-call `onSuccess` (the workshop's
-    // "Added to your archive." and its return to `idle`) runs after this callback settles. Awaiting the
-    // refetch here would gate the success UI on a feed consumer that may not exist — measured in the
-    // review with a deferred `invalidateQueries`: the view stayed `uploading` until it resolved.
+    // Deliberately not returned as a promise: the workshop awaits `mutateAsync`, renders its own batch
+    // summary and moves on to the next file (E4-S2A2). Awaiting the refetch here would gate that summary
+    // on a feed consumer that may not exist — measured in E4-S1B's review with a deferred
+    // `invalidateQueries`: the view stayed `uploading` until it resolved.
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.photos });
     },
