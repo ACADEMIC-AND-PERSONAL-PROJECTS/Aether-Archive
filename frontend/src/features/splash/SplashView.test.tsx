@@ -8,7 +8,7 @@ import { queryKeys } from "../../api/queryKeys";
 import { createQueryClient } from "../../app/queryClient";
 import { compositeOver, contrastRatio, hexToRgb, parseColor } from "../../lib/color/contrast";
 import { oklchToHex } from "../../lib/color/oklch";
-import { FALLBACK_THEME, paletteToTheme, type AuraTheme } from "../../lib/color/theme";
+import { FALLBACK_THEME, paletteToTheme, THEME_BANDS, type AuraTheme } from "../../lib/color/theme";
 import {
   PULL_SURFACE_TOUCH_ACTION,
   PULL_THRESHOLD_PX,
@@ -757,10 +757,14 @@ describe("SplashView — text over glass and images (the scrim rule, E3-S5B)", (
       },
     ],
   });
+  // Derived from the generator's own bands rather than copied from them: a hard-coded triple keeps
+  // passing if the bands widen, because it would then measure a range the generator no longer produces.
+  // The three samples are the two extremes and the middle of the current bands.
+  const { bgLightness: BG, textLightness: TEXT } = THEME_BANDS;
   const BANDS = [
-    [0.1, 0.86],
-    [0.14, 0.9],
-    [0.18, 0.86],
+    [BG.min, TEXT.min],
+    [(BG.min + BG.max) / 2, (TEXT.min + TEXT.max) / 2],
+    [BG.max, TEXT.min],
   ] as const;
   const WHITE = { r: 255, g: 255, b: 255 };
   const VEIL_ALPHA = 0.7;

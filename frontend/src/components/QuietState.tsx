@@ -19,7 +19,7 @@ import { LOADING_PULSE } from "../lib/motion/tokens";
  * Since E3-S1A, `data-state="error"` also reports a *failed replacement*: the previous photo stays
  * painted on purpose (unmounting a good picture for a placeholder would break the splash's promise).
  * `.glass` alone is `rgba(0, 0, 0, 0.4)` — measured against a white photo that composites to
- * `rgb(153, 153, 153)`, where `--aura-text` reads **2.30:1** — so the notice carries its own scrim
+ * `rgb(153, 153, 153)`, where `--aura-text` reads **2.29:1** — so the notice carries its own scrim
  * (`bg-aura-bg/70`, the same value as the menu's veil) between the photo and the glass. With it, the
  * painted glyph measures **7.47:1** over a white photo and **13.41:1** over a dark one (`README`,
  * "The quiet states — measured"). The scrim is local, so the photo the user is still looking at is

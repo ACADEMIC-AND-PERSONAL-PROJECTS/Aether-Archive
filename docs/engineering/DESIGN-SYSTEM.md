@@ -271,12 +271,14 @@ that are rules, not taste:
 
 - **The empty sentence** is one paragraph in `font-display` / `--aura-text`, centred on `--aura-bg` — an
   ordinary paragraph, not a live region. No retry, no spinner, no illustration. Measured painted: glyph
-  `#e5e3e0` on base `#0b0b0d` — **15.35:1**.
+  `#e8e6e3` on base `#0b0b0d` — **15.79:1** at the brightest glyph pixel; a representative pixel in the
+  same capture reads `#e5e3e0` and **15.35:1** (E3-S4 sampled that one, E3-S5 the brightest). Both are
+  correct and both are far above AA; the sampling point is stated so the two never look like a drift.
 - **The loading pulse** is a full-bleed wash of `--aura-surface` at `opacity-25` carrying
   `aether-breathe` (§5). It is `aria-hidden`; there is no text and no progress bar. jsdom cannot observe
   animation, so the unit suite pins the class token and Chromium measures the frames.
 - **The error notice** is `GlassPanel` over its **own scrim**: `--aura-bg` at 70 %, the menu veil's
-  value. Glass alone is not enough over a pale photo — measured over white, the tint alone is **2.30:1**,
+  value. Glass alone is not enough over a pale photo — measured over white, the tint alone is **2.29:1**,
   while scrim + glass + `--aura-text` is **7.47:1** (13.41:1 over a dark photo). The photo stays visible
   outside the notice, so the scrim is local, not a full-screen veil — `error` does not imply an empty
   screen (the E3-S1A finding).

@@ -624,7 +624,7 @@ brightest glyph pixel inside it against a 5 × 5 median of the panel, WCAG 2.x r
 | Empty sentence on the base (19.035 px, Playfair Display)      | `rgb(11,11,13)` | `rgb(232,230,227)` | **15.79:1** |
 
 The sampler's first error-notice read was wrong, and the reason is worth keeping: the fixed sample
-point at (368, 772) falls in the panel's rounded corner and returned the white photo through it
+point at (369, 773) falls in the panel's rounded corner and returned the white photo through it
 (`rgb(103,109,116)` → 3.43:1). Six interior points — (200,772), (200,780), (100,772), (300,772),
 (200,822), (60,772) — all return `rgb(45,53,60)` → **8.16:1**. The menu's panel sample at (195,646) is
 interior. The arithmetic controls are in the component tests; the painted values are the browser's.
