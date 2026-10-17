@@ -1146,12 +1146,12 @@ finds it once during the lift and zero times after the drop. At the S3B tip dnd-
 drop animation ran; this slice replaced it with the tuned 250 ms animation, removed it under
 `prefers-reduced-motion`, and moved the state line inside the lifted square — see below.
 
-**The dead focus stop, still deliberately absent.** The activator does not spread dnd-kit's
-`attributes`: they carry `tabIndex: 0`, `role="button"` and an `aria-describedby` that promises the
-space bar. Without a sensor that would put a control in the tab order that does nothing when activated
-and point a screen reader at keys the grid does not listen for, so the remove button stays the tile's
-only focusable control. E4-S3D adds `attributes`, the `KeyboardSensor` and the
-announcement builders together, so the promise becomes true there; this slice is pointer and touch only.
+**No dead focus stop (S3B's reasoning, now satisfied).** In S3B the activator deliberately did not
+spread dnd-kit's `attributes`: they carry `tabIndex: 0`, `role="button"` and an `aria-describedby` that
+promises the space bar, and without a sensor that would have been a control in the tab order that does
+nothing when activated. **E4-S3D** adds `attributes` and the `KeyboardSensor` together, so the promise
+is now true — measured in the keyboard section below; at the S3B tip this slice was pointer and touch
+only.
 
 **The remove button stays clickable.** It is a **sibling** of the activator, so its pointer events
 never reach a sensor; tests pin both the gesture (a 300 ms press on it lifts nothing) and the click
@@ -1277,7 +1277,54 @@ The cost lands in the lazily loaded workshop chunk and the new gradient utilitie
 unchanged.
 
 Not measured here: Safari/iOS's `prefers-reduced-motion` reading (the probe emulates it through CDP in
-Chromium) — **SKIPPED**. The keyboard path and announcements are E4-S3D's other slice.
+Chromium) — **SKIPPED**. The keyboard path and announcements are measured in the next section (E4-S3D).
+
+## The keyboard path — measured (E4-S3D)
+
+The grid is operable without a pointer. The array is still the only order: the keyboard path writes
+through the same `moveItem`, and the queue sends the displayed order.
+
+**The keyboard path.** `KeyboardSensor` uses `sortableKeyboardCoordinates`: Space or Enter lifts,
+arrows move to the nearest tile in that direction, Space or Enter drops, Escape puts the photo back.
+The activator now spreads `useSortable`'s `attributes` — `role="button"`, `tabIndex: 0`,
+`aria-roledescription="sortable"` and built-in instructions behind `aria-describedby` — with a name
+rebuilt from the live array: `Photo 1 of 6: photo-1.png`. While a batch uploads, the tiles carry
+`aria-disabled="true"` and the sensor has no listeners, so the keys are inert as well as the pointer.
+The left/right/up/down reach comes from the coordinate getter; without it the sensor moves the
+overlay in 25 px steps and never changes the order.
+
+**The live region, stated honestly.** This slice uses dnd-kit's **default** announcements, which name
+its generated ids — measured: "Draggable item selection-0 was moved over droppable area selection-3."
+The position-based copy ("Photo 1 of 6 moved to position 4.") is the follow-up slice **E4-S3D1**,
+over the same sensor; it ships separately rather than doubling this PR. The workshop's own
+`role="status"` region stays silent during a drag either way, because a drag changes no upload state.
+
+Probe: headless Chromium **153.0.8010.12**, built `dist/` on `vite preview`, scripts outside the
+repository, 390 × 844 DPR 3.
+
+| Step (probe)    | Evidence                                                                                                         |
+| --------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Focus           | name `Photo 1 of 6: photo-1.png`, `role="button"`, `aria-roledescription="sortable"`, `aria-describedby` present |
+| Space (lift)    | `aria-pressed="true"`; overlay 1; upload region still "6 photos selected."; neighbour `transform 0.2s …`         |
+| ArrowDown       | upload region still "6 photos selected."; the live region narrates (default copy)                                |
+| Space (drop)    | order `[1,2,3,4,5,6]` → `[2,3,4,1,5,6]`; overlay 0, `data-dragging` 0                                            |
+| Escape mid-move | order unchanged; overlay 0, `data-dragging` 0                                                                    |
+
+0 off-origin requests and 0 page/console exceptions in the probe. The full transcript is in the PR
+body; the raw run also produced `version "153.0.8010.12"` and `PROBE_DONE`.
+
+Capture: `reports/e4s3-keyboard-390.png` (1170 × 2532, 390 × 844 DPR 3), taken after the arrow move:
+the source cell is empty, the clone is over the destination and the state line sits on its scrim.
+
+Tests changed: the S3B dead-focus-stop test is replaced by the attributes test, and 3 are added
+(keyboard down, keyboard up, and Escape cancel). The full suite is **32 files / 375 tests**; the
+shuffled suite was run **three times** (`npm run test -- --run --sequence.shuffle`), green each time.
+The workshop chunk grows from 60.45 kB / 19.88 kB gzip to **62.45 kB / 20.45 kB gzip** — dnd-kit's
+keyboard sensor and coordinate getter, inside the already-lazy chunk.
+
+Not measured here: a real screen reader (the default region is measured, but whether a reader speaks
+it is not; the custom copy and its exact-string tests are E4-S3D1), keyboards on iOS/Safari, and a
+physical device — **SKIPPED**.
 
 ## Auto-scroll — measured (E4-S3C, auto-scroll branch)
 

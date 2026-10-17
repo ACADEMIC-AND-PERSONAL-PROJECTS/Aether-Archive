@@ -39,9 +39,10 @@ const mockedDownscale = vi.mocked(downscaleForUpload);
  * — the cap and its explanation, a tile per file with a real remove button, one request at a time in
  * selection order, per-file failure isolation, retry identity, batch cancellation and its reset — plus
  * the picker and announcement contracts E4-S1A/S1B/E3-S5B/A1 established, E4-S3B's gestures (the two
- * activation thresholds, the overlay, the reorder callback and the disabled state while uploading), and
- * E4-S3C's motion slice: the auto-scroll tuning, the tuned drop animation and the reduced-motion
- * reading. Keyboard moves and announcements are E4-S3D and are not asserted here.
+ * activation thresholds, the overlay, the reorder callback and the disabled state while uploading),
+ * E4-S3C's motion slice (the auto-scroll tuning, the tuned drop animation and the reduced-motion
+ * reading), and E4-S3D's keyboard path (the sortable attributes, keyboard reorder, Escape cancel and
+ * the two live regions).
  *
  * Object URLs are stubbed with a counter so a test can name the URL a tile owns; the shipped code still
  * calls the real `URL.createObjectURL`/`revokeObjectURL` shape (jsdom implements both, measured in the
@@ -81,6 +82,16 @@ function fileOf(size: number, type = "image/png", name = "photo.png"): File {
 function pickFiles(input: HTMLElement, files: readonly File[]): void {
   Object.defineProperty(input, "files", { configurable: true, value: files });
   fireEvent.change(input);
+}
+
+/** A short grid of three named files, for the keyboard tests that do not need six. */
+function threeFiles(): readonly File[] {
+  return ["a", "b", "c"].map((name) => fileOf(16, "image/png", `${name}.png`));
+}
+
+/** The full six-photo grid the keyboard announcements count against. */
+function sixFiles(): readonly File[] {
+  return ["a", "b", "c", "d", "e", "f"].map((name) => fileOf(16, "image/png", `${name}.png`));
 }
 
 function renderWorkshop(): { client: QueryClient; unmount: () => void } {
@@ -141,9 +152,26 @@ function selectedTiles(): readonly HTMLElement[] {
   return within(screen.getByRole("list", { name: "Selected photos" })).getAllByRole("listitem");
 }
 
-/** The drag surfaces, in display order. They are not focusable in this slice: see `SelectionGrid`. */
+/** The drag surfaces, in display order. Since E4-S3D they are the tile's keyboard affordance too. */
 function dragActivators(): readonly HTMLElement[] {
   return screen.getAllByTestId("drag-activator");
+}
+
+/** The drag surface inside a named tile, found through the tile's remove button. */
+function activatorFor(name: string): HTMLElement {
+  const activator = tileFor(name).querySelector<HTMLElement>('[data-testid="drag-activator"]');
+  if (activator === null) {
+    throw new Error(`no drag activator for ${name}`);
+  }
+  return activator;
+}
+
+/** A keyboard press, then the event-loop turn dnd-kit's keyboard sensor needs to attach its listener. */
+async function pressKey(target: Element | Document, code: string, key: string): Promise<void> {
+  fireEvent.keyDown(target, { code, key });
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
 }
 
 /** The visible order, as each tile's state line reads it ("a.png: Waiting"). */
@@ -571,24 +599,107 @@ describe("reordering", () => {
     expect(selectedTiles()).toHaveLength(1);
   });
 
-  it("should not add a dead focus stop before the keyboard slice exists", () => {
+  it("should expose each tile as a named sortable with its position", () => {
     renderWorkshop();
-    pickFiles(screen.getByLabelText("Choose photos"), [
-      fileOf(16, "image/png", "a.png"),
-      fileOf(16, "image/png", "b.png"),
+    pickFiles(screen.getByLabelText("Choose photos"), threeFiles());
+
+    // E4-S3D adds the KeyboardSensor and dnd-kit's attributes together: the activator is now a real
+    // focus stop with a role and a name, not the dead tab stop E4-S3B deliberately avoided.
+    const first = screen.getByRole("button", { name: "Photo 1 of 3: a.png" });
+    expect(first).toHaveAttribute("aria-roledescription", "sortable");
+    expect(first).toHaveAttribute("tabindex", "0");
+    expect(first).toHaveClass("touch-manipulation");
+    expect(screen.getByRole("button", { name: "Photo 3 of 3: c.png" })).toBeVisible();
+
+    // The instructions the tile points at come from dnd-kit's built-in accessibility; the custom
+    // position-based copy is the follow-up slice (E4-S3D1), not this one.
+    const instructions = first.getAttribute("aria-describedby");
+    expect(instructions).not.toBeNull();
+    expect(document.getElementById(instructions ?? "")).toHaveTextContent("space bar");
+
+    // The remove control is a sibling of the drag surface, so a pointer-down on it reaches no sensor.
+    const remove = screen.getByRole("button", { name: "Remove a.png" });
+    expect(first.contains(remove)).toBe(false);
+    expect(remove.contains(first)).toBe(false);
+  });
+
+  it("should move a tile down with the keyboard", async () => {
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), sixFiles());
+    stubGridRects();
+
+    // Two persistent regions, each owning one conversation: the workshop's says what the queue is
+    // doing, dnd-kit's says where the photo is. A drag changes no upload state, so only one speaks.
+    expect(screen.getAllByRole("status")).toHaveLength(2);
+    expect(screen.getByTestId("workshop-status")).toHaveTextContent("6 photos selected.");
+
+    const first = activatorFor("a.png");
+    first.focus();
+    expect(first).toHaveFocus();
+
+    await pressKey(first, "Space", " ");
+    expect(first).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("drag-overlay")).toBeVisible();
+    expect(screen.getByTestId("workshop-status")).toHaveTextContent("6 photos selected.");
+
+    // The stubbed three-column pitch puts `d` directly under `a`; the drop lands on position 4.
+    await pressKey(document, "ArrowDown", "ArrowDown");
+    await pressKey(document, "Space", " ");
+    expect(tileLines()).toEqual([
+      "b.png: Waiting",
+      "c.png: Waiting",
+      "d.png: Waiting",
+      "a.png: Waiting",
+      "e.png: Waiting",
+      "f.png: Waiting",
     ]);
+    expect(screen.queryByTestId("drag-overlay")).toBeNull();
+    await settleDragListeners();
+  });
 
-    // The KeyboardSensor and dnd-kit's attributes are E4-S3D. Until then the
-    // activator is a pointer surface only — no role, no tab index — and the remove button is the
-    // tile's only control.
-    const activator = dragActivators()[0];
-    expect(activator).toHaveClass("touch-manipulation");
-    expect(activator).not.toHaveAttribute("tabindex");
-    expect(activator).not.toHaveAttribute("role");
+  it("should move a tile up with the keyboard", async () => {
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), sixFiles());
+    stubGridRects();
 
-    const tile = tileFor("a.png");
-    expect(within(tile).getAllByRole("button")).toHaveLength(1);
-    expect(within(tile).getByRole("button")).toHaveAccessibleName("Remove a.png");
+    const fourth = activatorFor("d.png");
+    fourth.focus();
+    await pressKey(fourth, "Space", " ");
+
+    await pressKey(document, "ArrowUp", "ArrowUp");
+    await pressKey(document, "Space", " ");
+    expect(tileLines()).toEqual([
+      "d.png: Waiting",
+      "a.png: Waiting",
+      "b.png: Waiting",
+      "c.png: Waiting",
+      "e.png: Waiting",
+      "f.png: Waiting",
+    ]);
+    await settleDragListeners();
+  });
+
+  it("should cancel a keyboard move with Escape and keep the order", async () => {
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), threeFiles());
+    stubGridRects();
+
+    const first = activatorFor("a.png");
+    first.focus();
+    await pressKey(first, "Space", " ");
+    // Prove the drag is live before cancelling it, so a missing sensor cannot make the rest vacuous.
+    expect(first).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("drag-overlay")).toBeVisible();
+    await pressKey(document, "ArrowRight", "ArrowRight");
+    await pressKey(document, "Escape", "Escape");
+
+    expect(tileLines()).toEqual(["a.png: Waiting", "b.png: Waiting", "c.png: Waiting"]);
+    // dnd-kit clears its own overlay and the source slot's dragging state on cancel; the array never
+    // saw the move, so the order is untouched.
+    expect(screen.queryByTestId("drag-overlay")).toBeNull();
+    expect(document.querySelector('[data-dragging="true"]')).toBeNull();
+    expect(first).not.toHaveAttribute("aria-pressed");
+    await settleDragListeners();
   });
 
   it("should remove the settle and the drop motion when the reader asks for reduced motion", async () => {
@@ -683,9 +794,14 @@ describe("reordering", () => {
     if (first === undefined) {
       throw new Error("the first tile has no drag activator");
     }
+    expect(first).toHaveAttribute("aria-disabled", "true");
+
     fireEvent.mouseDown(first, { clientX: 56, clientY: 56, button: 0 });
     fireEvent.mouseMove(document, { clientX: 116, clientY: 56 });
     await act(async () => {});
+    // The keyboard path is disabled too: the sensor has no listeners while `useSortable` is disabled.
+    await pressKey(first, "Space", " ");
+    await pressKey(document, "ArrowRight", "ArrowRight");
 
     expect(document.querySelector('[data-dragging="true"]')).toBeNull();
     expect(screen.queryByTestId("drag-overlay")).toBeNull();

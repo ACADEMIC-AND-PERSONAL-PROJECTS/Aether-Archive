@@ -410,7 +410,8 @@ opens on tap, feels tactile, and gets out of the way.
 | E4-S3A | The order reducer (criterion 2, reducer half) | p0 | 1 | 4 | Done |
 | E4-S3B | The gesture core: mouse/touch sensors, sortable grid, overlay (criterion 1) | p0 | 4 | 4 | Done |
 | E4-S3C | Motion: drop ≤ 300 ms, auto-scroll and reduced motion (criterion 4) — two PRs | p0 | 1 | 4 | Done |
-| E4-S3D | Keyboard and announcements, with the cancel path (criterion 3) | p0 | 2 | 4 | Todo |
+| E4-S3D | Keyboard path and cancel, with dnd-kit's default announcements (criterion 3) | p0 | 1 | 4 | In progress |
+| E4-S3D1 | Position-based announcement copy and instructions (criterion 3) | p0 | 1 | 4 | Todo |
 | E4-S4 | Aura colour picker with palette suggestions | p0 | 5 | 4 | Todo |
 | E4-S5 | Publish dump with optimistic UI | p0 | 5 | 4 | Todo |
 
@@ -454,7 +455,7 @@ opens on tap, feels tactile, and gets out of the way.
 - [ ] **(A2)** Uploads run sequentially or bounded-concurrent; one failure never aborts the others silently.
 - [ ] **(A2/B)** Tests for the cap and for the downscale decision function (pure).
 
-### E4-S3 — Drag-and-drop ordering · 8 pts · p0 · **re-cut at review into S3A (1) + S3B (4) + S3C (1, two PRs) + S3D (2)**
+### E4-S3 — Drag-and-drop ordering · 8 pts · p0 · **re-cut at review into S3A (1) + S3B (4) + S3C (1, two PRs) + S3D (1) + S3D1 (1)**
 
 *As the curator, I want to reorder my 6 images by touch, so that the dump tells the story I want.*
 
@@ -477,6 +478,14 @@ opens on tap, feels tactile, and gets out of the way.
 > unit test; dnd-kit's default live region speaks internal ids and must be replaced by the custom
 > announcements/instructions; and a test should pin that a reorder before a batch sends the files in
 > the displayed order (S3C or E4-S5).
+>
+> Split at PR #131's review: the keyboard slice measured 496 hand-written, 96 over the ~400 PR ideal,
+> and the review **built and measured the cut**: keyboard operability with dnd-kit's default
+> announcements is 260 lines, green (32 files / 375 tests), with the custom copy as the remainder.
+> **S3D** ships the keyboard path and cancel; **S3D1** ships the position-based announcements and
+> instructions. Same total points (2). The review also falsified the first-over guard in the custom
+> copy (a back-step to the origin position was never announced); the guard is fixed in S3D1 with a
+> last-announced-destination ref and an ArrowLeft-back test, so the defect never reaches `develop`.
 
 - [ ] **(B)** `@dnd-kit` grid: long-press (touch) / drag (mouse) reorder with visual lift, no scroll conflict.
 - [ ] **(A)** Order is a pure reducer in `lib/` (unit-tested) driving `displayOrder` 0–5 in the payload.
@@ -568,7 +577,7 @@ delivery, documentation, and a clean v1.0.
 
 | ID | Story | P | Pts | Sprint | Status |
 | --- | --- | --- | --- | --- | --- |
-| E6-S1 | CI — backend + frontend on every PR | p0 | 5 | 4 | In review |
+| E6-S1 | CI — backend + frontend on every PR | p0 | 5 | 4 | Done |
 | E6-S2 | Required status checks on `main`/`develop` | p0 | 2 | 4 | Todo |
 | E6-S3 | Accessibility audit (WCAG 2.2 AA) | p1 | 3 | 5 | Todo |
 | E6-S4 | Real-device verification pass (LAN) | p0 | 3 | 5 | Todo |
