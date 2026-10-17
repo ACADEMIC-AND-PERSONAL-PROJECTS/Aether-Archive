@@ -30,7 +30,7 @@
 | 5b | E3-S5B | Accessibility — contrast, `inert`, the announcement fix, the manual pass (criteria 3–5) | 2 | p0 | Done | #111 |
 | 6a | E4-S1A | Single photo upload — the picker and the validation (criterion 1) | 2 | p0 | Done | #114 |
 | 6b | E4-S1B | Single photo upload — send with progress and cancel, then retry and invalidation (criteria 2–4) | 3 | p0 | Done | #115 |
-| 7a | E4-S2A | Multi-select (≤ 6), the thumbnail grid and sequential uploads (criteria 1, 3, 4) | 3 | p0 | In progress | — |
+| 7a | E4-S2A | Multi-select (≤ 6), the thumbnail grid and sequential uploads (criteria 1, 3, 4) | 3 | p0 | In review | #116 |
 | 7b | E4-S2B | Client-side downscale before upload (criterion 2, and criterion 5's downscale half) | 2 | p0 | Todo | — |
 
 **Total: 12 slices · 28 points** (the row above them is a chore, not a story; E3-S1A/B, E3-S5A/B,
@@ -335,3 +335,13 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   README and the probe record on both sides; the retry side of the same race (a lost response after a
   store can duplicate on retry) is documented too. **The five work commits are 2–3 seconds apart** — the
   same post-hoc partition as E4-S1A, recorded for the retrospective rather than rewritten.
+- 2026-10-17 — **E4-S2 was split by criterion at its start**, not at review — S2A (multi-select, the cap,
+  the grid, the sequential queue; criteria 1, 3, 4) and S2B (downscale; criterion 2) — applying the
+  sprint's own lesson before it could be quoted at us. S2A (PR #116) measured **1,686 hand-written** at
+  its tip (production 810, tests 794, docs 82). Its constructed criterion cut — defer the queue, keep
+  selection and grid — typechecks, lints, passes 24 of its 38 tests and measures **1,273**, with
+  **production alone at 642**, over the ~500 threshold; so no cut reaches the budget. The queue is
+  concurrency one (`maxActive: 1` measured), a failure never aborts the files behind it (the `continue`
+  mutant killed), retry resends the same `File`, and invalidation stays on success only. The cap ignores
+  overflow with one sentence and names refusals per file. The five mutants (cap, `Promise.all`,
+  `return`, retry identity, `onSettled`) all died.

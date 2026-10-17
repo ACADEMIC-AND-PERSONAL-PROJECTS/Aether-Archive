@@ -441,6 +441,9 @@ opens on tap, feels tactile, and gets out of the way.
 > the sequential queue with per-file state); **E4-S2B** carries criterion 2 (downscale) and its half of
 > criterion 5. The cut never fails a criterion — downscale is independent of selection — and it takes
 > the canvas-dependent work (ADR-018: jsdom has no canvas) out of the larger slice. Points unchanged.
+> **S2A** (PR #116) measured **1,686 hand-written** at its tip (production 810, tests 794, docs 82);
+> its constructed criterion cut (defer the queue) measured **1,273** — production alone 642, over the
+> threshold — so it keeps the atomic exception on arithmetic rather than being re-cut again.
 
 - [ ] **(A)** Multi-select picker; hard cap of 6 with a quiet explanation, extra selections ignored or blocked.
 - [ ] **(B)** Images downscaled/compressed client-side before upload when above a threshold (quality preserved for viewing).
