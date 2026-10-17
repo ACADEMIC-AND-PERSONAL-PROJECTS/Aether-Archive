@@ -545,7 +545,7 @@ delivery, documentation, and a clean v1.0.
 
 | ID | Story | P | Pts | Sprint | Status |
 | --- | --- | --- | --- | --- | --- |
-| E6-S1 | CI — backend + frontend on every PR | p0 | 5 | 4 | Todo |
+| E6-S1 | CI — backend + frontend on every PR | p0 | 5 | 4 | In review |
 | E6-S2 | Required status checks on `main`/`develop` | p0 | 2 | 4 | Todo |
 | E6-S3 | Accessibility audit (WCAG 2.2 AA) | p1 | 3 | 5 | Todo |
 | E6-S4 | Real-device verification pass (LAN) | p0 | 3 | 5 | Todo |
@@ -566,6 +566,7 @@ delivery, documentation, and a clean v1.0.
 | E6-S19 | Upload-validation hardening from E4-S1A's review | p2 | 1 | — | Todo |
 | E6-S20 | Static-WebP downscaling, once animation and alpha are detectable | p2 | 2 | — | Todo |
 | E6-S21 | Splash hero URL origin validation | p2 | 1 | — | Todo |
+| E6-S22 | GitHub Actions majors and Dependabot | p2 | 1 | — | Todo |
 
 ### E6-S1 — CI on every PR · 5 pts · p0
 
@@ -768,6 +769,19 @@ splash issue an off-machine request — the one thing the rule forbids.
       quiet failure, never a request.
 - [ ] A test pins the refusal with an absolute and a protocol-relative URL, and a backend test pins the
       relative guarantee the client relies on.
+
+### E6-S22 — GitHub Actions majors and Dependabot · 1 pt · p2
+
+*As a maintainer, I want the CI's own actions current and watched, so the pipeline does not rot under
+deprecation warnings.*
+
+E6-S1 pins every action to a commit SHA on the then-current `v4` tags. Run logs already warn that
+`setup-java@v4` is deprecated and that the Node 20 runtime under `checkout`/`setup-node` is forced onto
+Node 24; current majors are checkout v7, setup-java v6, setup-node v7 and upload-artifact v7.
+
+- [ ] Migrate the workflow to the current major of each action, pinned by SHA, and re-run the suite.
+- [ ] Add `.github/dependabot.yml` for `github-actions` (and optionally `npm`/`maven`) with a weekly
+      schedule; review the first PR it opens rather than auto-merging.
 
 ---
 
