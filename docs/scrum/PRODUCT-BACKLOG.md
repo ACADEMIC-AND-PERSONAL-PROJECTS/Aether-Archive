@@ -403,7 +403,7 @@ opens on tap, feels tactile, and gets out of the way.
 | ID | Story | P | Pts | Sprint | Status |
 | --- | --- | --- | --- | --- | --- |
 | E4-S1A | Single photo upload — the picker and the validation (criterion 1) | p0 | 2 | 3 | Done |
-| E4-S1B | Single photo upload — send, progress, cancel, retry, invalidation (criteria 2–4) | p0 | 3 | 3 | In review |
+| E4-S1B | Single photo upload — send, progress, cancel, retry, invalidation (criteria 2–4) | p0 | 3 | 3 | Done |
 | E4-S2A1 | The selection grid surface (criterion 3) | p0 | 1 | 3 | In review |
 | E4-S2A2 | Multi-select (≤ 6) and the sequential queue (criteria 1, 4) | p0 | 2 | 3 | Todo |
 | E4-S2B | Client-side downscale before upload (criterion 2) | p0 | 2 | 3 | Todo |
@@ -421,7 +421,7 @@ opens on tap, feels tactile, and gets out of the way.
 > was not hermetic against `VITE_MAX_UPLOAD_MB`). **E4-S1A** (2 pts, PR #114, merge `c376404`) carries criterion 1 — the
 > picker and the validation; measured **776 hand-written** at its tip, and its exception is claimed on a
 > **measured state cut** at **555**, still over the ~500 branch threshold, so no cut reaches the budget.
-> **E4-S1B** (3 pts, PR #115) carries criteria 2–4 — send with progress and cancel, then retry and
+> **E4-S1B** (3 pts, PR #115, merge `eced081`) carries criteria 2–4 — send with progress and cancel, then retry and
 > invalidation; it closes #31. It measured **1,279 hand-written** at its final tip (branch total 1,326
 > with the records) and claims the exception on a **constructed criterion cut** at **1,157** — 1,122 at
 > the reviewed tip, 1,115 in the reviewer's reconstruction — still 2.3× the ~500 threshold. Points are
