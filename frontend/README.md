@@ -1017,8 +1017,73 @@ local stub; scripts outside the repository; the stub answers every second upload
   390 × 844 at DPR 3.
 
 Not measured here: a physical phone, Safari, a screen reader, and a real backend's `StorageService.store`
-timing (the stub never stores). Downscaling is E4-S2B and is not in this slice — the picked `File` is
-sent as-is.
+timing (the stub never stores). Downscaling arrived in E4-S2B — the next section — so the queue now
+sends the prepared `File`, not the picked one.
+
+## Downscaling before upload — measured (E4-S2B)
+
+The queue sends a downscaled copy when a photo is wasteful and the picked `File` unchanged otherwise.
+The decision is pure (`planDownscale` in `lib/upload/downscale.ts`); the browser edge sits behind
+injectable dependencies like `lib/color/decode.ts`; the tile keeps painting the original object URL,
+so the user always sees their own photo.
+
+- **`MAX_LONG_EDGE = 2560 px`** — a 390 CSS px phone at DPR 3 needs 1170 physical pixels; 2560 leaves
+  room for zoom and larger displays while staying above normal viewing resolution. The **long** edge is
+  capped, so portrait and landscape are treated alike.
+- **`MAX_BYTES_BEFORE_DOWNSCALE = 6 MiB`** — some files are heavy without being tall (a 2560 × 2560 PNG
+  can weigh far more than its pixels suggest), so source size alone also triggers a re-encode.
+- **`JPEG_QUALITY = 0.9`** — visually indistinguishable at 2560 px at normal viewing distance; PNG
+  ignores it (lossless).
+
+A file is prepared when its long edge is **over** 2560 **or** its source bytes are **over** 6 MiB;
+exactly at either bound is untouched (tests pin 2560 vs 2561 and 6 MiB vs +1). The long edge is capped
+and the other axis follows the aspect ratio, rounded to the nearest pixel. When only the byte threshold
+is crossed, the dimensions are kept and the file is re-encoded.
+
+**Eligible types and output.** JPEG/JPG → JPEG; WebP → JPEG; PNG → PNG (the only output that can carry
+alpha). GIF is skipped because a canvas holds one frame and the animation would be lost; AVIF because
+canvas can decode but not universally encode it. Everything else is sent unchanged. The returned `File`
+carries the **encoded blob's own type**, not merely the requested one: MDN records that an unsupported
+requested type falls back to PNG, and `StorageService.store` refuses a declared type that contradicts
+the magic bytes, so a fallback must travel as PNG.
+
+**Failure.** `downscaleForUpload` never rejects: no `createImageBitmap` (jsdom, an old engine), a
+decode failure, no 2D context, a `null` `toBlob`, or an encoder rejection all return the **original
+`File`**. The queue catches a rejection too. Downscaling can make an upload smaller; it can never stop
+one.
+
+**In the queue.** The prepared file is stored on the item (`uploadFile`) and sent, so "Try again"
+resends that same object and never encodes twice. The progress total is the sent file's size; while
+preparation runs the line is the indeterminate pulse (the total is genuinely unknown), then it becomes
+the determinate 0 % line once the request opens.
+
+### Measured
+
+`npm run test -- --run` and `npm run test -- --run --sequence.shuffle`: **29 files, 341 tests, both
+green**. `downscale.test.ts` adds 29 cases (planner boundaries/types/rounding, then execution against
+injected ports and every failure fallback); `WorkshopView.test.tsx` adds 3 (prepared body, retry
+identity, rejected fallback).
+
+Probe: headless Chromium 152 at 390 × 844 DPR 3, built `dist/` served by a local stub, scripts outside
+the repository. A generated 4000 × 3000 JPEG was picked, uploaded, and the stub recorded and saved the
+multipart `file` part; Chromium then decoded both the fixture and the received bytes with
+`createImageBitmap`:
+
+|                     | Original fixture          | Received by the stub                                    |
+| ------------------- | ------------------------- | ------------------------------------------------------- |
+| Dimensions          | 4000 × 3000               | **2560 × 1920**                                         |
+| Bytes               | 3,800,460                 | **853,780** (22.5 % of the source)                      |
+| Media type          | `image/jpeg`              | `image/jpeg`                                            |
+| Magic bytes         | `ff d8 ff e0 00 10 4a 46` | `ff d8 ff e0 00 10 4a 46`                               |
+| Decodes in Chromium | yes                       | **yes** (the dimensions above are the decoded bitmap's) |
+
+- The `file` part was `filename="photo-4000x3000.jpg"`, `Content-Type: image/jpeg`, 853,780 bytes; the
+  `category` part was `uncategorized`. 0 off-origin requests, 0 page exceptions.
+- Progress during preparation: `data-total="0"`, no `aria-valuenow` (the pulse). Once the request was
+  in flight: `data-total="853780"`, `aria-valuenow="0"` — the sent size, not the source's 3,800,460.
+- There is no visual change in this story (the grid, the panel and the progress line are E4-S2A's), so
+  no mobile capture is required. Not measured here: Safari's `OffscreenCanvas`/`toBlob` behaviour and a
+  physical phone; the fallback keeps Safari uploadable regardless.
 
 ## Zero external requests — measured on the built bundle
 
