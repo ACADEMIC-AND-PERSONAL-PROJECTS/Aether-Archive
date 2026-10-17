@@ -187,8 +187,12 @@ export function SplashView() {
 /** The four states, decided once here so the view above stays a markup.
  *
  * The order of the questions is the order of what the user can see: no photo *yet* (the query is still
- * asking, or still retrying) outranks everything, because nothing else has been observed. The empty
- * archive is checked before the generic failure — it is an answer, not a fault.
+ * asking, or still retrying) outranks everything, because nothing else has been observed. On a **first
+ * fetch** the empty archive is checked before the generic failure — it is an answer, not a fault. On a
+ * **failed refetch** the kept photo means the empty answer cannot arise, because `_docs/openapi.yml` has
+ * no delete endpoint: an archive that had a photo still has it, so `isError` is the only question left.
+ * If a future story adds deletion, this is the branch that has to ask `isEmptyArchive` before answering
+ * `error` — recorded here rather than discovered then.
  *
  * A photo whose bytes arrived but will not decode is an **error even while an earlier photo is still
  * painted**: that src belongs to a photo this visit no longer offers, so reporting `ready` would tell

@@ -464,8 +464,10 @@ built bundle in headless Chromium 152 at 390 × 844, same stub mechanism as abov
 `aether-breathe` (2400 ms). Over 2.6 s: 26 frames, 24 distinct opacities, **0.250008 → 0.999961**; the
 painted centre moved rgb(18,18,21) → rgb(13,13,14). `document.getAnimations()` reported one running
 animation; `[role=progressbar]` count **0**. Under `Emulation.setEmulatedMedia`
-`prefers-reduced-motion: reduce`: a single value (**0.250**), `animation-duration: 1e-05s`, **0** running
-animations — the class carries no `motion-enter` marker, so §11's global freeze leaves the still frame.
+`prefers-reduced-motion: reduce`: a single value (**0.250**), `animation-duration: 1e-05s`, and the
+animation **never starts** — reviewed and corrected: `getAnimations()` still returns **one** animation, but
+it is `pending` with `startTime: null`, not "0 running". The class carries no `motion-enter` marker, so
+§11's global freeze leaves the still frame.
 
 **Empty is one sentence.** Painted: "Your archive is empty for now." in Playfair Display, 19.035 px,
 glyph `rgb(229,227,224)` on base `rgb(11,11,13)` — **15.35:1**. No pulse, no retry; the tap target is

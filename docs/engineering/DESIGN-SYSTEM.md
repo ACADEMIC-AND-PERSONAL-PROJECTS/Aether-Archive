@@ -222,7 +222,8 @@ compiles to nothing at all.
 global `reduce` freeze (§11) shrinks it to a still frame at 0.25 — the intended reduced-motion reading.
 It animates opacity only, never a transform, so it cannot become a containing block. Measured in
 Chromium over 2.6 s: 26 frames, 24 distinct opacities, **0.250008 → 0.999961**; under emulated `reduce`,
-one value (**0.250**), `animation-duration: 1e-05s`, no running animations.
+one value (**0.250**), `animation-duration: 1e-05s`, and the animation never starts (`pending`,
+`startTime: null` — it is not "0 animations", which a later reviewer measured and corrected).
 
 - **Route transitions are entry-only.** `app/RouteTransition.tsx` keys one wrapper on the view's
   identity (`lib/motion/route.ts`), so React replaces the view and the entry replays on the new

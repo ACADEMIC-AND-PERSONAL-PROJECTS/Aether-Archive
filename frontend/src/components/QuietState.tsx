@@ -86,8 +86,13 @@ export interface QuietErrorProps {
 /**
  * The error notice: a bottom-anchored glass panel, one sentence plus a real retry button.
  *
- * `role="status"` is the polite half of the ARIA guidance (WAI-ARIA APG, alert pattern): the message
- * is announced when it appears, focus is **not** moved, and the retry stays in the normal tab order.
+ * `role="status"` is the polite half of the ARIA guidance (WAI-ARIA APG, alert pattern): the region is
+ * exposed politely, focus is **not** moved, and the retry stays in the normal tab order. **What that does
+ * not buy, stated rather than implied**: the region mounts together with its text, and a live region
+ * announces *changes* to content that already exists — most screen readers will not announce a node
+ * inserted with its content. So the exposure is real and the announcement is unverified; **E3-S5** owns
+ * the AT pass that decides between a persistent region and this one, and the same applies to
+ * {@link QuietEmpty}, whose sentence is on screen from its first render.
  * The button's visible name is "Try again"; `aria-describedby` gives it the sentence as its
  * description, so a screen reader hears the context without the accessible name drifting away from
  * the visible label (WCAG 2.5.3).
