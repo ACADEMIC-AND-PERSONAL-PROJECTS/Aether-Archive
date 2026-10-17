@@ -420,10 +420,10 @@ opens on tap, feels tactile, and gets out of the way.
 > picker and the validation; measured **776 hand-written** at its tip, and its exception is claimed on a
 > **measured state cut** at **555**, still over the ~500 branch threshold, so no cut reaches the budget.
 > **E4-S1B** (3 pts, PR #115) carries criteria 2–4 — send with progress and cancel, then retry and
-> invalidation; it closes #31. It measured **1,234 hand-written** at its tip (branch total 1,269 with
-> the records) and claims the exception on a **constructed criterion cut** at **1,122** — **1,115** in
-> the review's independent reconstruction — still 2.2× the ~500 threshold. Points are unchanged; the
-> sprint record (`docs/scrum/sprints/sprint03.md`, notes) carries the measurements.
+> invalidation; it closes #31. It measured **1,279 hand-written** at its final tip (branch total 1,325
+> with the records) and claims the exception on a **constructed criterion cut** at **1,157** — 1,122 at
+> the reviewed tip, 1,115 in the reviewer's reconstruction — still 2.3× the ~500 threshold. Points are
+> unchanged; the sprint record (`docs/scrum/sprints/sprint03.md`, notes) carries the measurements.
 
 - [ ] **(A)** Native file picker (accept images only), client-side type/size validation before upload.
 - [ ] **(B)** Upload progress indicator (glass, quiet); cancel supported where feasible.

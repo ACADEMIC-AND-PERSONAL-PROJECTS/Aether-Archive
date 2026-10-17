@@ -311,12 +311,13 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   (the only transport with request progress and in-flight cancel), the quiet 2 px progress line, Cancel
   returning to the same `File`, Try again resending that same object, and one prefix invalidation of
   `photos` on success only — pinned in both directions, which kills the `onSuccess → onSettled` mutant
-  the #113 review found alive. It measured **1,234 hand-written** at its tip (production 485, tests 624,
-  docs 125), 2.5× the ~500 branch threshold; the branch total is **1,269** with the 35 record lines.
+  the #113 review found alive. It measured **1,279 hand-written** at its final tip (production 492,
+  tests 654, docs 133), 2.6× the ~500 branch threshold; the branch total is **1,325** with the 46
+  record lines.
   Its exception is claimed on a **constructed criterion cut** — defer criterion 3's retry surface, keep
-  criteria 2 and 4 — which typechecks, lints, passes 25 of the slice's 29 tests and measures **1,122**;
-  the review's independent reconstruction measured **1,115**, seven lines lower, and the conclusion is
-  unaffected because both are 2.2× the threshold. The two surface sums are 588 (API) and 646 (view), and
+  criteria 2 and 4 — which typechecks, lints, passes 26 of the slice's 30 tests and measures **1,157 at
+  the final tip** (1,122 at the reviewed tip; the review's independent reconstruction measured 1,115),
+  still 2.3× the threshold. The two surface sums are 588 (API) and 646 (view), and
   neither is a viable slice (the API alone delivers nothing visible; the view alone cannot send). So no
   cut reaches the budget, and the claim is stated as that measurement rather than as an inseparability.
   **The review upheld the exception and found no behavioural defect**; its two blockers were a stale
