@@ -293,6 +293,11 @@ that are rules, not taste:
 
 - Contrast: ≥ 4.5:1 for text (≥ 3:1 for ≥ 24 px), enforced by construction in the theme generator.
 - Focus visible and consistent; glass overlays trap focus, close on `Esc`, restore focus.
+- **The automated gate is axe-core 4.14, zero violations at every impact** — not only `serious` — on the
+  splash (ready, empty, error) and the menu. It is a dev dependency with no transitive dependencies,
+  absent from `dist/`. In jsdom it is a **structural** gate: `color-contrast` comes back `incomplete`
+  on the splash and `inapplicable` on the menu (no layout, no paint). Contrast evidence belongs to the
+  behaviour slice.
 - Drag-and-drop has a keyboard path and announces moves; nothing is touch-only.
 - Touch targets ≥ 44 × 44 px; no hover-only affordances.
 
@@ -328,6 +333,10 @@ that are rules, not taste:
   the empty base and on the notice over white and dark photos, the notice's placement through an entry,
   and the Tab/Enter path (`reports/e3s4-*.png`). The probe's network audit reports every request
   same-origin and none off-origin.
+- Accessibility audit (E3-S5A): RTL pins roles, names, the focus trap, `Esc` and the focus return on
+  the splash and the menu; five axe-core runs (ready, empty, error and menu open on the splash; the
+  menu alone) assert zero violations at every impact, with the `color-contrast` buckets named.
+  Captures, painted contrast and the inert/announcement measurements arrive with the behaviour slice.
 
 ## 11. The CSS foundation (E2-S3)
 

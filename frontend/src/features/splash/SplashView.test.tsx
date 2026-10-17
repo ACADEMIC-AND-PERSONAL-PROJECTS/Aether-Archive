@@ -14,6 +14,7 @@ import {
   TAP_SLOP_PX,
 } from "../../lib/gesture/pullToRefresh";
 import { LOADING_PULSE } from "../../lib/motion/tokens";
+import { ruleStatus, runAxe, violationSummary } from "../../test/axe";
 
 import type { Palette } from "../../lib/color/types";
 import type * as HeroModule from "../../lib/image/hero";
@@ -590,6 +591,61 @@ describe("SplashView — quiet states (E3-S4)", () => {
     expect(screen.getByRole("status")).toHaveTextContent(/^Couldn't load a photo\.$/);
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
     expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("SplashView — the accessibility audit (E3-S5A)", () => {
+  /*
+   * The threshold is in `test/axe.ts`: **zero violations at every impact**. The `color-contrast` bucket
+   * is asserted too, because a green axe run in jsdom is not a contrast check — measured on this
+   * screen, axe returns it as `incomplete` (no layout, no paint, no canvas), and on the menu as
+   * `inapplicable`. Contrast evidence belongs to the behaviour slice, not this gate.
+   */
+  it("should produce no axe violations in the ready state, with contrast named incomplete", async () => {
+    stubApi(() => jsonResponse(PHOTO));
+    renderSplash();
+
+    await screen.findByRole("img", { name: "A photo from your archive" });
+    const results = await runAxe(document.body);
+
+    expect(violationSummary(results)).toEqual([]);
+    expect(ruleStatus(results, "color-contrast")).toBe("incomplete");
+  });
+
+  it("should produce no axe violations in the empty state, with contrast named incomplete", async () => {
+    stubApi(() => problemResponse("empty-archive", 404));
+    renderSplash();
+    await screen.findByRole("status");
+
+    const results = await runAxe(document.body);
+
+    expect(violationSummary(results)).toEqual([]);
+    expect(ruleStatus(results, "color-contrast")).toBe("incomplete");
+  });
+
+  it("should produce no axe violations in the error state, with contrast named incomplete", async () => {
+    stubApi(() => problemResponse("not-found", 404));
+    renderSplash();
+    await screen.findByRole("status");
+
+    const results = await runAxe(document.body);
+
+    expect(violationSummary(results)).toEqual([]);
+    expect(ruleStatus(results, "color-contrast")).toBe("incomplete");
+  });
+
+  it("should produce no axe violations with the menu open, and not mistake inapplicable for a pass", async () => {
+    stubApi(() => jsonResponse(PHOTO));
+    renderSplash();
+    await screen.findByRole("img", { name: "A photo from your archive" });
+
+    fireEvent.click(tapTarget());
+    const results = await runAxe(document.body);
+
+    expect(violationSummary(results)).toEqual([]);
+    // Measured: with the dialog open axe does not evaluate the rule at all — `inapplicable`, not
+    // `pass`. Contrast evidence belongs to the behaviour slice, not this gate.
+    expect(ruleStatus(results, "color-contrast")).toBe("inapplicable");
   });
 });
 
