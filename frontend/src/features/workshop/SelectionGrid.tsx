@@ -1,20 +1,35 @@
 import {
   DndContext,
   DragOverlay,
+  KeyboardSensor,
   MouseSensor,
   TouchSensor,
   closestCenter,
   useSensor,
   useSensors,
+  type Announcements,
   type DragEndEvent,
   type DragStartEvent,
+  type UniqueIdentifier,
 } from "@dnd-kit/core";
-import { SortableContext, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import {
+  SortableContext,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 
 import { prefersReducedMotion } from "../../lib/motion/reduced";
 import { EASE_SOFT } from "../../lib/motion/tokens";
+import {
+  cancelAnnouncement,
+  dropAnnouncement,
+  moveAnnouncement,
+  pickupAnnouncement,
+  SCREEN_READER_INSTRUCTIONS,
+} from "../../lib/ordering/announce";
 import {
   AUTO_SCROLL_OPTIONS,
   DROP_ANIMATION_MS,
@@ -26,7 +41,7 @@ import {
 
 /**
  * The selection grid — one tile per picked photo, with its own state and its own way out (E4-S2A1),
- * and since E4-S3 the place where the dump's order is arranged by pointer or finger.
+ * and since E4-S3 the place where the dump's order is arranged by pointer, finger or keyboard.
  *
  * ## Why it is a separate component
  *
@@ -60,16 +75,21 @@ import {
  * While an upload is in flight, the remove button is disabled rather than removed, and dragging is
  * disabled for the same reason — the E4-S3B decision the story asked for: the queue reads the array
  * once when it starts, so a reorder mid-batch would make the grid disagree with the order the requests
- * are actually leaving in. Both controls come back when the request settles.
+ * are actually leaving in. Both controls come back when the request settles, and the tiles carry
+ * `aria-disabled` while busy, so assistive tech hears that the grid is not movable.
  *
- * ## The activator is not focusable yet, on purpose
+ * ## The keyboard path (E4-S3D)
  *
- * The keyboard sensor, dnd-kit's `attributes`, the announcements and the instructions are the second
- * half of E4-S3 (E4-S3D), not this slice. Spreading `attributes` without a sensor would put a control in the
- * tab order that does nothing when activated — a dead focus stop — and point a screen reader at keys
- * the grid does not listen for. So this slice spreads **only the listeners**: the activator is a
- * pointer/touch surface, the remove button stays the tile's only focusable control, and
- * `data-testid="drag-activator"` is what tests and the probe use.
+ * dnd-kit's `attributes` put the drag surface in the tab order with `role="button"`, a name that
+ * states the photo's position and file, and `aria-describedby` pointing at our instructions;
+ * `KeyboardSensor` with `sortableKeyboardCoordinates` turns Space/Enter into a lift, the arrows into
+ * moves to the nearest tile, Space/Enter into a drop and Escape into a cancel. Without the coordinate
+ * getter the sensor moves the overlay in 25 px steps and never changes the order. E4-S3B deliberately
+ * shipped no focus stop without a sensor; the two land together here.
+ *
+ * Announcements (`lib/ordering/announce.ts`) are built from the current array, so a reader hears
+ * "Photo 2 of 6 moved to position 4." rather than generated ids. The workshop's own `role="status"`
+ * region stays silent during a drag: it narrates uploads, and a drag changes none.
  *
  * ## Reordering
  *
@@ -181,6 +201,16 @@ function removeLabel(item: SelectionItem): string {
   return item.file.name === "" ? "Remove photo" : `Remove ${item.file.name}`;
 }
 
+/**
+ * The tile's keyboard name. The position comes first because a move changes it and the announcement
+ * then has something to refer to; the file name follows so six tiles are still distinguishable.
+ */
+function tileLabel(item: SelectionItem, position: number, total: number): string {
+  return item.file.name === ""
+    ? `Photo ${position} of ${total}`
+    : `Photo ${position} of ${total}: ${item.file.name}`;
+}
+
 /** The artwork layer shared by the tile and its drag overlay: scrim, then the preview if it decoded. */
 function TileFace({
   item,
@@ -212,23 +242,34 @@ function TileFace({
 /** One sortable tile. `useSortable` may only live below `SortableContext`, never in the overlay. */
 function SortableTile({
   item,
+  position,
+  total,
   busy,
   reducedMotion,
   onRemove,
   onPreviewError,
 }: {
   readonly item: SelectionItem;
+  readonly position: number;
+  readonly total: number;
   readonly busy: boolean;
   readonly reducedMotion: boolean;
   readonly onRemove: (id: string) => void;
   readonly onPreviewError: (id: string) => void;
 }) {
-  const { listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
-    useSortable({
-      id: item.id,
-      disabled: busy,
-      transition: reducedMotion ? null : SORTABLE_TRANSITION,
-    });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: item.id,
+    disabled: busy,
+    transition: reducedMotion ? null : SORTABLE_TRANSITION,
+  });
 
   const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -245,15 +286,17 @@ function SortableTile({
       className={`min-w-0 ${isDragging ? "opacity-0" : ""}`}
     >
       <div className="relative aspect-square overflow-hidden rounded-[14px]">
-        {/* The drag surface. Deliberately a sibling of the remove button, and deliberately not a
-            focus stop until the keyboard slice brings the sensor: see the header. */}
+        {/* The drag surface — a sibling of the remove button, and the tile's keyboard affordance
+            since E4-S3D: the attributes put it in the tab order and dnd-kit's sensor listens. */}
         <div
           ref={setActivatorNodeRef}
+          {...attributes}
           {...listeners}
+          aria-label={tileLabel(item, position, total)}
           data-testid="drag-activator"
           // `touch-action: manipulation` leaves vertical panning and pinch-zoom to the browser, so a
           // short swipe scrolls the grid instead of lifting the tile (measured in the Chromium probe).
-          className="absolute inset-0 touch-manipulation rounded-[14px] [@media(pointer:fine)]:cursor-grab [@media(pointer:fine)]:active:cursor-grabbing"
+          className="absolute inset-0 touch-manipulation rounded-[14px] focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/50 [@media(pointer:fine)]:cursor-grab [@media(pointer:fine)]:active:cursor-grabbing"
         >
           <TileFace item={item} onPreviewError={onPreviewError} />
         </div>
@@ -309,7 +352,52 @@ export function SelectionGrid({
         tolerance: TOUCH_LONG_PRESS_TOLERANCE_PX,
       },
     }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
+
+  /*
+   * The announcements are built from the current array so they speak positions rather than ids.
+   * `positionOf` is 1-based; `null` stands for "no such tile" (an over that resolved to nothing).
+   */
+  const announcements = useMemo<Announcements>(() => {
+    const positionOf = (id: UniqueIdentifier | null | undefined): number | null => {
+      if (id === null || id === undefined) {
+        return null;
+      }
+      const index = items.findIndex((item) => item.id === id);
+      return index === -1 ? null : index + 1;
+    };
+
+    return {
+      onDragStart({ active }) {
+        const position = positionOf(active.id);
+        return position === null ? undefined : pickupAnnouncement(position, items.length);
+      },
+      onDragOver({ active, over }) {
+        const position = positionOf(active.id);
+        const destination = positionOf(over?.id);
+        // dnd-kit's first `over` is the tile itself. Announcing "moved to position 1" there would
+        // overwrite the pick-up instructions with a sentence that says nothing moved.
+        return position === null || destination === null || destination === position
+          ? undefined
+          : moveAnnouncement(position, items.length, destination);
+      },
+      onDragEnd({ active, over }) {
+        const position = positionOf(active.id);
+        if (position === null) {
+          return undefined;
+        }
+        const destination = positionOf(over?.id);
+        return destination === null
+          ? cancelAnnouncement(position, items.length)
+          : dropAnnouncement(destination, items.length);
+      },
+      onDragCancel({ active }) {
+        const position = positionOf(active.id);
+        return position === null ? undefined : cancelAnnouncement(position, items.length);
+      },
+    };
+  }, [items]);
 
   const activeItem =
     activeId === null ? null : (items.find((item) => item.id === activeId) ?? null);
@@ -338,6 +426,10 @@ export function SelectionGrid({
       sensors={sensors}
       collisionDetection={closestCenter}
       autoScroll={AUTO_SCROLL_OPTIONS}
+      accessibility={{
+        announcements,
+        screenReaderInstructions: { draggable: SCREEN_READER_INSTRUCTIONS },
+      }}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveId(null)}
@@ -348,10 +440,12 @@ export function SelectionGrid({
         disabled={busy}
       >
         <ul role="list" aria-label="Selected photos" className="grid grid-cols-3 items-start gap-2">
-          {items.map((item) => (
+          {items.map((item, index) => (
             <SortableTile
               key={item.id}
               item={item}
+              position={index + 1}
+              total={items.length}
               busy={busy}
               reducedMotion={reducedMotion}
               onRemove={onRemove}
@@ -362,8 +456,8 @@ export function SelectionGrid({
       </SortableContext>
 
       {/* A clone, not a second sortable: calling `useSortable` here would register a duplicate id.
-          `aria-hidden` because the tile's own text already describes it. The status line sits inside
-          the lifted square on its own scrim: see the header. */}
+          `aria-hidden` because the live region, not a second reading of the tile, is the announcement.
+          The status line sits inside the lifted square on its own scrim: see the header. */}
       <DragOverlay
         dropAnimation={reducedMotion ? null : { duration: DROP_ANIMATION_MS, easing: EASE_SOFT }}
       >
