@@ -284,7 +284,7 @@ opens on tap, feels tactile, and gets out of the way.
 | --- | --- | --- | --- | --- | --- |
 | E3-S1 | Immersive splash view | p0 | 5 | 3 | Done |
 | E3-S2 | Glass menu overlay | p0 | 5 | 3 | Done |
-| E3-S3 | Route transitions & motion system | p0 | 3 | 3 | Todo |
+| E3-S3 | Route transitions & motion system | p0 | 3 | 3 | Done |
 | E3-S4 | Quiet loading / empty / error states | p1 | 2 | 3 | Todo |
 | E3-S5 | View tests & accessibility pass | p0 | 3 | 3 | Todo |
 
@@ -338,6 +338,15 @@ opens on tap, feels tactile, and gets out of the way.
 - [ ] Animations are interruptible; back/forward navigation remains correct.
 - [ ] Reduced motion disables transforms (opacity only).
 - [ ] Screenshots/recording attached for the review.
+
+> **Delivered in one PR (Sprint 3)**: #106, merged `f84063a`, **1,224 hand-written changed lines** (1,190 at
+> review → 1,224 merged), 663 of them product against 561 of record. Over both budgets; the exception claim
+> was restated after review — a third cut existed and met every criterion, so the claim rests on the budget
+> arithmetic rather than on inseparability. ADR-022 declines **Framer Motion** (measured +83.92 kB raw /
+> +29.22 kB gzip for the smallest tree-shaken import against +0.49 / +0.15 for the CSS layer) — a divergence
+> from `_docs/aether_archive_specs.md`, **approved by the owner on 2026-10-17** and recorded with a named
+> revisit trigger. Two findings were routed rather than absorbed: scroll restoration between scrollable
+> views → **E5-S1**; a `position: fixed` overlay coupling to the transformed wrapper → **E3-S4**.
 
 ### E3-S4 — Quiet loading / empty / error states · 2 pts · p1
 
