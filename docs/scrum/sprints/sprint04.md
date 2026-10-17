@@ -14,7 +14,7 @@
 | # | ID | Story | Points | Priority | Status | PR |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | E6-S1 | CI on every PR — backend and frontend jobs, cached, under 8 minutes | 5 | p0 | Done | #123 |
-| 2 | E4-S3 | Drag-and-drop ordering — `@dnd-kit`, a pure reducer, the keyboard path | 8 | p0 | In progress | — |
+| 2 | E4-S3 | Drag-and-drop ordering — `@dnd-kit`, a pure reducer, the keyboard path | 8 | p0 | In review | #124 |
 | 3 | E4-S4 | Aura colour picker — hex input, palette swatches, live glass preview | 5 | p0 | Todo | — |
 | 4 | E4-S5 | Publish dump — `POST /dumps`, optimistic insert, rollback | 5 | p0 | Todo | — |
 | 5 | E6-S2 | Required status checks on `main` and `develop` | 2 | p0 | Todo | — |
