@@ -312,11 +312,21 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   returning to the same `File`, Try again resending that same object, and one prefix invalidation of
   `photos` on success only — pinned in both directions, which kills the `onSuccess → onSettled` mutant
   the #113 review found alive. It measured **1,234 hand-written** at its tip (production 485, tests 624,
-  docs 125), 2.5× the ~500 branch threshold. Its exception is claimed on a **constructed criterion cut**
-  — defer criterion 3's retry surface, keep criteria 2 and 4 — which typechecks, lints, passes 25 of the
-  slice's 29 tests and measures **1,122**, still 2.2× the threshold; the two surface sums are 588 (API)
-  and 646 (view), and neither is a viable slice (the API alone delivers nothing visible; the view alone
-  cannot send). So no cut reaches the budget, and the claim is stated as that measurement rather than as
-  an inseparability. The cancelled-upload sentence is visible now (`toBeVisible()` on the panel node,
-  not a hidden one), and the screen never claims the archive stored nothing — a cancel can race
-  `StorageService.store`, which the README and the probe record on both sides.
+  docs 125), 2.5× the ~500 branch threshold; the branch total is **1,269** with the 35 record lines.
+  Its exception is claimed on a **constructed criterion cut** — defer criterion 3's retry surface, keep
+  criteria 2 and 4 — which typechecks, lints, passes 25 of the slice's 29 tests and measures **1,122**;
+  the review's independent reconstruction measured **1,115**, seven lines lower, and the conclusion is
+  unaffected because both are 2.2× the threshold. The two surface sums are 588 (API) and 646 (view), and
+  neither is a viable slice (the API alone delivers nothing visible; the view alone cannot send). So no
+  cut reaches the budget, and the claim is stated as that measurement rather than as an inseparability.
+  **The review upheld the exception and found no behavioural defect**; its two blockers were a stale
+  total (the PR carried the record's net growth instead of the branch's gross; re-measured to 1,269) and
+  a missing mobile capture (four now in `reports/e4s1b-{uploading,cancelled,error,success}-390.png`).
+  Its nits found two unpinned behaviours that the author's own mutants missed — a duplicate Upload button
+  inside the uploading branch and three of the four focus transitions survived the suite — both are now
+  pinned, and the awaited-invalidation gating the success UI is pinned by a test with a deferred refetch.
+  The cancelled-upload sentence is visible now (`toBeVisible()` on the panel node, not a hidden one), and
+  the screen never claims the archive stored nothing — a cancel can race `StorageService.store`, which the
+  README and the probe record on both sides; the retry side of the same race (a lost response after a
+  store can duplicate on retry) is documented too. **The five work commits are 2–3 seconds apart** — the
+  same post-hoc partition as E4-S1A, recorded for the retrospective rather than rewritten.
