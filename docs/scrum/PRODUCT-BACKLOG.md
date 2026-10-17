@@ -404,8 +404,8 @@ opens on tap, feels tactile, and gets out of the way.
 | --- | --- | --- | --- | --- | --- |
 | E4-S1A | Single photo upload — the picker and the validation (criterion 1) | p0 | 2 | 3 | Done |
 | E4-S1B | Single photo upload — send, progress, cancel, retry, invalidation (criteria 2–4) | p0 | 3 | 3 | Done |
-| E4-S2A1 | The selection grid surface (criterion 3) | p0 | 1 | 3 | In review |
-| E4-S2A2 | Multi-select (≤ 6) and the sequential queue (criteria 1, 4) | p0 | 2 | 3 | Todo |
+| E4-S2A1 | The selection grid surface (criterion 3) | p0 | 1 | 3 | Done |
+| E4-S2A2 | Multi-select (≤ 6) and the sequential queue (criteria 1, 4) | p0 | 2 | 3 | In progress |
 | E4-S2B | Client-side downscale before upload (criterion 2) | p0 | 2 | 3 | Todo |
 | E4-S3 | Drag-and-drop ordering | p0 | 8 | 4 | Todo |
 | E4-S4 | Aura colour picker with palette suggestions | p0 | 5 | 4 | Todo |
@@ -440,7 +440,7 @@ opens on tap, feels tactile, and gets out of the way.
 > The first cut (S2A = criteria 1, 3, 4; S2B = criterion 2) was recorded at the story's start but did not
 > survive PR #116's review: the reviewer constructed a criterion-3-only cut on top of E4-S1B that is
 > green and measures **244 hand-written**, under both budgets. The story is therefore cut in three:
-> **S2A1** the grid surface (criterion 3, normal budget), **S2A2** multi-select and the queue
+> **S2A1** the grid surface (criterion 3, normal budget, PR #117 merged `abf514d`), **S2A2** multi-select and the queue
 > (criteria 1 and 4, coupled — a queue of one is E4-S1B and a selection the app cannot send is not the
 > story; its exception is claimed on that coupling), **S2B** downscale (criterion 2). #116 was closed
 > unmerged; its review also found a StrictMode defect (`aliveRef` never re-armed), fixed in A2.

@@ -30,8 +30,8 @@
 | 5b | E3-S5B | Accessibility — contrast, `inert`, the announcement fix, the manual pass (criteria 3–5) | 2 | p0 | Done | #111 |
 | 6a | E4-S1A | Single photo upload — the picker and the validation (criterion 1) | 2 | p0 | Done | #114 |
 | 6b | E4-S1B | Single photo upload — send with progress and cancel, then retry and invalidation (criteria 2–4) | 3 | p0 | Done | #115 |
-| 7a | E4-S2A1 | The selection grid surface — one tile, its state and its remove action (criterion 3) | 1 | p0 | In review | #117 |
-| 7b | E4-S2A2 | Multi-select (≤ 6) and the sequential queue (criteria 1, 4) | 2 | p0 | Todo | — |
+| 7a | E4-S2A1 | The selection grid surface — one tile, its state and its remove action (criterion 3) | 1 | p0 | Done | #117 |
+| 7b | E4-S2A2 | Multi-select (≤ 6) and the sequential queue (criteria 1, 4) | 2 | p0 | In progress | — |
 | 7c | E4-S2B | Client-side downscale before upload (criterion 2) | 2 | p0 | Todo | — |
 
 **Total: 12 slices · 28 points** (the row above them is a chore, not a story; E3-S1A/B, E3-S5A/B,
@@ -350,3 +350,11 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   **uploads died under `StrictMode` in `npm run dev` while the built-bundle probe stayed green** — fixed
   in S2A2 with a StrictMode-wrapped test. The generalisable form: a probe of the built bundle cannot
   see development-only double-invocation, and a lifetime ref set only in cleanup is armed by accident.
+- 2026-10-17 — **E4-S2A1 (PR #117, merged `abf514d`) delivered the tile surface.** The picked photo is
+  now one tile with its scrim, named remove and per-file state, on E4-S1B's unchanged send path;
+  **455 hand-written**, under the story threshold. Its review's two blockers were another measured
+  falsification — `min-h-full` "centred" the grid only in the comment: the tile sat at y=24, and the
+  committed capture itself was the evidence — fixed with `justify-center` on the scroll container
+  (301.30 against a computed 301.31) and recaptured; and the slice count (12, not 13). The nits were
+  turned into tests (tile `data-state="error"` on every failure path, URL revocation on replace and
+  remove, the empty-name fallback, focus after a refused replacement).
