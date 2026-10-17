@@ -159,7 +159,7 @@ describe("the picker", () => {
     expect(preview).toHaveAttribute("decoding", "async");
   });
 
-  it("should return to the picker when a replacement pick is refused", () => {
+  it("should return to the picker when a replacement pick is refused", async () => {
     renderWorkshop();
     pickFile(screen.getByLabelText("Choose a photo"), fileOf(2048));
     expect(document.querySelector("main img")).not.toBeNull();
@@ -172,6 +172,7 @@ describe("the picker", () => {
       "isn't an image the archive can keep",
     );
     expect(screen.queryAllByRole("button")).toHaveLength(0);
+    await waitFor(() => expect(screen.getByLabelText("Choose a photo")).toHaveFocus());
   });
 
   it("should drop a preview the browser cannot decode, keeping the file selected", async () => {
@@ -233,6 +234,34 @@ describe("the grid surface", () => {
     expect(screen.getByRole("button", { name: "Remove notes.png" })).toBeDisabled();
     expect(screen.getByRole("listitem")).toHaveAttribute("data-state", "uploading");
     expect(screen.getByRole("listitem")).toHaveTextContent("Uploading");
+  });
+
+  it("should revoke the replaced and the removed preview URLs", () => {
+    const revoke = vi.spyOn(URL, "revokeObjectURL");
+    renderWorkshop();
+
+    pickFile(screen.getByLabelText("Choose a photo"), fileOf(16, "image/png", "a.png"));
+    const firstSrc = document.querySelector("main img")?.getAttribute("src") ?? "";
+    expect(firstSrc).not.toBe("");
+
+    pickFile(screen.getByLabelText("Choose another"), fileOf(16, "image/png", "b.png"));
+    expect(revoke).toHaveBeenCalledWith(firstSrc);
+
+    const secondSrc = document.querySelector("main img")?.getAttribute("src") ?? "";
+    expect(secondSrc).not.toBe(firstSrc);
+    fireEvent.click(screen.getByRole("button", { name: "Remove b.png" }));
+    expect(revoke).toHaveBeenCalledWith(secondSrc);
+  });
+
+  it("should keep a usable name when a file has none", () => {
+    renderWorkshop();
+    pickFile(
+      screen.getByLabelText("Choose a photo"),
+      new File([new Uint8Array(4)], "", { type: "image/png" }),
+    );
+
+    expect(screen.getByRole("button", { name: "Remove photo" })).toBeVisible();
+    expect(screen.getByRole("listitem")).toHaveTextContent("Photo: Waiting");
   });
 });
 
@@ -311,6 +340,7 @@ describe("uploading", () => {
       ),
     );
     // The same sentence lives on the tile, so the failure has an owner even after the panel changes.
+    expect(screen.getByRole("listitem")).toHaveAttribute("data-state", "error");
     expect(screen.getByRole("listitem")).toHaveTextContent("The archive couldn't read that image.");
     expect(screen.getByRole("main")).toHaveAttribute("data-state", "error");
     expect(screen.getByLabelText("Choose another")).toBeVisible();
@@ -349,6 +379,7 @@ describe("uploading", () => {
         "That photo is larger than the archive accepts.",
       ),
     );
+    expect(screen.getByRole("listitem")).toHaveAttribute("data-state", "error");
     expect(screen.getByRole("listitem")).toHaveTextContent(
       "That photo is larger than the archive accepts.",
     );
@@ -375,6 +406,7 @@ describe("uploading", () => {
         "The archive didn't answer. Try again.",
       ),
     );
+    expect(screen.getByRole("listitem")).toHaveAttribute("data-state", "error");
     expect(screen.getByRole("listitem")).toHaveTextContent("The archive didn't answer. Try again.");
     expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent("The archive didn't answer. Try again.");
