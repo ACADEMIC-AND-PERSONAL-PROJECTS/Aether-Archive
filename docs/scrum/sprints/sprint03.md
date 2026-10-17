@@ -24,7 +24,7 @@
 | 1a | E3-S1A | Immersive splash — the photo, its tone, the quiet states (criteria 1, 2, 5) | 3 | p0 | Done | #100 |
 | 1b | E3-S1B | Immersive splash — the tap intent, the pull-to-refresh, the per-visit photo (criteria 3, 4) | 2 | p0 | Done | #101 |
 | 2 | E3-S2 | Glass menu overlay | 5 | p0 | Done | #104 |
-| 3 | E3-S3 | Route transitions & motion system | 3 | p0 | Todo | — |
+| 3 | E3-S3 | Route transitions & motion system | 3 | p0 | Done | #106 |
 | 4 | E3-S4 | Quiet loading / empty / error states | 2 | p1 | Todo | — |
 | 5 | E3-S5 | View tests & accessibility pass | 3 | p0 | Todo | — |
 | 6 | E4-S1 | Single photo upload | 5 | p0 | Todo | — |
@@ -225,3 +225,20 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   artefact of where the mutants point — a decision made silently is equally unpinned and far less likely to
   be hit. The rule is therefore about *testing what you bothered to argue*, not about arguing being the
   hazard.
+- 2026-10-17 — **E3-S3 merged (`f84063a`, PR #106) after REQUEST CHANGES whose three blockers were all
+  records, not code.** The first is the most consequential finding of the sprint: the ADR declining Framer
+  Motion cited `CLAUDE.md`, but the mandate is in `_docs/aether_archive_specs.md` three times — line 11, the
+  menu at line 30, and line 95, *"Polish Framer Motion transitions between all routes"*, which is this
+  story's own criterion 2. `CLAUDE.md` requires an ADR **plus explicit user approval** for a spec change;
+  the ADR had the measurements and no approval, because the mandate had been read from the summary rather
+  than the contract. The owner approved the divergence on the four-build numbers, and the ADR now records
+  it as a divergence with a named revisit trigger. **The generalisable form is the sprint's recurring
+  defect one level up**: a document that points at the contract is not the contract, and a decision recorded
+  against the pointer is a decision recorded against the wrong source.
+- 2026-10-17 — **The sizing signal now has a mechanism, and it is not "decisions are expensive".** The
+  review decomposed E3-S3 as 663 lines of product against 561 of record, and E3-S2 as 137 of record with
+  no committed verify report. The difference between two stories of similar scope is therefore largely a
+  **documentation choice nobody estimates**: the DoD asks for the verify report *pasted in the PR*, and a
+  story that commits it adds a few hundred lines to its own diff. That reframing — **documentation is
+  unbounded by estimation** — is the actionable form for the retrospective, and it is why the three data
+  points (5 pts → 1,516; 5 pts → 1,085; 3 pts → 1,190/1,224) say nothing about the point estimates.
