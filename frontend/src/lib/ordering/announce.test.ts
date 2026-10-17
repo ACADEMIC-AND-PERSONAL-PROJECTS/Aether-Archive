@@ -11,7 +11,7 @@ import {
 /**
  * The announcement copy (E4-S3D1), pinned as exact strings.
  *
- * A screen-reader sentence is a decision, not a by-product of JSX: the story's sample is
+ * A screen-reader sentence is a decision, not a by-product of JSX: the copy decision is
  * "Photo 2 of 6 moved to position 4.", and a wrong position or a plural that drifts is a defect a
  * visual review would never catch. The clamp cases keep a malformed call from saying "Photo 0 of 6".
  */

@@ -1324,7 +1324,7 @@ Tests: the S3B dead-focus-stop test is replaced by the attributes test; keyboard
 Escape cancel and the back-step test join it, plus 8 in `announce.test.ts`. The full suite is **33
 files / 384 tests**; the shuffled suite was run **three times** (`npm run test -- --run
 --sequence.shuffle`), green each time. The workshop chunk grows from 60.45 kB / 19.88 kB gzip to
-**63.78 kB / 20.84 kB gzip** — dnd-kit's keyboard sensor and coordinate getter, inside the lazy chunk.
+**63.86 kB / 20.87 kB gzip** — dnd-kit's keyboard sensor and coordinate getter, inside the lazy chunk.
 
 Not measured here: a real screen reader (the copy and the live region are measured, but whether a
 reader speaks it is not), keyboards on iOS/Safari, and a physical device — **SKIPPED**.
