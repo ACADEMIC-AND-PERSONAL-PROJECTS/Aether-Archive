@@ -1,13 +1,14 @@
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SplashView } from "./SplashView";
 import { queryKeys } from "../../api/queryKeys";
 import { createQueryClient } from "../../app/queryClient";
+import { compositeOver, contrastRatio, hexToRgb, parseColor } from "../../lib/color/contrast";
 import { oklchToHex } from "../../lib/color/oklch";
-import { FALLBACK_THEME, paletteToTheme, type AuraTheme } from "../../lib/color/theme";
+import { FALLBACK_THEME, paletteToTheme, THEME_BANDS, type AuraTheme } from "../../lib/color/theme";
 import {
   PULL_SURFACE_TOUCH_ACTION,
   PULL_THRESHOLD_PX,
@@ -349,6 +350,31 @@ describe("SplashView — the glass menu (E3-S2)", () => {
     expect(document.activeElement).toBe(tapTarget());
   });
 
+  it("should take the covered page out of the accessibility tree while the menu is open", async () => {
+    stubApi(() => jsonResponse(PHOTO));
+    renderSplash();
+    await screen.findByRole("img", { name: "A photo from your archive" });
+
+    // The declaration is the testable half: React renders `inert={true}` as the boolean attribute
+    // `inert=""` (probed; the DOM *property* is what jsdom lacks). The effect — the tap target gone
+    // from the accessibility tree and unfocusable while the dialog is open, back in both once it
+    // closes — is measured in Chromium (`frontend/README.md`, "The accessibility pass").
+    expect(screen.getByRole("main")).not.toHaveAttribute("inert");
+    fireEvent.click(tapTarget());
+    expect(screen.getByRole("main")).toHaveAttribute("inert");
+    // ...and the dialog is a *sibling* of the covered surface. Nested inside `<main>` it would sit in
+    // the inert subtree and be ignored with it — measured in Chromium: a dialog moved under an inert
+    // `<main>` comes back `ignored: true, ignoredReasons: ["inertElement"]`, while the sibling dialog
+    // stays exposed (`frontend/README.md`, "The accessibility pass").
+    expect(screen.getByRole("dialog", { name: "Menu" }).closest("main")).toBeNull();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.getByRole("main")).not.toHaveAttribute("inert");
+    // ...and the focus return above still lands: closing removes the attribute and unmounts the
+    // dialog, and focus ends on the trigger (measured in Chromium: `afterClose`).
+    expect(document.activeElement).toBe(tapTarget());
+  });
+
   it("should leave the photo alone when the drag starts on the open menu", async () => {
     const fetchSpy = stubApi(() => jsonResponse(PHOTO));
     renderSplash();
@@ -502,8 +528,12 @@ describe("SplashView — quiet states (E3-S4)", () => {
     stubApi(() => problemResponse("empty-archive", 404));
     renderSplash();
 
-    const sentence = await screen.findByRole("status");
+    // E3-S5B moved `role="status"` off this paragraph and onto the splash's persistent region. The
+    // words are asserted twice, once per surface, so the visible sentence and the announced one cannot
+    // drift apart.
+    const sentence = await screen.findByTestId("quiet-empty");
     expect(sentence).toHaveTextContent(/^Your archive is empty for now\.$/);
+    expect(screen.getByRole("status")).toHaveTextContent(/^Your archive is empty for now\.$/);
     // The criterion's type rule, and §2.2's token rule: display serif, the text token, not the muted
     // one (the muted token is guaranteed on the page, not through glass — §2.2).
     expect(sentence).toHaveClass("font-display");
@@ -522,16 +552,21 @@ describe("SplashView — quiet states (E3-S4)", () => {
     const fetchSpy = stubApi(() => problemResponse("not-found", 404));
     renderSplash();
 
-    const notice = await screen.findByRole("status");
-    expect(notice).toHaveTextContent(/^Couldn't load a photo\.$/);
+    // The visible sentence and the persistent live region say the same thing (E3-S5B); the region is
+    // what a screen reader hears on the change, the paragraph is what the retry is described by.
+    const message = await screen.findByTestId("quiet-error-message");
+    expect(message).toHaveTextContent(/^Couldn't load a photo\.$/);
+    const announced = screen.getByRole("status");
+    expect(announced).toHaveTextContent(/^Couldn't load a photo\.$/);
     // The problem+json body in this test carries `detail: "Nothing to show."`; criterion 3 forbids
     // echoing it, and a raw message is exactly what a copied server string looks like.
-    expect(notice).not.toHaveTextContent("Nothing to show.");
+    expect(message).not.toHaveTextContent("Nothing to show.");
+    expect(announced).not.toHaveTextContent("Nothing to show.");
     expect(screen.queryByRole("alert")).toBeNull();
 
     const retry = screen.getByRole("button", { name: "Try again" });
     expect(retry).toHaveAttribute("type", "button");
-    expect(retry).toHaveAttribute("aria-describedby", notice.id);
+    expect(retry).toHaveAttribute("aria-describedby", message.id);
     expect(retry).toHaveClass("text-aura-text");
     expect(retry).not.toHaveClass("text-aura-muted");
     // The single glass material, and the notice's own scrim. Measured over a white photo: the glass
@@ -594,12 +629,47 @@ describe("SplashView — quiet states (E3-S4)", () => {
   });
 });
 
+describe("SplashView — the quiet states' announcement (E3-S5B)", () => {
+  it("should fill a live region that already existed, never mount one with its text", async () => {
+    // The fetch is held open so the assertion about the *first* render is made before any state can
+    // change: this is the moment the region has to exist, because a live region announces changes.
+    let answer: (() => void) | undefined;
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          answer = () => resolve(problemResponse("not-found", 404));
+        }),
+    );
+    renderSplash();
+
+    const region = screen.getByRole("status");
+    expect(screen.getByRole("main")).toHaveAttribute("data-state", "loading");
+    expect(region).toBeEmptyDOMElement();
+    // The region is a sibling of `<main>`, not a child: a fetch can settle while the menu is open,
+    // and `<main>` is inert then. Chromium measures that half (README, "The accessibility pass");
+    // here the structural fact is pinned, because a region inside the covered surface is the failure.
+    expect(region.closest("main")).toBeNull();
+
+    await waitFor(() => expect(answer).toBeTypeOf("function"));
+    await act(async () => {
+      answer?.();
+    });
+
+    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "error"));
+    // Same node, now filled. That is the property an announcement needs and an inserted region lacks:
+    // the region was exposed while empty, and its content changed under it.
+    expect(screen.getByRole("status")).toBe(region);
+    expect(region).toHaveTextContent(/^Couldn't load a photo\.$/);
+  });
+});
+
 describe("SplashView — the accessibility audit (E3-S5A)", () => {
   /*
    * The threshold is in `test/axe.ts`: **zero violations at every impact**. The `color-contrast` bucket
    * is asserted too, because a green axe run in jsdom is not a contrast check — measured on this
    * screen, axe returns it as `incomplete` (no layout, no paint, no canvas), and on the menu as
-   * `inapplicable`. Contrast evidence belongs to the behaviour slice, not this gate.
+   * `inapplicable`. The arithmetic evidence is `SplashView — text over glass and images` below; the
+   * painted pixels are a Chromium measurement (`frontend/README.md`, "The accessibility pass").
    */
   it("should produce no axe violations in the ready state, with contrast named incomplete", async () => {
     stubApi(() => jsonResponse(PHOTO));
@@ -630,12 +700,11 @@ describe("SplashView — the accessibility audit (E3-S5A)", () => {
   it("should produce no axe violations in the empty state, with contrast named incomplete", async () => {
     stubApi(() => problemResponse("empty-archive", 404));
     renderSplash();
-    await screen.findByRole("status");
 
-    // `role="status"` is shared with the error state, so it cannot say which state is under audit —
-    // and in the next slice every state carries one. The state attribute is the assertion that makes
-    // the test's name true.
-    expect(screen.getByRole("main")).toHaveAttribute("data-state", "empty");
+    // Since E3-S5B the persistent status region exists in every state, so `findByRole("status")`
+    // resolves before the answer arrives and the audit could run on `loading`. The state attribute is
+    // what makes the test's name true, and it is the wait as well as the assertion.
+    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "empty"));
     const results = await runAxe(document.body);
 
     expect(violationSummary(results)).toEqual([]);
@@ -645,9 +714,8 @@ describe("SplashView — the accessibility audit (E3-S5A)", () => {
   it("should produce no axe violations in the error state, with contrast named incomplete", async () => {
     stubApi(() => problemResponse("not-found", 404));
     renderSplash();
-    await screen.findByRole("status");
 
-    expect(screen.getByRole("main")).toHaveAttribute("data-state", "error");
+    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "error"));
     const results = await runAxe(document.body);
 
     expect(violationSummary(results)).toEqual([]);
@@ -667,8 +735,98 @@ describe("SplashView — the accessibility audit (E3-S5A)", () => {
 
     expect(violationSummary(results)).toEqual([]);
     // Measured: with the dialog open axe does not evaluate the rule at all — `inapplicable`, not
-    // `pass`. Contrast evidence belongs to the behaviour slice, not this gate.
+    // `pass`. The menu's arithmetic evidence is in `GlassMenu.test.tsx`; the painted pixels are a
+    // Chromium measurement (`frontend/README.md`, "The accessibility pass").
     expect(ruleStatus(results, "color-contrast")).toBe("inapplicable");
+  });
+});
+
+describe("SplashView — text over glass and images (the scrim rule, E3-S5B)", () => {
+  /** The generator's bands (§2.2), made numeric in `theme.ts`; the lightest background is the worst case. */
+  const palette = (bgLightness: number, textLightness: number): Palette => ({
+    colors: [
+      {
+        hex: oklchToHex({ l: bgLightness, c: 0.05, h: 200 }),
+        oklch: { l: bgLightness, c: 0.05, h: 200 },
+        weight: 0.5,
+      },
+      {
+        hex: oklchToHex({ l: textLightness, c: 0.02, h: 200 }),
+        oklch: { l: textLightness, c: 0.02, h: 200 },
+        weight: 0.5,
+      },
+    ],
+  });
+  // Derived from the generator's own bands rather than copied from them: a hard-coded triple keeps
+  // passing if the bands widen, because it would then measure a range the generator no longer produces.
+  // The three samples are the two extremes and the middle of the current bands.
+  const { bgLightness: BG, textLightness: TEXT } = THEME_BANDS;
+  const BANDS = [
+    [BG.min, TEXT.min],
+    [(BG.min + BG.max) / 2, (TEXT.min + TEXT.max) / 2],
+    [BG.max, TEXT.min],
+  ] as const;
+  const WHITE = { r: 255, g: 255, b: 255 };
+  const VEIL_ALPHA = 0.7;
+
+  it("should keep the empty sentence on the base legible, fallback and generated alike", async () => {
+    stubApi(() => problemResponse("empty-archive", 404));
+    renderSplash();
+
+    const sentence = await screen.findByTestId("quiet-empty");
+    expect(sentence).toHaveClass("text-aura-text");
+    expect(
+      contrastRatio(hexToRgb(FALLBACK_THEME.text), hexToRgb(FALLBACK_THEME.bg)),
+    ).toBeGreaterThanOrEqual(4.5);
+
+    // The empty sentence sits directly on `--aura-bg`, not on glass: the generator's own guarantee.
+    for (const [bgLightness, textLightness] of BANDS) {
+      const theme = paletteToTheme(palette(bgLightness, textLightness));
+      expect(
+        contrastRatio(hexToRgb(theme.text), hexToRgb(theme.bg)),
+        `${theme.text} on ${theme.bg}`,
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("should keep the notice's two text styles legible over a white photo", async () => {
+    stubApi(() => problemResponse("not-found", 404));
+    renderSplash();
+
+    const message = await screen.findByTestId("quiet-error-message");
+    const retry = screen.getByRole("button", { name: "Try again" });
+    // Both styles — the message (`text-base`) and the retry (`text-sm`) — wear the text token, never
+    // the muted one; this is the rule §2.2 derived from E3-S2's 4.14:1 finding.
+    for (const element of [message, retry]) {
+      expect(element).toHaveClass("text-aura-text");
+      expect(element).not.toHaveClass("text-aura-muted");
+    }
+    // Drift guard for the composite below: the scrim is the menu veil's value, local to the notice.
+    expect(screen.getByTestId("quiet-error-scrim")).toHaveClass("bg-aura-bg/70");
+
+    const compositeOnWhite = (bgLightness: number, textLightness: number): number => {
+      const theme = paletteToTheme(palette(bgLightness, textLightness));
+      const glass = parseColor(theme.glass);
+      const panel = compositeOver(
+        glass.rgb,
+        glass.alpha,
+        compositeOver(hexToRgb(theme.bg), VEIL_ALPHA, WHITE),
+      );
+      return contrastRatio(hexToRgb(theme.text), panel);
+    };
+
+    for (const [bgLightness, textLightness] of BANDS) {
+      expect(
+        compositeOnWhite(bgLightness, textLightness),
+        `text ${textLightness} on panel from bg ${bgLightness}, scrim ${VEIL_ALPHA} over white`,
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+
+    // The control that makes the scrim the subject: the same glass on the same white photo without it.
+    const worst = paletteToTheme(palette(0.18, 0.86));
+    const bareGlass = parseColor(worst.glass);
+    const glassOnWhite = compositeOver(bareGlass.rgb, bareGlass.alpha, WHITE);
+    expect(contrastRatio(hexToRgb(worst.text), glassOnWhite)).toBeLessThan(4.5);
   });
 });
 

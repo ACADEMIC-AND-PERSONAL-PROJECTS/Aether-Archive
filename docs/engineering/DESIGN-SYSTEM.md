@@ -269,20 +269,31 @@ one value (**0.250**), `animation-duration: 1e-05s`, and the animation never sta
 Implemented in `frontend/src/components/QuietState.tsx` (E3-S4) and rendered by the splash. The details
 that are rules, not taste:
 
-- **The empty sentence** is one `role="status"` paragraph in `font-display` / `--aura-text`, centred on
-  `--aura-bg`. No retry, no spinner, no illustration. Measured painted: glyph `#e5e3e0` on base
-  `#0b0b0d` — **15.35:1**.
+- **The empty sentence** is one paragraph in `font-display` / `--aura-text`, centred on `--aura-bg` — an
+  ordinary paragraph, not a live region. No retry, no spinner, no illustration. Measured painted: glyph
+  `#e8e6e3` on base `#0b0b0d` — **15.79:1** at the brightest glyph pixel; a representative pixel in the
+  same capture reads `#e5e3e0` and **15.35:1** (E3-S4 sampled that one, E3-S5 the brightest). Both are
+  correct and both are far above AA; the sampling point is stated so the two never look like a drift.
 - **The loading pulse** is a full-bleed wash of `--aura-surface` at `opacity-25` carrying
   `aether-breathe` (§5). It is `aria-hidden`; there is no text and no progress bar. jsdom cannot observe
   animation, so the unit suite pins the class token and Chromium measures the frames.
 - **The error notice** is `GlassPanel` over its **own scrim**: `--aura-bg` at 70 %, the menu veil's
-  value. Glass alone is not enough over a pale photo — measured over white, the tint alone is **2.30:1**,
+  value. Glass alone is not enough over a pale photo — measured over white, the tint alone is **2.29:1**,
   while scrim + glass + `--aura-text` is **7.47:1** (13.41:1 over a dark photo). The photo stays visible
   outside the notice, so the scrim is local, not a full-screen veil — `error` does not imply an empty
   screen (the E3-S1A finding).
 - **The retry** is a real `<button type="button">` named "Try again", 44 px tall, `aria-describedby` the
   notice's message, in `--aura-text`; focus-visible draws a 1 px inset outline. Measured keyboard path:
   one `Tab` reaches it with `:focus-visible` true; `Enter` issues the request.
+- **The announcement is one persistent live region, not the sentences (E3-S5B).** A live region announces
+  *changes* to content that already exists; a node inserted together with its text is not reliably
+  announced. The splash therefore mounts one visually hidden `role="status"` region in every state —
+  empty in `loading` / `ready`, filled with the visible words in `empty` / `error` — and the visible
+  sentences are ordinary paragraphs. The region is a **sibling of `<main>`**, not a child: `<main>` is
+  inert while the menu is open, and a fetch can settle in that window, so a child region would leave the
+  accessibility tree exactly when it has something to say (measured: with the dialog open, `<main>` is
+  `ignored: true, ignoredReasons: ["inertElement"]` while the sibling region is `ignored: false` and
+  carries the new text). A test pins the visible words and the announced copy equal.
 - **Placement is `absolute` against `<main>`, never `fixed`.** The route wrapper transforms during its
   entry, making it the containing block for fixed descendants (§5, ADR-022), which re-anchors a fixed
   notice for the entry's duration. Absolute keeps the notice with the photo it describes: measured
@@ -293,11 +304,20 @@ that are rules, not taste:
 
 - Contrast: ≥ 4.5:1 for text (≥ 3:1 for ≥ 24 px), enforced by construction in the theme generator.
 - Focus visible and consistent; glass overlays trap focus, close on `Esc`, restore focus.
+- **`inert` removes the covered page while the dialog is open (E3-S5B).** The splash's `<main>` carries
+  `inert` while the menu is open — out of the tab order, out of pointer hit-testing and out of the
+  accessibility tree, so an assistive technology's virtual cursor cannot reach the tap target behind the
+  dialog. The dialog is its **sibling**; nested inside `<main>` it would be ignored with it (measured:
+  `ignored: true, ignoredReasons: ["inertElement"]`). Baseline since April 2023; a browser without it
+  ignores the attribute and E3-S2's focus trap remains the guarantee. jsdom implements neither the
+  property nor the effect, so the unit suite pins the attribute and the sibling relationship, and
+  Chromium measures the tree and the focus order.
 - **The automated gate is axe-core 4.14, zero violations at every impact** — not only `serious` — on the
-  splash (ready, empty, error) and the menu. It is a dev dependency with no transitive dependencies,
-  absent from `dist/`. In jsdom it is a **structural** gate: `color-contrast` comes back `incomplete`
-  on the splash and `inapplicable` on the menu (no layout, no paint). Contrast evidence belongs to the
-  behaviour slice.
+  splash in all four states (loading, ready, empty, error) and the menu (open, and alone). It is a dev
+  dependency with no transitive dependencies, absent from `dist/`. In jsdom it is a **structural** gate:
+  `color-contrast` comes back `incomplete` on the splash and `inapplicable` on the menu (no layout, no
+  paint); contrast is proved by the token arithmetic in the component tests and by painted pixels
+  measured in Chromium (`frontend/README.md`, "The accessibility pass").
 - Drag-and-drop has a keyboard path and announces moves; nothing is touch-only.
 - Touch targets ≥ 44 × 44 px; no hover-only affordances.
 
@@ -334,9 +354,14 @@ that are rules, not taste:
   and the Tab/Enter path (`reports/e3s4-*.png`). The probe's network audit reports every request
   same-origin and none off-origin.
 - Accessibility audit (E3-S5A): RTL pins roles, names, the focus trap, `Esc` and the focus return on
-  the splash and the menu; five axe-core runs (ready, empty, error and menu open on the splash; the
-  menu alone) assert zero violations at every impact, with the `color-contrast` buckets named.
-  Captures, painted contrast and the inert/announcement measurements arrive with the behaviour slice.
+  the splash and the menu; six axe-core runs (loading, ready, empty and error on the splash; the menu
+  open on the splash; the menu alone) assert zero violations at every impact, with the `color-contrast`
+  buckets named.
+- The accessibility pass (E3-S5B): the unit suite pins the `inert` attribute and the sibling contract,
+  the persistent status region (same node, empty before the change, filled after) and the contrast
+  arithmetic for the empty sentence and the notice over a white photo; Chromium measures the effects —
+  the accessibility tree while inert, painted contrast per text style, the announcement on the same
+  node, the keyboard path and layout at 320/390/430 px (`reports/e3s5-*.png`).
 
 ## 11. The CSS foundation (E2-S3)
 

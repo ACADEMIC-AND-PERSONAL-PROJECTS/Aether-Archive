@@ -39,6 +39,21 @@ import { GlassMenu } from "../menu/GlassMenu";
  *   `role="dialog"` + `aria-modal`, the focus trap, `Escape`, the veil tap, the scroll lock). The menu
  *   is rendered beside `<main>`, not inside it, which is what keeps a drag that starts on the menu off
  *   the pull-to-refresh handlers that live on `<main>`.
+ * - **The quiet states' announcement (E3-S5B).** A live region announces *changes* to content that
+ *   already exists, not a node inserted together with its text. One visually hidden `role="status"`
+ *   region therefore mounts in every state and is filled on the transition to `empty` or `error`;
+ *   the visible sentences in `components/QuietState.tsx` are ordinary paragraphs. It is a **sibling of
+ *   `<main>`**, like the dialog, not a child: a state change can arrive while the menu is open, and
+ *   `<main>` is inert then, so a region inside it would be removed from the accessibility tree exactly
+ *   when it has something to say. Chromium measures both halves — the region stays exposed while
+ *   `<main>` is inert, and the same node carries the text after the change. The trade: a screen-reader
+ *   user browsing afterwards meets the same words twice, which is one message seen twice.
+ * - **`inert` on what the dialog covers (E3-S5B).** While the menu is open this `<main>` is inert:
+ *   removed from the tab order, from pointer hit-testing and from the accessibility tree, so an
+ *   assistive technology's virtual cursor cannot reach the tap target behind the dialog. Baseline since
+ *   April 2023; a browser without it ignores the attribute and keeps E3-S2's focus trap as the
+ *   guarantee. jsdom implements neither the property nor the effect, so the suite pins the attribute,
+ *   the dialog's sibling relationship and the focus return; Chromium measures the tree and focus order.
  * - **The re-roll.** Pull down past `lib/gesture/pullToRefresh.ts`'s threshold and another photo is asked
  *   for. The shell is untouched: no navigation, no reload, no second app instance. The surface carries
  *   that module's `touch-action`, without which a real browser takes the drag for a scroll and the gesture
@@ -62,6 +77,19 @@ const EMPTY_ARCHIVE_CODE = "empty-archive";
 
 /** Which of the four things the splash is doing — the seam E3-S4 renders into. */
 export type SplashState = "loading" | "ready" | "empty" | "error";
+
+/**
+ * What the persistent live region says for each state. Loading and ready are silent on purpose: §7's
+ * loading placeholder is not a labelled spinner, and a photo appearing is not an event that needs
+ * announcing. Empty and error are the archive *talking back*, and they are the two states whose
+ * visible sentence is duplicated here word for word — a test pins the pair so they cannot drift.
+ */
+const ANNOUNCEMENTS: Record<SplashState, string> = {
+  loading: "",
+  ready: "",
+  empty: "Your archive is empty for now.",
+  error: "Couldn't load a photo.",
+};
 
 /** The archive answered `404 empty-archive`: the archive holds no photo yet. */
 function isEmptyArchive(error: unknown): boolean {
@@ -130,6 +158,10 @@ export function SplashView() {
   return (
     <>
       <main
+        // E3-S5B: while the dialog is open the page it covers is inert. React writes the boolean
+        // attribute (`inert=""`) rather than a property; jsdom 30 has no property and no effect, so
+        // the suite pins the declaration and Chromium measures the accessibility tree.
+        inert={menuOpen}
         data-state={state}
         className={`relative flex flex-1 overflow-hidden bg-aura-bg ${PULL_SURFACE_TOUCH_ACTION}`}
         {...pull.handlers}
@@ -175,6 +207,15 @@ export function SplashView() {
           className="absolute inset-0 z-10 cursor-pointer select-none focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/50"
         />
       </main>
+
+      {/* The persistent live region, and the second reason a sibling of `<main>` is load-bearing:
+          a fetch can settle while the menu is open, so `<main>` is inert exactly when this has
+          something to announce. Outside it, the region stays exposed; inside, it would vanish from
+          the accessibility tree with the rest of the covered page. `.sr-only` keeps it out of the
+          composition, and `role="status"` is polite and atomic. */}
+      <p role="status" className="sr-only">
+        {ANNOUNCEMENTS[state]}
+      </p>
 
       {/* Beside `<main>`, never inside it: the pull-to-refresh handlers are on that element and React
           events bubble through the React tree, so a drag that starts on the open menu would otherwise

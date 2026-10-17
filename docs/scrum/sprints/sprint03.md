@@ -25,9 +25,9 @@
 | 1b | E3-S1B | Immersive splash — the tap intent, the pull-to-refresh, the per-visit photo (criteria 3, 4) | 2 | p0 | Done | #101 |
 | 2 | E3-S2 | Glass menu overlay | 5 | p0 | Done | #104 |
 | 3 | E3-S3 | Route transitions & motion system | 3 | p0 | Done | #106 |
-| 4 | E3-S4 | Quiet loading / empty / error states | 2 | p1 | Todo | — |
-| 5a | E3-S5A | Accessibility — the axe gate (criteria 1, 2) | 1 | p0 | In review | #110 |
-| 5b | E3-S5B | Accessibility — contrast, `inert`, the announcement fix, the manual pass (criteria 3–5) | 2 | p0 | Todo | — |
+| 4 | E3-S4 | Quiet loading / empty / error states | 2 | p1 | Done | #108 |
+| 5a | E3-S5A | Accessibility — the axe gate (criteria 1, 2) | 1 | p0 | Done | #110 |
+| 5b | E3-S5B | Accessibility — contrast, `inert`, the announcement fix, the manual pass (criteria 3–5) | 2 | p0 | In review | #111 |
 | 6 | E4-S1 | Single photo upload | 5 | p0 | Todo | — |
 | 7 | E4-S2 | Multi-select (≤ 6) & client-side downscale | 5 | p0 | Todo | — |
 

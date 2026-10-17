@@ -19,7 +19,7 @@ import { LOADING_PULSE } from "../lib/motion/tokens";
  * Since E3-S1A, `data-state="error"` also reports a *failed replacement*: the previous photo stays
  * painted on purpose (unmounting a good picture for a placeholder would break the splash's promise).
  * `.glass` alone is `rgba(0, 0, 0, 0.4)` — measured against a white photo that composites to
- * `rgb(153, 153, 153)`, where `--aura-text` reads **2.30:1** — so the notice carries its own scrim
+ * `rgb(153, 153, 153)`, where `--aura-text` reads **2.29:1** — so the notice carries its own scrim
  * (`bg-aura-bg/70`, the same value as the menu's veil) between the photo and the glass. With it, the
  * painted glyph measures **7.47:1** over a white photo and **13.41:1** over a dark one (`README`,
  * "The quiet states — measured"). The scrim is local, so the photo the user is still looking at is
@@ -28,6 +28,15 @@ import { LOADING_PULSE } from "../lib/motion/tokens";
  * **The words are `--aura-text`, never `--aura-muted`** (DESIGN-SYSTEM §2.2, measured by E3-S2: 8.07:1
  * against 4.14:1 for the muted token over glass). The muted token is raised by the generator until it
  * clears 4.5:1 on the *page background*; a glass notice is not the page background.
+ *
+ * ## Announcement (E3-S5B): the sentences are not live regions
+ *
+ * A live region announces changes to content that already exists; a node inserted together with its text
+ * is not reliably announced. These two sentences therefore mount as ordinary paragraphs, and the splash
+ * owns **one persistent `role="status"` region** (`features/splash/SplashView.tsx`) outside `<main>`,
+ * present from the first render and filled when the state changes. The words are duplicated word for
+ * word there, and a test pins the pair. The retry's `aria-describedby` still points at the visible
+ * sentence, so its name and description stay in the page.
  *
  * ## Placement: no portal, and no `position: fixed`
  *
@@ -50,7 +59,7 @@ export function QuietEmpty() {
   return (
     <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-8">
       <p
-        role="status"
+        data-testid="quiet-empty"
         className="max-w-xs text-center font-display text-lg tracking-display text-aura-text"
       >
         Your archive is empty for now.
@@ -86,13 +95,11 @@ export interface QuietErrorProps {
 /**
  * The error notice: a bottom-anchored glass panel, one sentence plus a real retry button.
  *
- * `role="status"` is the polite half of the ARIA guidance (WAI-ARIA APG, alert pattern): the region is
- * exposed politely, focus is **not** moved, and the retry stays in the normal tab order. **What that does
- * not buy, stated rather than implied**: the region mounts together with its text, and a live region
- * announces *changes* to content that already exists — most screen readers will not announce a node
- * inserted with its content. So the exposure is real and the announcement is unverified; **E3-S5** owns
- * the AT pass that decides between a persistent region and this one, and the same applies to
- * {@link QuietEmpty}, whose sentence is on screen from its first render.
+ * **The sentence is ordinary text, not a live region (E3-S5B).** It mounts together with its content,
+ * and a live region announces *changes* to content that already exists, so the announcement is owned by
+ * the splash's persistent `role="status"` region instead (file comment above). Focus is **not** moved,
+ * and the retry stays in the normal tab order.
+ *
  * The button's visible name is "Try again"; `aria-describedby` gives it the sentence as its
  * description, so a screen reader hears the context without the accessible name drifting away from
  * the visible label (WCAG 2.5.3).
@@ -111,7 +118,7 @@ export function QuietError({ onRetry }: QuietErrorProps) {
         className="absolute inset-0 rounded-[20px] bg-aura-bg/70"
       />
       <GlassPanel className="relative flex items-center gap-4 px-4 py-2">
-        <p id={messageId} role="status" className="text-base text-aura-text">
+        <p data-testid="quiet-error-message" id={messageId} className="text-base text-aura-text">
           Couldn&apos;t load a photo.
         </p>
         <button

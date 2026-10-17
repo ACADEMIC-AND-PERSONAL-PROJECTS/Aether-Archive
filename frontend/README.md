@@ -496,8 +496,9 @@ Captures at 390 × 844: `reports/e3s4-loading-390.png`, `reports/e3s4-empty-390.
 ## The accessibility audit — measured (E3-S5A)
 
 Scope: the splash and the glass menu, in jsdom 30 under Vitest 5. Axe settles structure and naming;
-RTL settles the focus behaviour. Contrast, `inert`, the announcement and the manual layout captures
-belong to the behaviour slice (E3-S5B) and arrive with it.
+RTL settles the focus behaviour. This section is the gate; the effects it cannot see — `inert`,
+painted contrast, the announcement, the keyboard path and layout at three widths — are measured in
+"The accessibility pass — measured (E3-S5B)" below.
 
 ### axe-core: dev-only, and absent from `dist/`
 
@@ -520,10 +521,10 @@ violation summary, rule bucket — which is smaller than what a wrapper would ad
 dev-only, never shipped: the production bundle is built from `src/` without `test/`, and both markers
 are absent from it.
 
-**The threshold: zero violations at every impact** — not "no serious ones". Five runs: the splash in
-the **ready**, **empty** and **error** states, the splash with the menu open, and the menu alone. Each
-asserts an empty list, so a `moderate` or `minor` finding added later fails rather than being waved
-through. Today they find none. What the green run does **not** prove: jsdom has no layout, no paint and
+**The threshold: zero violations at every impact** — not "no serious ones". Six runs: the splash in
+the **loading**, **ready**, **empty** and **error** states, the splash with the menu open, and the
+menu alone. Each asserts an empty list, so a `moderate` or `minor` finding added later fails rather
+than being waved through. Today they find none. What the green run does **not** prove: jsdom has no layout, no paint and
 no canvas, so `color-contrast` is returned **incomplete** on the splash (`impact: serious`) and
 **inapplicable** on the menu. Those buckets are asserted, so an axe upgrade that starts answering — or
 stops running the rule — is visible.
@@ -537,8 +538,148 @@ h1 then h3: violations ["heading-order"]; page-has-heading-one inapplicable
 h3 only:    violations [];               page-has-heading-one inapplicable
 ```
 
-Captures arrive with the behaviour slice: the axe gate needs none, and the screenshots that accompany
-the contrast, `inert` and announcement measurements are taken there.
+The screenshots that accompany the contrast, `inert` and announcement measurements are in the next
+section (`reports/e3s5-*.png`).
+
+## The accessibility pass — measured (E3-S5B)
+
+Scope: the splash's four states and the glass menu. The unit suite settles roles, names, the focus trap,
+`Esc`, the focus return, the two declarations this slice adds (the `inert` attribute and the persistent
+status region) and the contrast arithmetic; Chromium settles what jsdom cannot — the `inert` effect,
+painted contrast, the announcement on the same node, layout at 320/390/430 px, the keyboard path and
+the network. Everything below was run against the built bundle served by the same stub as the sections
+above, in Chromium 152 headless.
+
+### `inert` on what the dialog covers — decided, measured
+
+Decision: the splash's `<main>` carries `inert={menuOpen}`, and the dialog stays its **sibling**
+(`features/menu/GlassMenu.tsx`). Chromium, menu open at 390 × 844, `Accessibility.getPartialAXTree`:
+
+```json
+menuClosed.trigger        {"role":"button","name":"Open the menu","ignored":false}
+withInert.trigger         {"role":"none","ignored":true,"ignoredReasons":["inertElement"]}
+withInert.main            {"role":"none","ignored":true,"ignoredReasons":["inertElement"]}
+withInert.dialog          {"role":"dialog","name":"Menu","ignored":false}
+withInert.focus           {"activeTag":"A","activeText":"The River","isTrigger":false}
+withoutInert.trigger      {"role":"button","name":"Open the menu","ignored":false}
+withoutInert.focus        {"activeTag":"BUTTON","activeLabel":"Open the menu","isTrigger":true}
+withoutInertOrAriaModal   {"role":"button","name":"Open the menu","ignored":false}
+dialogNestedInert.dialog  {"role":"none","ignored":true,"ignoredReasons":["inertElement"]}
+afterClose                {"inert":false,"dialogs":0,"activeTag":"BUTTON","activeLabel":"Open the menu","expanded":"false"}
+```
+
+Reading: `inert` is what removes the covered surface — with it, the trigger and `<main>` are `ignored`
+with the browser's own reason `inertElement`, while the dialog stays exposed, and a programmatic
+`.focus()` on the trigger is a no-op (focus remains on the dialog's first link). Remove `inert` — and
+`aria-modal` too — and the same trigger is exposed and focus reaches it, so this is not `aria-modal`
+doing the work silently. Moving the dialog _inside_ `<main>` while inert shows the sibling structure is
+load-bearing: the dialog itself becomes ignored. Closing removes the attribute and unmounts the dialog;
+focus lands back on the trigger (`afterClose` above). jsdom implements neither the property nor the
+effect, so the suite pins the attribute, the sibling relationship and the focus return; this probe is
+the effect.
+
+Method note, because the first cut was wrong: removing `inert`, focusing and restoring it inside one
+`Runtime.evaluate` made the following AX query measure the restored state — the "without inert" row
+still said `inertElement`. The measurements above keep the attribute off across the query and restore
+it afterwards. An accepted fact has to be measured in the state that produced it.
+
+### The quiet states' announcement — decided, measured
+
+Decision: **one persistent region**, not `role="status"` on the sentences. Measured in Chromium: at
+`ready` the region exists with `textContent === ""`; after a failed re-roll it is the **same DOM node**
+(`sameNode: true`) with `textNow: "Couldn't load a photo."`, equal to the visible sentence. The
+accessibility tree contains `[{"role":"status","name":""}]` plus **two** `StaticText` copies of the
+sentence — the visible paragraph and the hidden region. The empty state behaves identically
+(`statusText` equals the visible words). The trade is that duplicate: one message seen twice in browse
+mode, not two messages.
+
+The reason it is a **sibling of `<main>`**, not a child, is the window the menu opens: a fetch can
+settle while the dialog is open and `<main>` is inert. Measured by flipping the stub to error and
+dispatching the pull through React's handlers while the menu stayed open (`inert` blocks user input,
+not dispatch):
+
+```json
+statusWhileInert {"menuOpen":true,"mainInert":true,"text":"Couldn't load a photo.","insideMain":false}
+status AX        {"role":"status","name":"","ignored":false}
+exposed text     [{"role":"StaticText","name":"Couldn't load a photo."}]
+```
+
+`<main>` is ignored with `inertElement` in that same state, so a child region would have been removed
+from the tree exactly when it had something to say; the sibling stays exposed, and only its copy of the
+words is in the tree while the dialog is open. A region inserted together with its text is the pattern
+live regions do not reliably announce; that is why the visible sentences are ordinary paragraphs and a
+test pins the words equal.
+
+### Painted contrast, per text style
+
+Method: screenshots of the built bundle, each text rectangle from `Range.getClientRects()`, the
+brightest glyph pixel inside it against a 5 × 5 median of the panel, WCAG 2.x relative luminance.
+
+| Surface / text                                                | Painted panel   | Glyph              | Ratio       |
+| ------------------------------------------------------------- | --------------- | ------------------ | ----------- |
+| Menu entries over white, fallback theme (19.035 px)           | `rgb(50,50,51)` | `rgb(232,230,227)` | **10.28:1** |
+| Menu entries over white, theme from the dark half (19.035 px) | `rgb(45,53,60)` | `rgb(198,211,221)` | **8.16:1**  |
+| Error message over white, theme from the dark half (15.5 px)  | `rgb(45,53,60)` | `rgb(198,211,221)` | **8.16:1**  |
+| Retry "Try again" over white, same notice (13.225 px)         | `rgb(45,53,60)` | `rgb(198,211,221)` | **8.16:1**  |
+| Empty sentence on the base (19.035 px, Playfair Display)      | `rgb(11,11,13)` | `rgb(232,230,227)` | **15.79:1** |
+
+The sampler's first error-notice read was wrong, and the reason is worth keeping: the fixed sample
+point at (369, 773) falls in the panel's rounded corner and returned the white photo through it
+(`rgb(103,109,116)` → 3.43:1). Six interior points — (200,772), (200,780), (100,772), (300,772),
+(200,822), (60,772) — all return `rgb(45,53,60)` → **8.16:1**. The menu's panel sample at (195,646) is
+interior. The arithmetic controls are in the component tests; the painted values are the browser's.
+The empty capture serves both this table and the state screenshot, so the duplicate file the review
+flagged is not carried.
+
+### Keyboard path and retry, end to end
+
+Measured on the built bundle with real key events:
+
+```text
+Tab from the page        → BUTTON "Open the menu"
+Enter                    → menu opens, focus on A "The River"
+Tab                      → A "Curate"
+Tab                      → BUTTON "Close"
+Tab                      → A "The River"   (wraps)
+Shift+Tab from The River → BUTTON "Close"
+Tab, Enter               → /river, heading "The River", dialog count 0
+```
+
+The retry: one `Tab` lands on "Try again" (`:focus-visible` true, 1 px outline, 83.5 × 44 px);
+`Enter` raised the stub's request count 12 → 13.
+
+### Layout at 320, 390 and 430 px
+
+- Splash: the tap target is exactly the viewport at each width (320 × 800, 390 × 844, 430 × 800), no
+  horizontal overflow, `scrollHeight` equals the viewport height, and the status region's text is empty
+  in `ready`.
+- Menu at 390: sheet `x16 y642 358 × 186`, bottom 828 inside 844; entries 340 × 56 px — the 44 px
+  floor cleared by 12 px. At 320: `288 × 186` at `y598`, entries 270 × 56; at 430: `398 × 186` at
+  `y598`, entries 380 × 56. `fits` is true on all three axes at all three widths.
+- Captures: `reports/e3s5-splash-320.png`, `e3s5-splash-390.png`, `e3s5-splash-430.png`,
+  `e3s5-menu-320.png`, `e3s5-menu-390.png`, `e3s5-menu-430.png`, `e3s5-menu-over-white-390.png`,
+  `e3s5-menu-over-half-390.png`, `e3s5-empty-390.png`, `e3s5-error-over-white-390.png`.
+
+### Network, re-measured with this build
+
+`performance.getEntriesByType("resource")` on a loaded splash: **7 entries, all same-origin** — the
+JS/CSS chunks, the Inter face, `/api/v1/photos/random` and `/images/photo.png`; `offOrigin: []`. The
+`dist/` URL audit is unchanged: 18 `www.w3.org` namespace strings, 2 `react.dev`, 2 `localhost`, 1
+`reactrouter.com`, and no request behind any of them.
+
+### What this pass does not cover
+
+- axe in jsdom cannot judge contrast, focus visibility or animation; the buckets are asserted, not the
+  verdicts.
+- A real screen reader was not driven. The persistent region, its changed text and its AX exposure are
+  verified; the **announcement itself** (whether a reader speaks it) is not. The duplicate-words trade
+  is recorded above.
+- `inert` is measured in Chromium 152. A browser without it ignores the attribute and keeps E3-S2's
+  focus trap and veil, which the suite pins.
+- Drag-and-drop's keyboard path belongs to E4-S3, not to this story.
+- `app/RouteFallback.tsx` still mounts `role="status"` together with its "Loading view" text — the
+  same insert-with-text pattern this story replaced on the splash. It is outside the two screens this
+  pass covers and is unchanged; it needs the same decision in the story that owns the route shell.
 
 ## Zero external requests — measured on the built bundle
 
