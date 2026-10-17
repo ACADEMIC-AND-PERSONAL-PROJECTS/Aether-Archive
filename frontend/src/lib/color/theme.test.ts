@@ -198,9 +198,17 @@ describe("themeFromBackground", () => {
     expect(() => themeFromBackground("#abc")).toThrow("Not a #rrggbb colour");
   });
 
-  it("should guarantee every §2.2 pair for a sampled cube, or refuse the colour", () => {
+  it("should refuse pure black and pure white pages by policy", () => {
+    expect(() => themeFromBackground("#000000")).toThrow("Pure black and pure white");
+    expect(() => themeFromBackground("#ffffff")).toThrow("Pure black and pure white");
+    // The near endpoints are accepted.
+    expect(themeFromBackground("#010101").bg).toBe("#010101");
+    expect(themeFromBackground("#fefefe").bg).toBe("#fefefe");
+  });
+
+  it("should accept every other sampled colour with every §2.2 pair and non-pure text", () => {
     let accepted = 0;
-    let refused = 0;
+    const refused: string[] = [];
     for (let r = 0; r <= 255; r += 17) {
       for (let g = 0; g <= 255; g += 17) {
         for (let b = 0; b <= 255; b += 17) {
@@ -210,34 +218,44 @@ describe("themeFromBackground", () => {
           let theme;
           try {
             theme = themeFromBackground(hex);
-          } catch (error) {
-            // The only refusal is the mid-tone band; a syntax error here would be a defect.
-            expect(String(error)).toContain("cannot carry 4.5:1 text");
-            refused += 1;
+          } catch {
+            refused.push(hex);
             continue;
           }
           accepted += 1;
           expect(theme.bg).toBe(hex);
+          // The brief forbids pure black/white text; the search must never return it.
+          expect(theme.text).not.toBe("#000000");
+          expect(theme.text).not.toBe("#ffffff");
+          // The surface must step away from the page, never collapse into it.
+          expect(theme.surface).not.toBe(theme.bg);
+          const surfaceDirection = lightness(theme.surface) - lightness(theme.bg);
+          expect(Math.sign(surfaceDirection)).toBe(theme.glass.startsWith("rgba(255") ? 1 : -1);
           for (const ratio of Object.values(contrastReport(theme))) {
             expect(ratio).toBeGreaterThanOrEqual(CONTRAST_MINIMUM);
           }
         }
       }
     }
-    // The refusal band is real, and it is a band: most backgrounds are accepted.
-    expect(refused).toBeGreaterThan(0);
-    expect(accepted).toBeGreaterThan(refused);
+    // Only the two pure endpoints are refused; the two-direction search accepts the rest.
+    expect(refused.sort()).toEqual(["#000000", "#ffffff"]);
+    expect(accepted).toBe(4096 - 2);
   });
 
-  it("should refuse a saturated mid-tone whose page cannot carry any 4.5:1 text", () => {
-    // Measured with the cube test below: #0066ff is in the narrow refusal band, not a syntax error.
-    expect(() => themeFromBackground("#0066ff")).toThrow("cannot carry 4.5:1 text");
+  it("should try the other text direction before refusing a saturated colour", () => {
+    // #cc3399: the dark direction only passes at pure black; the light direction passes near-white.
+    const theme = themeFromBackground("#cc3399");
+    expect(theme.text).not.toBe("#000000");
+    expect(theme.text).not.toBe("#ffffff");
+    expect(theme.glass).toMatch(/^rgba\(0, 0, 0, 0\.4\)$/);
+    expect(contrastReport(theme).textOnBg).toBeGreaterThanOrEqual(CONTRAST_MINIMUM);
+    // #0066ff was refused by the first cut's single-direction search; it is accepted now.
+    expect(() => themeFromBackground("#0066ff")).not.toThrow();
   });
 
   it("should flip the glass tint with the text so the glass pair stays legible", () => {
     const dark = themeFromBackground("#101418");
     const light = themeFromBackground("#f2ead8");
-    expect(dark.text).toBeTruthy();
     expect(dark.glass).toMatch(/^rgba\(0, 0, 0, 0\.4\)$/);
     expect(dark.hairline).toContain("255, 255, 255");
     expect(light.glass).toMatch(/^rgba\(255, 255, 255, 0\.4\)$/);
