@@ -221,35 +221,31 @@ describe("themeFromBackground", () => {
   });
 
   it("should accept every other sampled colour with every §2.2 pair and non-pure text", () => {
+    const steps = Array.from({ length: 16 }, (_, index) => index * 17);
+    const channel = (value: number): string => value.toString(16).padStart(2, "0");
+    const cube = steps.flatMap((r) =>
+      steps.flatMap((g) => steps.map((b) => `#${channel(r)}${channel(g)}${channel(b)}`)),
+    );
     let accepted = 0;
     const refused: string[] = [];
-    for (let r = 0; r <= 255; r += 17) {
-      for (let g = 0; g <= 255; g += 17) {
-        for (let b = 0; b <= 255; b += 17) {
-          const hex = `#${[r, g, b]
-            .map((channel) => channel.toString(16).padStart(2, "0"))
-            .join("")}`;
-          let theme;
-          try {
-            theme = themeFromBackground(hex);
-          } catch {
-            refused.push(hex);
-            continue;
-          }
-          accepted += 1;
-          expect(theme.bg).toBe(hex);
-          // The brief forbids pure black/white text; the search must never return it.
-          expect(theme.text).not.toBe("#000000");
-          expect(theme.text).not.toBe("#ffffff");
-          // The surface must step away from the page, never collapse into it or into pure black/white.
-          // (At the cube's edge the away-step flips; the direction is asserted on mid-tone pages below.)
-          expect(theme.surface).not.toBe(theme.bg);
-          expect(theme.surface).not.toBe("#000000");
-          expect(theme.surface).not.toBe("#ffffff");
-          for (const ratio of Object.values(contrastReport(theme))) {
-            expect(ratio).toBeGreaterThanOrEqual(CONTRAST_MINIMUM);
-          }
-        }
+    for (const background of cube) {
+      let theme;
+      try {
+        theme = themeFromBackground(background);
+      } catch {
+        refused.push(background);
+        continue;
+      }
+      accepted += 1;
+      expect(theme.bg).toBe(background);
+      // Non-pure text and surface; the surface never collapses (at the cube's edge its step flips).
+      for (const token of [theme.text, theme.surface]) {
+        expect(token).not.toBe("#000000");
+        expect(token).not.toBe("#ffffff");
+      }
+      expect(theme.surface).not.toBe(theme.bg);
+      for (const ratio of Object.values(contrastReport(theme))) {
+        expect(ratio).toBeGreaterThanOrEqual(CONTRAST_MINIMUM);
       }
     }
     // Only the two pure endpoints are refused; the two-direction search accepts the rest.
