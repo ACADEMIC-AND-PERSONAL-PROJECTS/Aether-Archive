@@ -361,12 +361,19 @@ in `.claude/` in S03-C1; the practice is checked in every story:
 - 2026-10-17 — **E4-S2A2 (PR #118) carries multi-select and the queue**, and with it the fix for the
   defect #116's review found: `aliveRef` is re-armed in the effect setup, so `npm run dev` uploads again,
   and a **StrictMode-wrapped test** pins it. It measured **1,721 hand-written** at its tip (production
-  631, tests 970, docs 120). Its exception is claimed on the **coupling** of criteria 1 and 4, with the
-  cut constructed: multi-select, cap and grid without the queue, typechecked, linted, **24 tests green**,
-  measured at **1,252** — but it deletes E4-S1B's shipped send path and its tests (629 deletions), so it
-  is a regression rather than a slice; a criterion-4-only cut is E4-S1B. The queue is concurrency one
-  (`maxActive: 1` over six files, every second answered 415), the loop carries on (`continue` mutant
-  killed), retry resends the same objects, and the nine mutants include the StrictMode re-arm, the
-  success-path revocation, the cancel-reset and the alive half of the progress gate. The progress gate
-  is a pure predicate (`lib/upload/progress.ts`) because React 19 no-ops a post-unmount `setState`
-  silently — measured as 0 `console.error`.
+  631, tests 970, docs 120) — **1,751** on the branch with the 30 record lines. Its exception is claimed
+  on the **coupling** of criteria 1 and 4, with the cut constructed twice. The author's cut (multi-select,
+  cap and grid, no queue) is green at 24 tests and measures 1,252, but it deletes E4-S1B's send path and
+  its tests; the **review's non-regressing cut** — first tile only, E4-S1B's single-photo send path kept
+  and its tests kept — is green at 28 tests and measures **1,108**, still 2.2× the ~500 threshold (and a
+  real slice would also carry its own docs, so that is a lower bound). The summary's sentence "a
+  regression rather than a slice" was false as a general claim; the conclusion stands on the 1,108. The
+  queue is concurrency one (`maxActive: 1` over six files, every second answered 415), the loop carries
+  on (`continue` mutant killed), retry resends the same objects, and the nine mutants include the
+  StrictMode re-arm, the success-path revocation, the cancel-reset and the alive half of the progress
+  gate. The progress gate is a pure predicate (`lib/upload/progress.ts`) because React 19 no-ops a
+  post-unmount `setState` silently — measured as 0 `console.error`. The review's last real finding was a
+  race: a Cancel landing after the last 201 overwrote the summary with "Upload cancelled." while the
+  transport's abort was a no-op and the photo was stored. The post-loop now compares processed files to
+  the queue length — when every file was processed the summary wins — and a test pins the interleaving
+  (restoring the old check fails it).
