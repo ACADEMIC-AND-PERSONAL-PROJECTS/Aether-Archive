@@ -27,7 +27,7 @@
 | 3 | E3-S3 | Route transitions & motion system | 3 | p0 | Done | #106 |
 | 4 | E3-S4 | Quiet loading / empty / error states | 2 | p1 | Done | #108 |
 | 5a | E3-S5A | Accessibility — the axe gate (criteria 1, 2) | 1 | p0 | Done | #110 |
-| 5b | E3-S5B | Accessibility — contrast, `inert`, the announcement fix, the manual pass (criteria 3–5) | 2 | p0 | In review | #111 |
+| 5b | E3-S5B | Accessibility — contrast, `inert`, the announcement fix, the manual pass (criteria 3–5) | 2 | p0 | Done | #111 |
 | 6 | E4-S1 | Single photo upload | 5 | p0 | Todo | — |
 | 7 | E4-S2 | Multi-select (≤ 6) & client-side downscale | 5 | p0 | Todo | — |
 
@@ -257,3 +257,17 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   split" claim has been withdrawn** (E3-S1, E3-S3, E3-S4, here), and the lesson is now a rule rather than a
   resolution: construct the cut you did not name — by criterion, by state, by surface — before claiming the
   exception, and if the branch is under ~500 argue the arithmetic instead. E3-S5B closes #30.
+- 2026-10-17 — **E3-S5A merged (`97d258b`, PR #110) and E3-S5B (`ed5cd94`, PR #111); the E3 epic is
+  complete.** The split cost is measured rather than asserted: **237 + 496 = 733 lines against the 551 the
+  story would have been unsplit** (+33%), and the second slice finished four lines under the branch
+  threshold — disclosed, as the review asked, rather than argued. What the extra record bought: a gate the
+  reviewer made stronger than it was opened (a loading-state run, `data-state` assertions, a dialog
+  assertion), an `inert` implementation whose failure mode is documented (a dialog nested in the inert
+  subtree is itself ignored), and a status region placed as a **sibling** of `<main>` on the strength of a
+  measurement — it would leave the accessibility tree exactly when the menu is open and it has something to
+  say.
+- 2026-10-17 — **The review's negative control is the line to keep.** In E3-S5B the reviewer mutated
+  `GLASS_ALPHA` 0.4 → 0.1 and the notice test **stayed green**, correctly — the 70 % scrim is the
+  load-bearing layer, so the test was measuring the mechanism it names. Three rounds in a row a reviewer's
+  own mutant taught more than the author's four, and this is the first that proved a test by *not* killing
+  it. A mutation battery that only demonstrates killing is half a battery.
