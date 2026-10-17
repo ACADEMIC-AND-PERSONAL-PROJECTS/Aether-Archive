@@ -408,8 +408,9 @@ opens on tap, feels tactile, and gets out of the way.
 | E4-S2A2 | Multi-select (≤ 6) and the sequential queue (criteria 1, 4) | p0 | 2 | 3 | Done |
 | E4-S2B | Client-side downscale before upload (criterion 2) | p0 | 2 | 3 | Done |
 | E4-S3A | The order reducer (criterion 2, reducer half) | p0 | 1 | 4 | Done |
-| E4-S3B | The gesture core: mouse/touch sensors, sortable grid, overlay (criterion 1) | p0 | 4 | 4 | In review |
-| E4-S3C | Keyboard, announcements, auto-scroll and motion (criteria 3, 4) | p0 | 3 | 4 | Todo |
+| E4-S3B | The gesture core: mouse/touch sensors, sortable grid, overlay (criterion 1) | p0 | 4 | 4 | Done |
+| E4-S3C | Motion: drop ≤ 300 ms, auto-scroll, reduced motion (criterion 4) | p0 | 1 | 4 | In progress |
+| E4-S3D | Keyboard and announcements, with the cancel path (criterion 3) | p0 | 2 | 4 | Todo |
 | E4-S4 | Aura colour picker with palette suggestions | p0 | 5 | 4 | Todo |
 | E4-S5 | Publish dump with optimistic UI | p0 | 5 | 4 | Todo |
 
@@ -453,7 +454,7 @@ opens on tap, feels tactile, and gets out of the way.
 - [ ] **(A2)** Uploads run sequentially or bounded-concurrent; one failure never aborts the others silently.
 - [ ] **(A2/B)** Tests for the cap and for the downscale decision function (pure).
 
-### E4-S3 — Drag-and-drop ordering · 8 pts · p0 · **re-cut at review into S3A (1) + S3B (4) + S3C (3)**
+### E4-S3 — Drag-and-drop ordering · 8 pts · p0 · **re-cut at review into S3A (1) + S3B (4) + S3C (1) + S3D (2)**
 
 *As the curator, I want to reorder my 6 images by touch, so that the dump tells the story I want.*
 
@@ -463,12 +464,11 @@ opens on tap, feels tactile, and gets out of the way.
 > document listener between tests), fixed in the re-cut. **S3A** ships the reducer, **S3B** the gesture
 > core (its own measured exception), **S3C** keyboard/announcements/auto-scroll/motion. Points unchanged.
 >
-> **Carried into S3C from S3B's review:** the sort settle (and any drop transition) must respect
-> `prefers-reduced-motion` — `global.css` freezes `animation-duration` only, not `transition-duration`;
-> the overlay's status line needs a scrim or to move inside the lifted surface; `onDragCancel` needs a
-> unit test; dnd-kit's default live region speaks internal ids and must be replaced by the custom
-> announcements/instructions; and a test should pin that a reorder before a batch sends the files in
-> the displayed order (S3C or E4-S5).
+> **Carried from S3B's review, now owned:** **S3C** (motion) covers the sort settle and any drop
+> transition under `prefers-reduced-motion` (`global.css` froze `animation-duration` only, not
+> `transition-duration`), the overlay status line's scrim, and the reorder-before-batch order test.
+> **S3D** (keyboard) covers `onDragCancel` and replaces dnd-kit's internal-id live region with the
+> custom announcements/instructions.
 
 - [ ] **(B)** `@dnd-kit` grid: long-press (touch) / drag (mouse) reorder with visual lift, no scroll conflict.
 - [ ] **(A)** Order is a pure reducer in `lib/` (unit-tested) driving `displayOrder` 0–5 in the payload.
