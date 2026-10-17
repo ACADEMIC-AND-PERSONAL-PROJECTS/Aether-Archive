@@ -1317,7 +1317,7 @@ Capture: `reports/e4s3-keyboard-390.png` (1170 × 2532, 390 × 844 DPR 3), taken
 the source cell is empty, the clone is over the destination and the state line sits on its scrim.
 
 Tests changed: the S3B dead-focus-stop test is replaced by the attributes test, and 3 are added
-(keyboard down, keyboard up, and Escape cancel). The full suite is **33 files / 375 tests**; the
+(keyboard down, keyboard up, and Escape cancel). The full suite is **32 files / 375 tests**; the
 shuffled suite was run **three times** (`npm run test -- --run --sequence.shuffle`), green each time.
 The workshop chunk grows from 60.45 kB / 19.88 kB gzip to **62.45 kB / 20.45 kB gzip** — dnd-kit's
 keyboard sensor and coordinate getter, inside the already-lazy chunk.

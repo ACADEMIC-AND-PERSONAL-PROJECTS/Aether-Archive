@@ -687,6 +687,9 @@ describe("reordering", () => {
     const first = activatorFor("a.png");
     first.focus();
     await pressKey(first, "Space", " ");
+    // Prove the drag is live before cancelling it, so a missing sensor cannot make the rest vacuous.
+    expect(first).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("drag-overlay")).toBeVisible();
     await pressKey(document, "ArrowRight", "ArrowRight");
     await pressKey(document, "Escape", "Escape");
 
