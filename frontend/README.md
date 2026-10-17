@@ -870,6 +870,25 @@ Not measured here: a real backend's `StorageService.store` timing (the stub neve
 phone or a real network, and Safari's XHR implementation. The unit tests pin the DOM contract; the
 probe pins the browser events.
 
+## The selection grid — the tile surface (E4-S2A1)
+
+The picked photo is now a **tile in a selection grid** instead of a full-bleed preview; the send path
+above is unchanged. This is the surface E4-S2A2 grows into multi-select, so the tile is where the
+per-file state, the remove action and the always-mounted scrim live.
+
+- `<ul aria-label="Selected photos">` with one `<li data-state>` per file; the state line reads
+  "Waiting", "Uploading" or the failure sentence, prefixed `sr-only` by the file's own name so six
+  state lines never become six anonymous ones.
+- The remove button is a real `<button>` named "Remove <file name>", 44 × 44 hit area with a 28 px
+  visible disc; it is **disabled, not removed, while the request is in flight** — the request holds a
+  snapshot of the file, and a tile vanishing mid-flight would leave the screen describing something the
+  user cannot see.
+- `loading="lazy"` and `decoding="async"` on the preview (the rendering rule); the tile's scrim is
+  always mounted, so a preview that cannot decode loses the `<img>` but never the tile or its controls
+  (the E4-S1A fix, carried).
+- The glass panel now sits over the theme's base rather than over a full-bleed photo, so its backdrop
+  is `--aura-bg`; the contrast measurements above (E3-S2/E3-S4) remain the worst-case reference.
+
 ## Zero external requests — measured on the built bundle
 
 ```bash
