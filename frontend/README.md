@@ -900,7 +900,8 @@ unchanged; this section covers the cap, the queue and the batch's own states.
 Six is the dump's size, so six is the most a selection may hold. `planSelection` in
 `lib/upload/selection.ts` counts the tiles already in the grid plus this pick; every picked file still
 runs through `validateUpload`. A refused file (empty, wrong declared type, too large) is reported **per
-file, by name** — "photo.png: That photo is larger than the archive accepts." — and does not consume a
+file, by name** — "photo.png: That photo is larger than 15 MB." (the client sentence; the archive's own
+`upload-too-large` mapping is for the server side, E4-S1B) — and does not consume a
 slot. A valid file past the cap is ignored, once, with exactly:
 
 > You can add up to 6 photos at a time — 1 wasn't added.
@@ -942,6 +943,13 @@ panel (asserted with `toBeVisible()` on the panel node, not just a test id) and 
 "Upload cancelled." The E4-S1B caveat stands unchanged: a cancel can race a response that the server
 already stored, so the screen never claims the archive stored nothing.
 
+**A cancel that lands after the last response says so honestly.** The review measured the interleaving:
+a 201 arrives, Cancel is clicked before the continuation renders, the transport's abort is a no-op and
+the photo IS stored. The post-loop check now compares how many files the batch actually processed: when
+every queued file was processed, the batch summary wins ("Added 1 photo."), because the cancel had
+nothing to stop; only a cancel that stopped the loop says "Upload cancelled." A test pins the
+interleaving, and restoring the old check fails it.
+
 While the queue runs, the persistent status region reads the constant "Uploading." — a test pins it,
 including across a mid-batch failure; the settled summary is what carries the failure to assistive tech.
 
@@ -963,13 +971,17 @@ Unit suite, from `frontend/`:
 
 ```bash
 npm run test -- --run
-# Test Files 28 passed (28) · Tests 308 passed (308)
-VITE_MAX_UPLOAD_MB=20 npm run test -- --run
-# Test Files 28 passed (28) · Tests 308 passed (308)
+# Test Files 28 passed (28) · Tests 309 passed (309)
+npm run test -- --run --sequence.shuffle
+# Test Files 28 passed (28) · Tests 309 passed (309)
 ```
 
-`WorkshopView.test.tsx` covers the picker, the grid, the queue and the accessibility states in **33
-cases**; `selection.test.ts` adds **11** pure cases and `progress.test.ts` **2**. Nine deliberate
+`VITE_MAX_UPLOAD_MB=20 npm run test` was also run green (309) — but the suite pins that key to `"15"` in
+`vite.config.ts` for hermeticity (the E4-S1 fix), so it exercises the pin rather than the value; the
+shuffled run above is the real second condition.
+
+`WorkshopView.test.tsx` covers the picker, the grid, the queue and the accessibility states in **34
+cases**; `selection.test.ts` adds **11** pure cases and `progress.test.ts` **2**. Ten deliberate
 mutants were each applied, observed red, and reverted:
 
 | Mutant                                               | Result                                                                                    |
@@ -983,6 +995,7 @@ mutants were each applied, observed red, and reverted:
 | success-path `revokePreview` deleted                 | 1 failed — `expected "revokeObjectURL" to be called with arguments: [ 'blob:preview-1' ]` |
 | `cancelledRef.current = false` deleted               | 1 failed — `expected 1 to be greater than 1` (the second batch opened no request)         |
 | `alive` half of the progress gate defeated           | 1 failed — `expected true to be false`                                                    |
+| old post-loop cancel check restored                  | 1 failed — "Upload cancelled." overwrote "Added 1 photo." after a stored 201              |
 
 Browser probe (development-time, headless Chromium 152, 390 × 844 DPR 3, built `dist/` served by a
 local stub; scripts outside the repository; the stub answers every second upload with 415
