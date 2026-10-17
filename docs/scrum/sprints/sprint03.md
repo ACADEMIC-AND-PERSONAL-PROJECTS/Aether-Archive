@@ -26,12 +26,13 @@
 | 2 | E3-S2 | Glass menu overlay | 5 | p0 | Done | #104 |
 | 3 | E3-S3 | Route transitions & motion system | 3 | p0 | Done | #106 |
 | 4 | E3-S4 | Quiet loading / empty / error states | 2 | p1 | Todo | — |
-| 5 | E3-S5 | View tests & accessibility pass | 3 | p0 | Todo | — |
+| 5a | E3-S5A | Accessibility — the axe gate (criteria 1, 2) | 1 | p0 | In review | #110 |
+| 5b | E3-S5B | Accessibility — contrast, `inert`, the announcement fix, the manual pass (criteria 3–5) | 2 | p0 | Todo | — |
 | 6 | E4-S1 | Single photo upload | 5 | p0 | Todo | — |
 | 7 | E4-S2 | Multi-select (≤ 6) & client-side downscale | 5 | p0 | Todo | — |
 
-**Total: 8 slices · 28 points** (the row above them is a chore, not a story; E3-S1A and E3-S1B are one
-5-point story, split — see the note at the end of this section). The order is the
+**Total: 9 slices · 28 points** (the row above them is a chore, not a story; E3-S1A/B and E3-S5A/B are
+each one story, split — see the notes at the end of this section). The order is the
 dependency chain, with the placements worth a sentence:
 
 - **E3-S1 first** — the sprint's goal made visible: the app opens on a full-bleed random photo and nothing
@@ -246,3 +247,13 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   unbounded by estimation** — is the actionable form for the retrospective, and it is why the three data
   points (5 pts → 1,516; 5 pts → 1,085; 3 pts → 1,190 at review, 1,224 merged) say nothing about the point
   estimates.
+- 2026-10-17 — **E3-S5 was split at review into E3-S5A (the axe gate, criteria 1-2) and E3-S5B
+  (contrast, `inert`, the announcement fix and the manual pass, criteria 3-5).** The story landed at 551
+  hand-written lines claiming the atomic-story exception; the review found the cut I had not tested — **a
+  cut by criterion, not by surface**. I had argued that criteria 1 and 2 each name two surfaces, so no
+  surface cut could satisfy them; true and irrelevant, because the rule asks whether *a* slice fails a
+  criterion, and delivering criteria 1-2 then 3-5 fails none that the whole does not also defer. The cuts
+  are ~188 and ~210 lines, both under budget. **This is the fourth time in this sprint that a "cannot be
+  split" claim has been withdrawn** (E3-S1, E3-S3, E3-S4, here), and the lesson is now a rule rather than a
+  resolution: construct the cut you did not name — by criterion, by state, by surface — before claiming the
+  exception, and if the branch is under ~500 argue the arithmetic instead. E3-S5B closes #30.

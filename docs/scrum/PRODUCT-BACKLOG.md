@@ -380,6 +380,15 @@ opens on tap, feels tactile, and gets out of the way.
       comment records the trade; this is where it gets an owner.
 - [ ] Manual pass on a 390 px viewport documented in the PR.
 
+> **Delivered in two slices (Sprint 3), split at review.** **E3-S5A** (PR #110) carries criteria 1-2 — the
+> axe gate: `axe-core` 4.14.0 dev-only, five runs at zero violations of every impact, with the two buckets
+> axe cannot judge in jsdom (`incomplete`, `inapplicable`) pinned rather than tolerated. **E3-S5B** carries
+> criteria 3-5 — painted contrast, the `inert` decision, the persistent-announcement fix and the manual
+> pass — and closes #30. The story was first delivered whole at 551 hand-written lines claiming the
+> atomic-story exception; the review found **the cut I had not tested, by criterion rather than by
+> surface**, and both halves land under budget. Fourth withdrawn claim of its kind this sprint; the rule
+> now lives in the sprint notes and in `.claude/` memory rather than in a resolution.
+
 ---
 
 ## E4 — Curator's Workshop

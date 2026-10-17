@@ -612,11 +612,30 @@ describe("SplashView — the accessibility audit (E3-S5A)", () => {
     expect(ruleStatus(results, "color-contrast")).toBe("incomplete");
   });
 
+  it("should produce no axe violations in the loading state", async () => {
+    // The response is held open: the state under audit is the loading wash, so the query must not
+    // settle between the render and the run. This was the one user-reachable splash state the gate
+    // did not audit — the review probed it clean and asked for it here rather than later.
+    const fetchSpy = stubApi(() => jsonResponse(PHOTO));
+    fetchSpy.mockImplementation(() => new Promise<Response>(() => {}));
+    renderSplash();
+
+    expect(screen.getByRole("main")).toHaveAttribute("data-state", "loading");
+    const results = await runAxe(document.body);
+
+    expect(violationSummary(results)).toEqual([]);
+    expect(ruleStatus(results, "color-contrast")).toBe("incomplete");
+  });
+
   it("should produce no axe violations in the empty state, with contrast named incomplete", async () => {
     stubApi(() => problemResponse("empty-archive", 404));
     renderSplash();
     await screen.findByRole("status");
 
+    // `role="status"` is shared with the error state, so it cannot say which state is under audit —
+    // and in the next slice every state carries one. The state attribute is the assertion that makes
+    // the test's name true.
+    expect(screen.getByRole("main")).toHaveAttribute("data-state", "empty");
     const results = await runAxe(document.body);
 
     expect(violationSummary(results)).toEqual([]);
@@ -628,6 +647,7 @@ describe("SplashView — the accessibility audit (E3-S5A)", () => {
     renderSplash();
     await screen.findByRole("status");
 
+    expect(screen.getByRole("main")).toHaveAttribute("data-state", "error");
     const results = await runAxe(document.body);
 
     expect(violationSummary(results)).toEqual([]);
@@ -640,6 +660,9 @@ describe("SplashView — the accessibility audit (E3-S5A)", () => {
     await screen.findByRole("img", { name: "A photo from your archive" });
 
     fireEvent.click(tapTarget());
+    // The dialog is the state this run claims to audit; without this assertion it would audit the
+    // splash again and still pass, which is the failure mode a test name cannot catch.
+    expect(screen.getByRole("dialog", { name: "Menu" })).toBeInTheDocument();
     const results = await runAxe(document.body);
 
     expect(violationSummary(results)).toEqual([]);

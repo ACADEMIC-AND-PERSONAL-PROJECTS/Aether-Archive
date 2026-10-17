@@ -504,7 +504,7 @@ belong to the behaviour slice (E3-S5B) and arrive with it.
 ```bash
 npm ls axe-core --all                          # └── axe-core@4.14.0
 npm pkg get devDependencies.axe-core            # "4.14.0"
-node -e "…axe-core/package.json…"               # dependencies: null, license: MPL-2.0
+node -e "…axe-core/package.json…"               # no dependencies field (no peer/optional either), license: MPL-2.0
 du -sh node_modules/axe-core                   # 3.4M
 ls -lh node_modules/axe-core/axe.min.js        # 636.9K (KiB)
 wc -c < node_modules/axe-core/axe.min.js       # 652140 bytes
