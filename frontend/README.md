@@ -1048,9 +1048,6 @@ parsing the container. Everything else is sent unchanged. **E6-S20** records res
 when animation and alpha can be detected. The returned `File`
 carries the **encoded blob's own type**, not merely the requested one: MDN records that an unsupported
 requested type falls back to PNG, and `StorageService.store` refuses a declared type that contradicts
-the magic bytes, so a fallback must travel as PNG. The returned `File`
-carries the **encoded blob's own type**, not merely the requested one: MDN records that an unsupported
-requested type falls back to PNG, and `StorageService.store` refuses a declared type that contradicts
 the magic bytes, so a fallback must travel as PNG.
 
 **Never a bigger upload.** A re-encode that does not shrink the file is discarded and the original is
@@ -1098,6 +1095,87 @@ multipart `file` part; Chromium then decoded both the fixture and the received b
 - There is no visual change in this story (the grid, the panel and the progress line are E4-S2A's), so
   no mobile capture is required. Not measured here: Safari's `OffscreenCanvas`/`toBlob` behaviour and a
   physical phone; the fallback keeps Safari uploadable regardless.
+
+## The dump order — measured (E4-S3)
+
+The grid is sortable. The array **is** the order: `items` in `WorkshopView` is rendered top-left to
+bottom-right, and the future publish payload is `items.map(item => item.id)` with `displayOrder` equal
+to the index (0–5). There is no separate order field, no index stored on a tile and no sorting step at
+render time; a move produces one new array.
+
+**The reducer** is `moveItem(items, from, to)` in `lib/ordering/move.ts`, with `arrayMove` semantics
+(the destination is the index in the resulting array). It never mutates, returns the **same reference**
+for a no-op, clamps both endpoints into `[0, length - 1]`, and refuses non-integer indices (a caller
+bug) without touching the array. `orderedIds(items)` is the payload projection. Both are unit-tested
+without React, including all 16 from/to pairs on a four-photo array.
+
+**Sensors and activation.** `MouseSensor` starts after **8 px**; `TouchSensor` starts after a
+**250 ms** press and cancels if the finger moves **8 px** before that, so a swipe still scrolls the
+page and a long press lifts the tile. The activator carries `touch-action: manipulation`; the grid uses
+`rectSortingStrategy` and `closestCenter`. The remove button is a **sibling** of the drag activator, so
+its pointer events never reach a sensor. While an upload runs, `useSortable` and `SortableContext` are
+both `disabled` (the tiles report `aria-disabled="true"`): the queue reads the array when the batch
+starts, and a reorder mid-batch would make the grid disagree with the requests in flight.
+
+**Keyboard and announcements.** `KeyboardSensor` with `sortableKeyboardCoordinates`: Tab to a tile,
+Space/Enter to pick up, arrows to move, Space/Enter to drop, Escape to cancel. Announcements come from
+the pure builders in `lib/ordering/announce.ts` — `"Photo 2 of 6 moved to position 4."`, `"Photo 4 of 6
+dropped."`, `"Move cancelled. Photo 2 of 6 is back in position 2."` — instead of dnd-kit's generated
+ids, plus custom screen-reader instructions. dnd-kit mounts its own live region; the workshop's
+persistent status region stays where it was.
+
+**Auto-scroll and motion.** `DndContext` auto-scrolls the nearest scrollable ancestor with a threshold
+band, acceleration 8 and a 5 ms interval. The overlay clone uses the one soft shadow and hairline edge;
+its drop animation is **250 ms** on `cubic-bezier(0.22, 1, 0.36, 1)`, and the sortable settle is
+200 ms. Both are pinned below the story's 300 ms ceiling by `interaction.test.ts`. Under
+`prefers-reduced-motion: reduce` the grid passes no settle transition and no drop animation
+(`lib/motion/reduced.ts`); the pointer-following overlay stays, because it is the drag itself. dnd-kit
+deliberately skips the drop animation when the overlay's first and last keyframes are identical —
+measured on a pixel-exact drop onto the destination slot; the probe below drops 25 px off-centre to
+exercise it.
+
+**Three packages, justified.** `@dnd-kit/core` (sensors, context, overlay, announcements),
+`@dnd-kit/sortable` (sortable strategy and `sortableKeyboardCoordinates`) and `@dnd-kit/utilities`
+(the transform serialiser `useSortable` styles with). `@dnd-kit/accessibility` arrives transitively.
+They replace a hand-rolled pointer/keyboard/compositor stack that would have to re-earn the same
+accessibility and auto-scroll behaviour.
+
+Bundle delta, two production builds with and without the imports in `dist/`:
+
+| Chunk                 | Before                    | After                     | Delta                          |
+| --------------------- | ------------------------- | ------------------------- | ------------------------------ |
+| `WorkshopView` (lazy) | 11.48 kB / 4.26 kB gzip   | 63.55 kB / 20.75 kB gzip  | **+52.07 kB / +16.49 kB gzip** |
+| `index`               | 278.56 kB / 87.78 kB gzip | 278.61 kB / 87.83 kB gzip | +0.05 kB / +0.05 kB gzip       |
+| CSS                   | 21.34 kB / 5.16 kB gzip   | 22.15 kB / 5.32 kB gzip   | +0.81 kB / +0.16 kB gzip       |
+
+The cost lands in the lazily loaded workshop chunk, not in the first paint.
+
+### Measured
+
+`npm run lint`, `npm run format:check`, `npm run typecheck`, `npm run test -- --run` and
+`npm run test -- --run --sequence.shuffle`: **33 files, 378 tests, both green**. The new modules add
+11 reducer tests, 8 announcement tests, 3 envelope tests and 3 reduced-motion tests;
+`WorkshopView.test.tsx` adds 8 grid tests (gestures, keyboard, reduced motion) plus a StrictMode
+keyboard reorder, and axe runs in the sortable state.
+
+Probe: headless Chromium **153.0.8010.12**, built `dist/` on `vite preview`, scripts outside the
+repository, 390 × 844 DPR 3 (390 × 300 where scrolling matters — at 844 six tiles fit, and at 400 the
+document has only 48 px of travel, 27 of them spent by the focus scroll).
+
+| Scenario                                          | Evidence                                                                                                                                                                                                        |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mouse drag tile 1 → tile 3                        | order `[1,2,3,4,5,6]` → `[2,3,1,4,5,6]`; overlay present (1), lifted tile 1; neighbour transition `transform 0.2s cubic-bezier(0.22, 1, 0.36, 1)`; drop animation **250 ms** with the same ease, one WAAPI call |
+| Keyboard                                          | focus `"Photo 1 of 6: photo-1.png"`; Space → `aria-pressed="true"`; live region `"Photo 1 of 6 moved to position 2."`; Space → `"Photo 2 of 6 dropped."`; order `[2,1,3,4,5,6]`                                 |
+| Touch long-press (CDP `Input.dispatchTouchEvent`) | lifted tile 1, order `[1,2,3,4,5,6]` → `[2,3,1,4,5,6]`, page scroll 0 during the hold                                                                                                                           |
+| Short swipe, 390 × 300                            | page `scrollTop` 0 → **148** (its maximum), order unchanged, no tile in the dragging state                                                                                                                      |
+| Auto-scroll, 390 × 300                            | holding a drag 8 px from the bottom scrolled the page **0 → 148** while the drag stayed live; drop order `[2,3,4,5,1,6]`                                                                                        |
+
+0 off-origin requests and 0 page/console exceptions in every scenario. Captures:
+`reports/e4s3-drag-390.png` (lift + overlay) and `reports/e4s3-order-390.png` (final order).
+`prefers-reduced-motion` is handled in the grid — `lib/motion/reduced.ts` is read by a hook, and under
+`reduce` `useSortable` receives no transition and the overlay receives no drop animation — but it is
+proven with a stubbed `matchMedia` in jsdom, not in a reduced-motion Chromium profile (**SKIPPED**).
+Not measured here either: a physical phone's long-press feel and Safari's `touch-action` handling.
 
 ## Zero external requests — measured on the built bundle
 
