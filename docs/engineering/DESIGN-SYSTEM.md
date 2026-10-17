@@ -269,9 +269,16 @@ one value (**0.250**), `animation-duration: 1e-05s`, and the animation never sta
 Implemented in `frontend/src/components/QuietState.tsx` (E3-S4) and rendered by the splash. The details
 that are rules, not taste:
 
-- **The empty sentence** is one `role="status"` paragraph in `font-display` / `--aura-text`, centred on
-  `--aura-bg`. No retry, no spinner, no illustration. Measured painted: glyph `#e5e3e0` on base
-  `#0b0b0d` — **15.35:1**.
+- **The empty sentence** is one paragraph in `font-display` / `--aura-text`, centred on `--aura-bg`. No
+  retry, no spinner, no illustration. Measured painted: glyph `#e5e3e0` on base `#0b0b0d` — **15.35:1**
+  (E3-S4); E3-S5's sampler read the glyph core at **15.79:1**.
+- **Announcement is one persistent region, not the sentences (E3-S5).** A live region announces *changes*
+  to content that already exists; a node inserted together with its text is not reliably announced. The
+  splash mounts a visually hidden `role="status"` in every state and fills it on the transition to
+  `empty` or `error`; loading and ready leave it empty. The visible sentences are ordinary paragraphs.
+  The trade, named: a screen-reader user browsing afterwards meets the same words twice — the visible
+  sentence and the status region — which is one message seen twice, not two messages. A test pins the
+  words identical so the visible and announced copies cannot drift.
 - **The loading pulse** is a full-bleed wash of `--aura-surface` at `opacity-25` carrying
   `aether-breathe` (§5). It is `aria-hidden`; there is no text and no progress bar. jsdom cannot observe
   animation, so the unit suite pins the class token and Chromium measures the frames.
@@ -293,6 +300,18 @@ that are rules, not taste:
 
 - Contrast: ≥ 4.5:1 for text (≥ 3:1 for ≥ 24 px), enforced by construction in the theme generator.
 - Focus visible and consistent; glass overlays trap focus, close on `Esc`, restore focus.
+- **The covered surface is `inert` (E3-S5).** While the glass menu is open, the splash's `<main>` carries
+  `inert`; the dialog is its sibling, never a descendant — a dialog nested inside the inert subtree is
+  ignored with it (measured in Chromium). Measured in Chromium 152: the trigger is `ignored: true` with
+  reason `inertElement`, the dialog stays exposed, and `.focus()` on the covered trigger is a no-op;
+  with the attribute removed, focus reaches it. `Esc` removes the attribute and returns focus to the
+  trigger. jsdom has no `inert` effect, so the suite pins the attribute, the sibling relationship and
+  the focus return; the tree and focus-order effect is the browser's.
+- **The automated gate is axe-core 4.14, zero violations at every impact** — not only `serious` — on the
+  splash (ready/loading, empty, error) and the menu. It is a dev dependency with no transitive
+  dependencies, absent from `dist/`. In jsdom it is a **structural** gate: `color-contrast` comes back
+  `incomplete` on the splash and `inapplicable` on the menu (no layout, no paint). Contrast is enforced
+  by token arithmetic in the component tests and measured on painted pixels in Chromium.
 - Drag-and-drop has a keyboard path and announces moves; nothing is touch-only.
 - Touch targets ≥ 44 × 44 px; no hover-only affordances.
 
@@ -328,6 +347,11 @@ that are rules, not taste:
   the empty base and on the notice over white and dark photos, the notice's placement through an entry,
   and the Tab/Enter path (`reports/e3s4-*.png`). The probe's network audit reports every request
   same-origin and none off-origin.
+- Accessibility (E3-S5): RTL + axe-core in jsdom pin roles, names, the focus trap, `Esc`, the focus
+  return and the structural rules on both the splash's four states and the menu; the persistent live
+  region is pinned as the same DOM node across a state change. Chromium measures what jsdom cannot —
+  `inert`'s accessibility-tree and focus effect, painted contrast for every text style over glass and
+  images, the keyboard path end to end, and layout at 320/390/430 px (`reports/e3s5-*.png`).
 
 ## 11. The CSS foundation (E2-S3)
 

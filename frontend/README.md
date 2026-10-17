@@ -33,6 +33,7 @@ test together. Anything that needs a different major version records the evidenc
 | `tailwindcss` + `@tailwindcss/vite`                           | 4.3.3                     | Utility CSS, CSS-first configuration (ADR-014).                                                                                                     |
 | `vitest` + `jsdom`                                            | 5.0.5 + 30.1.3            | Test runner and DOM implementation.                                                                                                                 |
 | `@testing-library/react` (+ `dom`, `jest-dom`)                | 16.3.3 / 10.4.2 / 7.0.1   | Behaviour-level component tests and DOM matchers.                                                                                                   |
+| `axe-core`                                                    | 4.14.0                    | Accessibility audit in jsdom (E3-S5); dev-only, no transitive dependencies, absent from `dist/` (measured below).                                   |
 | `eslint` + `@eslint/js`                                       | 10.12.0 + 10.0.1          | Linter and its flat-config base rules.                                                                                                              |
 | `typescript-eslint`                                           | 8.71.2                    | TypeScript parsing and the `no-explicit-any` / `no-non-null-assertion` / unused-import rules.                                                       |
 | `eslint-plugin-import-x`, `eslint-import-resolver-typescript` | 4.17.1 + 4.4.5            | Import order and duplicate detection; the resolver is what lets it resolve extensionless TS specifiers — without it every import rule fails to run. |
@@ -127,7 +128,7 @@ frontend/
     ├── hooks/            useHeroImage + usePullToRefresh (E3-S1) — reusable hooks
     ├── types/            wire types mirroring _docs/openapi.yml (E2-S2)
     ├── styles/           global.css — the `@theme` token layer lives here
-    └── test/setup.ts     jest-dom matchers + RTL cleanup
+    └── test/             setup.ts (jest-dom + RTL cleanup), axe.ts (the E3-S5 threshold and helper)
 ```
 
 ## What the toolchain enforces
@@ -491,6 +492,155 @@ re-anchor. No portal was added.
 
 Captures at 390 × 844: `reports/e3s4-loading-390.png`, `reports/e3s4-empty-390.png`,
 `reports/e3s4-error-390.png`, `reports/e3s4-error-over-dark-390.png`.
+
+## The accessibility pass — measured (E3-S5)
+
+Scope: the splash's four states and the glass menu. jsdom + RTL settle roles, names, the focus trap,
+`Esc` and the focus return; axe settles structure; Chromium settles what neither can — the `inert`
+effect, painted contrast, and layout at 320/390/430 px. Everything below was run against the built
+bundle served by the same stub as the sections above, in Chromium 152 headless.
+
+### axe-core: dev-only, and absent from `dist/`
+
+```bash
+npm ls axe-core --all                          # └── axe-core@4.14.0
+npm pkg get devDependencies.axe-core            # "4.14.0"
+node -e "… axe-core/package.json …"             # dependencies: null, license: MPL-2.0
+du -sh node_modules/axe-core                   # 3.4M
+ls -l node_modules/axe-core/axe.min.js         # 636.9K
+gzip -c node_modules/axe-core/axe.min.js | wc -c   # 182586
+grep -rl "axe-core" dist/                      # no match
+grep -rl "axe.run" dist/                       # no match
+```
+
+`axe-core` directly, not a wrapper: the registry reports `vitest-axe@0.1.0` with six dependencies
+(its own `axe-core`, `lodash-es`, `aria-query`, `dom-accessibility-api`, `chalk`, `redent`) and
+`jest-axe@11.0.0` with four, against none here. The whole integration is `src/test/axe.ts` — run,
+violation summary, rule bucket — which is smaller than what a wrapper would add. MPL-2.0, unmodified,
+dev-only, never shipped: the production bundle is built from `src/` without `test/`, and both markers
+are absent from it.
+
+**The threshold: zero violations at every impact** — not "no serious ones". The four splash runs
+(loading/ready, empty, error, menu open) and the menu's run each assert an empty list, so a `moderate`
+or `minor` finding added later fails rather than being waved through. Today they find none. What the
+green run does **not** prove: jsdom has no layout, no paint and no canvas, so `color-contrast` is
+returned **incomplete** on the splash (`impact: serious`) and **inapplicable** on the menu. Those
+buckets are asserted, so an axe upgrade that starts answering — or stops running the rule — is
+visible. Contrast itself is proved by the token arithmetic in `SplashView.test.tsx` /
+`GlassMenu.test.tsx` and by the painted pixels below.
+
+### `inert` on what the dialog covers — decided, measured
+
+Decision: the splash's `<main>` carries `inert={menuOpen}`, and the dialog stays its **sibling**
+(`features/menu/GlassMenu.tsx`). Chromium, menu open at 390 × 844, `Accessibility.getPartialAXTree`:
+
+```json
+menuClosed.trigger        {"role":"button","name":"Open the menu","ignored":false}
+withInert.trigger         {"role":"none","ignored":true,"ignoredReasons":["inertElement"]}
+withInert.main            {"role":"none","ignored":true,"ignoredReasons":["inertElement"]}
+withInert.dialog          {"role":"dialog","name":"Menu","ignored":false}
+withInert.focus           {"activeTag":"A","activeText":"The River","isTrigger":false}
+withoutInert.trigger      {"role":"button","name":"Open the menu","ignored":false}
+withoutInert.focus        {"activeTag":"BUTTON","activeLabel":"Open the menu","isTrigger":true}
+withoutInertOrAriaModal   {"role":"button","name":"Open the menu","ignored":false}
+dialogNestedInert.dialog  {"role":"none","ignored":true,"ignoredReasons":["inertElement"]}
+afterClose                {"inert":false,"dialogs":0,"activeTag":"BUTTON","activeLabel":"Open the menu","expanded":"false"}
+```
+
+Reading: `inert` is what removes the covered surface — with it, the trigger and `<main>` are `ignored`
+with the browser's own reason `inertElement`, while the dialog stays exposed, and a programmatic
+`.focus()` on the trigger is a no-op (focus remains on the dialog's first link). Remove `inert` — and
+`aria-modal` too — and the same trigger is exposed and focus reaches it, so this is not `aria-modal`
+doing the work silently. Moving the dialog _inside_ `<main>` while inert shows the sibling structure is
+load-bearing: the dialog itself becomes `ignoredElement`. Closing removes the attribute and unmounts
+the dialog; focus lands back on the trigger (`afterClose` above). jsdom implements neither the property
+nor the effect, so the suite pins the attribute, the sibling relationship and the focus return; this
+probe is the effect.
+
+Method note, because the first cut was wrong: removing `inert`, focusing and restoring it inside one
+`Runtime.evaluate` made the following AX query measure the restored state — the "without inert" row
+still said `inertElement`. The measurements above keep the attribute off across the query and restore
+it afterwards. An accepted fact has to be measured in the state that produced it.
+
+### The quiet states' announcement — decided, measured
+
+Decision: **one persistent region**, not `role="status"` on the sentences. Measured in Chromium: at
+`ready` the region exists with `textContent === ""`; after a failed re-roll it is the **same DOM node**
+(`sameNode: true`) with `textNow: "Couldn't load a photo."`, equal to the visible sentence. The
+accessibility tree contains `[{"role":"status","name":""}]` plus **two** `StaticText` copies of the
+sentence — the visible paragraph and the hidden region. The empty state behaves identically
+(`statusText` equals the visible words). The trade is that duplicate: one message seen twice in browse
+mode, not two messages. A region inserted together with its text is the pattern live regions do not
+reliably announce; that is why the visible sentences are ordinary paragraphs and a test pins the two
+copies' words equal.
+
+### Painted contrast, per text style
+
+Method: screenshots of the built bundle, each text rectangle from `Range.getClientRects()`, the
+brightest glyph pixel inside it against a 5 × 5 median of the panel, WCAG 2.x relative luminance.
+
+| Surface / text                                                | Painted panel   | Glyph              | Ratio       |
+| ------------------------------------------------------------- | --------------- | ------------------ | ----------- |
+| Menu entries over white, fallback theme (19.035 px)           | `rgb(50,50,51)` | `rgb(232,230,227)` | **10.28:1** |
+| Menu entries over white, theme from the dark half (19.035 px) | `rgb(45,53,60)` | `rgb(198,211,221)` | **8.16:1**  |
+| Error message over white, theme from the dark half (15.5 px)  | `rgb(45,53,60)` | `rgb(198,211,221)` | **8.16:1**  |
+| Retry "Try again" over white, same notice (13.225 px)         | `rgb(45,53,60)` | `rgb(198,211,221)` | **8.16:1**  |
+| Empty sentence on the base (19.035 px, Playfair Display)      | `rgb(11,11,13)` | `rgb(232,230,227)` | **15.79:1** |
+
+The sampler's first error-notice read was wrong, and the reason is worth keeping: the fixed sample
+point at (368, 772) falls in the panel's rounded corner and returned the white photo through it
+(`rgb(103,109,116)` → 3.43:1). Six interior points — (200,772), (200,780), (100,772), (300,772),
+(200,822), (60,772) — all return `rgb(45,53,60)` → **8.16:1**. The menu's panel sample at (195,646) is
+interior. The arithmetic controls are in the component tests; the painted values are the browser's.
+
+### Keyboard path and retry, end to end
+
+Measured on the built bundle with real key events:
+
+```text
+Tab from the page        → BUTTON "Open the menu"
+Enter                    → menu opens, focus on A "The River"
+Tab                      → A "Curate"
+Tab                      → BUTTON "Close"
+Tab                      → A "The River"   (wraps)
+Shift+Tab from The River → BUTTON "Close"
+Tab, Enter               → /river, heading "The River", dialog count 0
+```
+
+The retry: one `Tab` lands on "Try again" (`:focus-visible` true, 1 px outline, 83.5 × 44 px);
+`Enter` raised the stub's request count 11 → 12.
+
+### Layout at 320, 390 and 430 px
+
+- Splash: the tap target is exactly the viewport at each width (320 × 800, 390 × 844, 430 × 800), no
+  horizontal overflow, `scrollHeight` equals the viewport height.
+- Menu at 390: sheet `x16 y642 358 × 186`, bottom 828 inside 844; entries 340 × 56 px — the 44 px
+  floor cleared by 12 px. At 320: `288 × 186` at `y598`, entries 270 × 56; at 430: `398 × 186` at
+  `y598`, entries 380 × 56. `fits` is true on all three axes at all three widths.
+- Captures: `reports/e3s5-splash-320.png`, `e3s5-splash-390.png`, `e3s5-splash-430.png`,
+  `e3s5-menu-390.png`, `e3s5-menu-over-white-390.png`, `e3s5-menu-over-half-390.png`,
+  `e3s5-empty-390.png`, `e3s5-empty-contrast-390.png`, `e3s5-error-over-white-390.png`.
+
+### Network, re-measured with this build
+
+`performance.getEntriesByType("resource")` on a loaded splash: **7 entries, all same-origin** — the
+JS/CSS chunks, the Inter face, `/api/v1/photos/random` and `/images/photo.png`; `offOrigin: []`. The
+`dist/` URL audit is unchanged: 18 `www.w3.org` namespace strings, 2 `react.dev`, 2 `localhost`, 1
+`reactrouter.com`, and no request behind any of them.
+
+### What this pass does not cover
+
+- axe in jsdom cannot judge contrast, focus visibility or animation; the buckets are asserted, not the
+  verdicts.
+- A real screen reader was not driven. The persistent region, its changed text and its AX exposure are
+  verified; the **announcement itself** (whether a reader speaks it) is not. The duplicate-words trade
+  is recorded above.
+- `inert` is measured in Chromium 152. A browser without it ignores the attribute and keeps E3-S2's
+  focus trap and veil, which the suite pins.
+- Drag-and-drop's keyboard path belongs to E4-S3, not to this story.
+- `app/RouteFallback.tsx` still mounts `role="status"` together with its "Loading view" text — the
+  same insert-with-text pattern this story replaced on the splash. It is outside the two screens this
+  pass covers and is unchanged; it needs the same decision in the story that owns the route shell.
 
 ## Zero external requests — measured on the built bundle
 
