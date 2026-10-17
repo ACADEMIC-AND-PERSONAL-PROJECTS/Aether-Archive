@@ -681,11 +681,11 @@ JS/CSS chunks, the Inter face, `/api/v1/photos/random` and `/images/photo.png`; 
   same insert-with-text pattern this story replaced on the splash. It is outside the two screens this
   pass covers and is unchanged; it needs the same decision in the story that owns the route shell.
 
-## The single upload — measured (E4-S1)
+## The photo picker — measured (E4-S1A)
 
-`POST /api/v1/photos` takes one multipart `file` part and a `category`. The client's boundary was
-copied from the server's `ImageFormat` and then measured against a running archive; the table is the
-output of that probe, not a reading of the source.
+This slice ships the picker and the client-side refusal only: it sends nothing. The server contract
+below was measured against a running archive because the validation vocabulary is derived from it;
+the later upload slices consume the same responses.
 
 | Request                                                | Status | `code`                   |
 | ------------------------------------------------------ | ------ | ------------------------ |
@@ -701,60 +701,49 @@ output of that probe, not a reading of the source.
 | no `file` part                                         | 400    | `missing-request-part`   |
 | no `category` part                                     | 400    | `validation-failure`     |
 
-The declared type is part of the contract, not a formality: the same 108-byte WebP answers **201**
-with `image/webp` and **415** with `application/octet-stream` (measured both ways). Chromium declares
-exactly the expected type for each extension — `fixture.png` → `image/png`, `fixture.jpeg` →
-`image/jpeg`, `fixture.gif` → `image/gif`, `fixture.webp` → `image/webp`, `fixture.avif` →
-`image/avif`; a text file named `decoy.png` → `image/png`, and only the server's magic-byte sniff
-catches it. The client therefore validates the declared type, size and emptiness and leaves the
-bytes to the server.
+**The client check is an experience measure, not a boundary.** It mirrors the server's _declared-type_
+axis, emptiness and size. It does **not** accept only what the server accepts, because it cannot see
+the bytes: text bytes declared `image/png` pass `validateUpload` and are refused by the server's
+magic-byte sniff with 415 `unsupported-image-type`. Decoding every pick client-side would be a second
+parser to keep in step, and the server's sniff remains the authority. Size has the same shape: the
+client refuses an oversized pick early, but the server enforces the ceiling (measured: 15,728,640 B →
+201, 15,728,641 B → 413).
 
 - `lib/upload/validation.ts` accepts the server's five formats plus `image/jpg`. The picker's
   `accept` hint lists the five standard types; `image/jpg` is accepted from a drop or another
   browser even though the hint omits it. File names are never consulted — the server discards them.
 - The limit comes from `VITE_MAX_UPLOAD_MB` (default 15, accepted range 1–1024, malformed values fall
   back to the default rather than disabling validation); the backend's `AETHER_MAX_UPLOAD_MB` remains
-  the authority. The variable is read from the repository-root `.env`; it is not yet listed in
-  `.env.example`.
-- `api/uploadPhoto.ts` uses **XHR**, because only `XMLHttpRequest.upload` reports request progress and
-  cancels in flight in every target browser. `fetch` has no upload-progress event, and streaming
-  uploads need `duplex: "half"` (Chromium-only). No dependency was added for this.
-- `category` is sent as `uncategorized`: the contract requires one and the category picker belongs to
-  E4-S2. Success calls `invalidateQueries({ queryKey: queryKeys.photos })`; `randomPhoto` is
-  `["photos", "random"]`, so prefix matching invalidates the splash hero too, while the splash query's
-  own `staleTime`/`gcTime` policy stays on the query. Only a 2xx invalidates.
+  the authority. Both keys are now documented side by side in `.env.example`, with the mirroring note.
+- The suite is hermetic against that key: `vite.config.ts` pins `VITE_MAX_UPLOAD_MB` beside
+  `VITE_API_BASE_URL`, and the size-boundary tests pass `maxBytes` explicitly so they measure the
+  validator rather than the machine. Measured: `VITE_MAX_UPLOAD_MB=20 npx vitest run
+src/lib/upload/validation.test.ts src/features/workshop/WorkshopView.test.tsx` → **19 passed**.
+- The selected state is the photo, full-bleed under the theme's scrim, and one glass panel reading
+  "Photo selected." with "Choose another". There is no upload action, progress element, retry or
+  invalidation in this slice; the browser probe found **0 buttons** and no "upload" text on the
+  screen, so nothing promises an action slices B and C have not shipped.
+- The probe also found a defect the unit tests could not see: a file the client accepts by declared
+  type but the browser cannot decode showed Chrome's broken-image glyph through the scrim. The
+  preview is now dropped on `error` while the selection survives, pinned by a test.
 
 Browser probe: the built bundle under Chromium 152 at 390 × 844 (DPR 3), served same-origin by a
-local static server that proxies `/api` and `/images` to the running archive.
+local static server.
 
-- **15 requests, `offOrigin: []`, no console errors, no uncaught exceptions.** The 15 include the
-  document, four JS chunks, the CSS, two Fontsource faces, three blob previews and three uploads.
-- A 15 MiB upload throttled to 200 kB/s emitted real `upload.onprogress` events with
-  `lengthComputable: true` — `32768 / 15728933` then `114688 / 15728933` — and the panel showed
-  `aria-valuenow="1"` after 512 ms. Capture: `reports/e4s1-uploading-390.png`.
-- **Cancel:** `Network.loadingFailed` reports `net::ERR_ABORTED`, `canceled: true`, the upload's
-  `abort` event fired, the state returned to `selected` with the live region reading
-  "Upload cancelled.". `images/` was byte-for-byte the same list before and after, and `tmp/` was
-  empty — a cancelled upload stores nothing.
-- **Failure:** the decoy (`text` bytes declared `image/png`) answered 415 and the panel showed
-  "The archive couldn't read that image." with `Try again` and `Choose another`, announced in the
-  persistent status region. Capture: `reports/e4s1-error-390.png`.
-- **Success:** `fixture.png` answered 201, the view returned to `idle`, the panel and the live region
-  read "Added to your archive.", and exactly one canonical `.png` appeared in `images/`. Capture:
-  `reports/e4s1-success-390.png`.
-- Layout at 390: no horizontal overflow; the panel is `x16 y723 358 × 105`, `Upload` is `70 × 44` and
-  `Choose another` `126 × 44`; computed glass is `rgba(0, 0, 0, 0.4)` + `blur(15px) saturate(1.2)`,
-  text `rgb(232, 230, 227)`.
+- Picking `not-image.txt` showed the refusal sentence, kept the view `idle`, and made **0 network
+  requests** — validation is local.
+- Picking `fixture.png` reached `selected` with a 64 × 64 preview, focus on the replace-picker input,
+  the panel and live region both reading "Photo selected.", and no horizontal overflow. **10 requests,
+  `offOrigin: []`, no console errors, no uncaught exceptions.**
+- Layout at 390: the panel is `x16 y723 358 × 105`, "Choose another" is `126 × 44`; computed glass is
+  `rgba(0, 0, 0, 0.4)` + `blur(15px) saturate(1.2)`, text `rgb(232, 230, 227)`. Capture:
+  `reports/e4s1a-selected-390.png`.
+- A decoy (`text` bytes declared `image/png`) passed the client check and lost its preview on decode,
+  while the view stayed `selected`.
 
-The probe also found a defect the unit tests could not see: a file the client accepts by declared type
-but the browser cannot decode showed Chrome's broken-image glyph through the preview scrim. The
-preview is now dropped on `error` while the selection survives, pinned by a test.
-
-What this pass does **not** cover: a real screen reader's announcement, browsers other than Chromium
-152, a physical phone or a real network, and the native picker in jsdom (the component tests set
-`files` and fire `change`; the browser probe uses `DOM.setFileInputFiles`). Query invalidation is
-observed in the real `QueryClient` in tests, not in the browser probe — the workshop mounts no feed
-consumer to refetch. Multipart temp files outside the data directory are not inspected.
+What this pass does **not** cover: an upload path (slice B/C), a real screen reader's announcement,
+browsers other than Chromium 152, a physical phone, and the native picker in jsdom (the component
+tests set `files` and fire `change`; the browser probe uses `DOM.setFileInputFiles`).
 
 ## Zero external requests — measured on the built bundle
 
