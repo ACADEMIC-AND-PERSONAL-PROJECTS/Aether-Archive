@@ -631,6 +631,58 @@ describe("the queue", () => {
     expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle");
   });
 
+  it("should open no request when the batch is cancelled during preparation", async () => {
+    // The story moved the request behind async work; these are the windows it opened. The reviewing
+    // pass removed each post-await guard and the suite stayed green — hence this deferred edge.
+    let release: (file: File) => void = () => {};
+    const file = fileOf(16, "image/png", "slow.png");
+    mockedDownscale.mockImplementationOnce(
+      () =>
+        new Promise<File>((resolve) => {
+          release = resolve;
+        }),
+    );
+
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [file]);
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Cancel" })).toBeVisible());
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await act(async () => {
+      release(file);
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("workshop-notice")).toHaveTextContent("Upload cancelled."),
+    );
+    expect(FakeXhr.instances).toHaveLength(0);
+    expect(tileFor("slow.png")).toHaveAttribute("data-state", "waiting");
+  });
+
+  it("should open no request after unmount during preparation", async () => {
+    let release: (file: File) => void = () => {};
+    const file = fileOf(16, "image/png", "slow.png");
+    mockedDownscale.mockImplementationOnce(
+      () =>
+        new Promise<File>((resolve) => {
+          release = resolve;
+        }),
+    );
+
+    const { unmount } = renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [file]);
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Cancel" })).toBeVisible());
+
+    unmount();
+    await act(async () => {
+      release(file);
+    });
+
+    expect(FakeXhr.instances).toHaveLength(0);
+  });
+
   it("should reset the cancellation flag and upload again after a cancelled batch", async () => {
     renderWorkshop();
     const firstFile = fileOf(16, "image/png", "a.png");

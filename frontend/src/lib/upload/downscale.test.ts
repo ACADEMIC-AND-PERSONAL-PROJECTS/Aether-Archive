@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   JPEG_QUALITY,
@@ -177,7 +177,6 @@ describe("planDownscale", () => {
   it.each([
     ["image/jpeg", "image/jpeg"],
     ["image/jpg", "image/jpeg"],
-    ["image/webp", "image/jpeg"],
     ["image/png", "image/png"],
   ] as const)("maps a %s source to a %s output", (source, output) => {
     const plan = planDownscale({
@@ -255,13 +254,43 @@ describe("downscaleForUpload", () => {
     expect(result.type).toBe("image/png");
   });
 
-  it("re-encodes a WebP source as JPEG", async () => {
-    const encoded = new Blob([new Uint8Array(64)], { type: "image/jpeg" });
-    const { dependencies, record } = fakeDependencies({ width: 3000, height: 2000 }, encoded);
+  it("leaves a WebP alone — it may be animated or carry alpha, which a canvas would lose", async () => {
+    const { dependencies, record } = fakeDependencies({ width: 3000, height: 2000 });
+    const file = fileOf(1024, "image/webp", "mood.webp");
 
-    await downscaleForUpload(fileOf(1024, "image/webp", "mood.webp"), { dependencies });
+    await expect(downscaleForUpload(file, { dependencies })).resolves.toBe(file);
+    expect(record.bitmaps).toEqual([]);
+    expect(record.encodes).toEqual([]);
+  });
 
-    expect(record.encodes).toEqual([{ type: "image/jpeg", quality: JPEG_QUALITY }]);
+  it("returns the original when the re-encode would be no smaller", async () => {
+    // Measured in review: a 6.5 MB PNG re-encoded to 10.2 MB, and a q50 JPEG to 1.77× — a "compress"
+    // that grows the upload could push it past the server's ceiling for no gain.
+    const bigger = new Blob([new Uint8Array(4096)], { type: "image/jpeg" });
+    const { dependencies } = fakeDependencies({ width: 4000, height: 3000 }, bigger);
+    const file = fileOf(1024, "image/jpeg", "already-tight.jpg");
+
+    await expect(downscaleForUpload(file, { dependencies })).resolves.toBe(file);
+  });
+
+  it("returns the original when preparation does not settle before its deadline", async () => {
+    vi.useFakeTimers();
+    try {
+      const file = fileOf(1024, "image/jpeg", "wedged.jpg");
+      const dependencies: DownscaleDependencies = {
+        createImageBitmap: () => new Promise(() => {}),
+        createCanvas: () => {
+          throw new Error("unreachable");
+        },
+        encode: () => new Promise(() => {}),
+      };
+
+      const promise = downscaleForUpload(file, { dependencies, timeoutMs: 50 });
+      await vi.advanceTimersByTimeAsync(50);
+      await expect(promise).resolves.toBe(file);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("keeps the dimensions when only the byte threshold is crossed", async () => {
