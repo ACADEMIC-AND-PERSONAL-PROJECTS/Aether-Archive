@@ -8,6 +8,7 @@ import { compositeOver, contrastRatio, hexToRgb, parseColor } from "../../lib/co
 import { oklchToHex } from "../../lib/color/oklch";
 import { paletteToTheme } from "../../lib/color/theme";
 import { ENTER_DRIFT_BASE, ENTER_FADE_BASE } from "../../lib/motion/tokens";
+import { ruleStatus, runAxe, violationSummary } from "../../test/axe";
 
 /**
  * The app's only dialog, asserted where the user can observe it.
@@ -263,6 +264,22 @@ describe("GlassMenu — the material over a photo (the scrim rule)", () => {
       contrastRatio(hexToRgb(worst.text), glassOnWhite),
       `${worst.text} on the bare glass over white`,
     ).toBeLessThan(4.5);
+  });
+});
+
+describe("GlassMenu — axe (E3-S5)", () => {
+  it("should produce no axe violations, and not mistake inapplicable for a contrast pass", async () => {
+    renderMenu();
+
+    const results = await runAxe(document.body);
+
+    // The threshold (`test/axe.ts`): zero violations at every impact, so a `moderate` or `minor`
+    // finding added later fails here rather than being waved through as "not serious".
+    expect(violationSummary(results)).toEqual([]);
+    // Measured: axe returns `color-contrast` as **inapplicable** for the dialog — it does not evaluate
+    // the entries through the veil and the glass at all. The contrast evidence is the arithmetic test
+    // above and the painted pixels in `frontend/README.md`; this green run is structural only.
+    expect(ruleStatus(results, "color-contrast")).toBe("inapplicable");
   });
 });
 
