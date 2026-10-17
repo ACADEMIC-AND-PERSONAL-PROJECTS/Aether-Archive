@@ -681,6 +681,81 @@ JS/CSS chunks, the Inter face, `/api/v1/photos/random` and `/images/photo.png`; 
   same insert-with-text pattern this story replaced on the splash. It is outside the two screens this
   pass covers and is unchanged; it needs the same decision in the story that owns the route shell.
 
+## The single upload — measured (E4-S1)
+
+`POST /api/v1/photos` takes one multipart `file` part and a `category`. The client's boundary was
+copied from the server's `ImageFormat` and then measured against a running archive; the table is the
+output of that probe, not a reading of the source.
+
+| Request                                                | Status | `code`                   |
+| ------------------------------------------------------ | ------ | ------------------------ |
+| png / jpeg / gif, declared as themselves               | 201    | —                        |
+| webp declared `image/webp`, avif declared `image/avif` | 201    | —                        |
+| jpeg declared `image/jpg` (non-standard spelling)      | 201    | —                        |
+| empty file declared `image/png`                        | 415    | `unsupported-image-type` |
+| text bytes declared `image/png`                        | 415    | `unsupported-image-type` |
+| png bytes declared `text/plain`                        | 415    | `unsupported-image-type` |
+| webp / avif declared `application/octet-stream`        | 415    | `unsupported-image-type` |
+| 15,728,640 B                                           | 201    | —                        |
+| 15,728,641 B                                           | 413    | `upload-too-large`       |
+| no `file` part                                         | 400    | `missing-request-part`   |
+| no `category` part                                     | 400    | `validation-failure`     |
+
+The declared type is part of the contract, not a formality: the same 108-byte WebP answers **201**
+with `image/webp` and **415** with `application/octet-stream` (measured both ways). Chromium declares
+exactly the expected type for each extension — `fixture.png` → `image/png`, `fixture.jpeg` →
+`image/jpeg`, `fixture.gif` → `image/gif`, `fixture.webp` → `image/webp`, `fixture.avif` →
+`image/avif`; a text file named `decoy.png` → `image/png`, and only the server's magic-byte sniff
+catches it. The client therefore validates the declared type, size and emptiness and leaves the
+bytes to the server.
+
+- `lib/upload/validation.ts` accepts the server's five formats plus `image/jpg`. The picker's
+  `accept` hint lists the five standard types; `image/jpg` is accepted from a drop or another
+  browser even though the hint omits it. File names are never consulted — the server discards them.
+- The limit comes from `VITE_MAX_UPLOAD_MB` (default 15, accepted range 1–1024, malformed values fall
+  back to the default rather than disabling validation); the backend's `AETHER_MAX_UPLOAD_MB` remains
+  the authority. The variable is read from the repository-root `.env`; it is not yet listed in
+  `.env.example`.
+- `api/uploadPhoto.ts` uses **XHR**, because only `XMLHttpRequest.upload` reports request progress and
+  cancels in flight in every target browser. `fetch` has no upload-progress event, and streaming
+  uploads need `duplex: "half"` (Chromium-only). No dependency was added for this.
+- `category` is sent as `uncategorized`: the contract requires one and the category picker belongs to
+  E4-S2. Success calls `invalidateQueries({ queryKey: queryKeys.photos })`; `randomPhoto` is
+  `["photos", "random"]`, so prefix matching invalidates the splash hero too, while the splash query's
+  own `staleTime`/`gcTime` policy stays on the query. Only a 2xx invalidates.
+
+Browser probe: the built bundle under Chromium 152 at 390 × 844 (DPR 3), served same-origin by a
+local static server that proxies `/api` and `/images` to the running archive.
+
+- **15 requests, `offOrigin: []`, no console errors, no uncaught exceptions.** The 15 include the
+  document, four JS chunks, the CSS, two Fontsource faces, three blob previews and three uploads.
+- A 15 MiB upload throttled to 200 kB/s emitted real `upload.onprogress` events with
+  `lengthComputable: true` — `32768 / 15728933` then `114688 / 15728933` — and the panel showed
+  `aria-valuenow="1"` after 512 ms. Capture: `reports/e4s1-uploading-390.png`.
+- **Cancel:** `Network.loadingFailed` reports `net::ERR_ABORTED`, `canceled: true`, the upload's
+  `abort` event fired, the state returned to `selected` with the live region reading
+  "Upload cancelled.". `images/` was byte-for-byte the same list before and after, and `tmp/` was
+  empty — a cancelled upload stores nothing.
+- **Failure:** the decoy (`text` bytes declared `image/png`) answered 415 and the panel showed
+  "The archive couldn't read that image." with `Try again` and `Choose another`, announced in the
+  persistent status region. Capture: `reports/e4s1-error-390.png`.
+- **Success:** `fixture.png` answered 201, the view returned to `idle`, the panel and the live region
+  read "Added to your archive.", and exactly one canonical `.png` appeared in `images/`. Capture:
+  `reports/e4s1-success-390.png`.
+- Layout at 390: no horizontal overflow; the panel is `x16 y723 358 × 105`, `Upload` is `70 × 44` and
+  `Choose another` `126 × 44`; computed glass is `rgba(0, 0, 0, 0.4)` + `blur(15px) saturate(1.2)`,
+  text `rgb(232, 230, 227)`.
+
+The probe also found a defect the unit tests could not see: a file the client accepts by declared type
+but the browser cannot decode showed Chrome's broken-image glyph through the preview scrim. The
+preview is now dropped on `error` while the selection survives, pinned by a test.
+
+What this pass does **not** cover: a real screen reader's announcement, browsers other than Chromium
+152, a physical phone or a real network, and the native picker in jsdom (the component tests set
+`files` and fire `change`; the browser probe uses `DOM.setFileInputFiles`). Query invalidation is
+observed in the real `QueryClient` in tests, not in the browser probe — the workshop mounts no feed
+consumer to refetch. Multipart temp files outside the data directory are not inspected.
+
 ## Zero external requests — measured on the built bundle
 
 ```bash
