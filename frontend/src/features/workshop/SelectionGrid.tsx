@@ -285,8 +285,9 @@ export function SelectionGrid({
   };
 
   const handleDragEnd = (event: DragEndEvent): void => {
-    // Cleared first: the overlay's drop animation keeps a clone of the previous children on screen
-    // for its own duration even though this component has already stopped rendering the drag state.
+    // Cleared first: the overlay renders only while `activeId` is set — measured, not assumed: the
+    // `[data-testid="drag-overlay"]` count is 0 within 20 ms of `mouseUp`. The library's drop
+    // animation (when one runs) belongs to E4-S3C's overlay tuning, not to this clone's lifetime.
     setActiveId(null);
     if (event.over === null) {
       return;

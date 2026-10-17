@@ -253,6 +253,9 @@ export function WorkshopView() {
       return;
     }
     setItems((previous) => {
+      // `moveItem` returns a readonly array by design (it never mutates); the state is mutable, so
+      // the spread is a type requirement, not a second copy of intent. A no-op returns the same
+      // reference and React skips the render.
       const moved = moveItem(previous, from, to);
       return moved === previous ? previous : [...moved];
     });
