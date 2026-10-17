@@ -69,7 +69,7 @@ A story is `Done` only when `DEFINITION-OF-DONE.md` is fully checked with eviden
 | 1 | The archive can store and serve images and dumps on PostgreSQL through a tested local API | 2026-10-15 → 2026-10-16 | Sprint 01 — Foundation & Backend | **Released** (`sprint-01`) |
 | 2 | The React shell runs and the design system (colour extraction, typography, glass) is defined | 2026-10-16 → 2026-10-30 | Sprint 02 — Design System | **Released** (`sprint-02`) |
 | 3 | The signature entry experience exists: immersive splash, glass menu, first uploads | 2026-10-16 → 2026-10-17 | Sprint 03 — Splash & Workshop | **Released** (`sprint-03`) |
-| 4 | Dumps can be curated end to end (upload, order, colour, publish) with CI guarding merges | 2026-11-30 → 2026-12-11 | Sprint 04 — Workshop & CI | Planned |
+| 4 | Dumps can be curated end to end (upload, order, colour, publish) with CI guarding merges | 2026-10-17 → 2026-10-31 | Sprint 04 — Workshop & CI | In progress |
 | 5 | The Time River scrolls and the background follows each dump's aura | 2026-12-14 → 2026-12-25 | Sprint 05 — Time River | Planned |
 | 6 | The app is polished, containerized, documented and released as v1.0 | 2026-12-28 → 2027-01-08 | Sprint 06 — Hardening & v1.0 | Planned |
 
