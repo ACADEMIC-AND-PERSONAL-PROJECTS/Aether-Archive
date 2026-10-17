@@ -33,6 +33,7 @@ test together. Anything that needs a different major version records the evidenc
 | `tailwindcss` + `@tailwindcss/vite`                           | 4.3.3                     | Utility CSS, CSS-first configuration (ADR-014).                                                                                                     |
 | `vitest` + `jsdom`                                            | 5.0.5 + 30.1.3            | Test runner and DOM implementation.                                                                                                                 |
 | `@testing-library/react` (+ `dom`, `jest-dom`)                | 16.3.3 / 10.4.2 / 7.0.1   | Behaviour-level component tests and DOM matchers.                                                                                                   |
+| `axe-core`                                                    | 4.14.0                    | Accessibility audit in jsdom (E3-S5A); dev-only, no transitive dependencies, absent from `dist/` (measured below).                                  |
 | `eslint` + `@eslint/js`                                       | 10.12.0 + 10.0.1          | Linter and its flat-config base rules.                                                                                                              |
 | `typescript-eslint`                                           | 8.71.2                    | TypeScript parsing and the `no-explicit-any` / `no-non-null-assertion` / unused-import rules.                                                       |
 | `eslint-plugin-import-x`, `eslint-import-resolver-typescript` | 4.17.1 + 4.4.5            | Import order and duplicate detection; the resolver is what lets it resolve extensionless TS specifiers — without it every import rule fails to run. |
@@ -127,7 +128,7 @@ frontend/
     ├── hooks/            useHeroImage + usePullToRefresh (E3-S1) — reusable hooks
     ├── types/            wire types mirroring _docs/openapi.yml (E2-S2)
     ├── styles/           global.css — the `@theme` token layer lives here
-    └── test/setup.ts     jest-dom matchers + RTL cleanup
+    └── test/             setup.ts (jest-dom + RTL cleanup), axe.ts (the E3-S5A threshold and helper)
 ```
 
 ## What the toolchain enforces
@@ -491,6 +492,53 @@ re-anchor. No portal was added.
 
 Captures at 390 × 844: `reports/e3s4-loading-390.png`, `reports/e3s4-empty-390.png`,
 `reports/e3s4-error-390.png`, `reports/e3s4-error-over-dark-390.png`.
+
+## The accessibility audit — measured (E3-S5A)
+
+Scope: the splash and the glass menu, in jsdom 30 under Vitest 5. Axe settles structure and naming;
+RTL settles the focus behaviour. Contrast, `inert`, the announcement and the manual layout captures
+belong to the behaviour slice (E3-S5B) and arrive with it.
+
+### axe-core: dev-only, and absent from `dist/`
+
+```bash
+npm ls axe-core --all                          # └── axe-core@4.14.0
+npm pkg get devDependencies.axe-core            # "4.14.0"
+node -e "…axe-core/package.json…"               # no dependencies field (no peer/optional either), license: MPL-2.0
+du -sh node_modules/axe-core                   # 3.4M
+ls -lh node_modules/axe-core/axe.min.js        # 636.9K (KiB)
+wc -c < node_modules/axe-core/axe.min.js       # 652140 bytes
+gzip -c node_modules/axe-core/axe.min.js | wc -c   # 182586
+grep -rl "axe-core" dist/                      # no match
+grep -rl "axe.run" dist/                       # no match
+```
+
+`axe-core` directly, not a wrapper: the registry reports `vitest-axe@0.1.0` with six dependencies
+(its own `axe-core`, `lodash-es`, `aria-query`, `dom-accessibility-api`, `chalk`, `redent`) and
+`jest-axe@11.0.0` with four, against none here. The whole integration is `src/test/axe.ts` — run,
+violation summary, rule bucket — which is smaller than what a wrapper would add. MPL-2.0, unmodified,
+dev-only, never shipped: the production bundle is built from `src/` without `test/`, and both markers
+are absent from it.
+
+**The threshold: zero violations at every impact** — not "no serious ones". Five runs: the splash in
+the **ready**, **empty** and **error** states, the splash with the menu open, and the menu alone. Each
+asserts an empty list, so a `moderate` or `minor` finding added later fails rather than being waved
+through. Today they find none. What the green run does **not** prove: jsdom has no layout, no paint and
+no canvas, so `color-contrast` is returned **incomplete** on the splash (`impact: serious`) and
+**inapplicable** on the menu. Those buckets are asserted, so an axe upgrade that starts answering — or
+stops running the rule — is visible.
+
+**Scope: `axe.run(document.body)`.** It audits the rendered subtree, not the whole document, so
+`html`-scoped rules are inapplicable (`page-has-heading-one` among them). Measured in jsdom with a
+planted DOM: a `<h3>` after the `<h1>` raises `heading-order`, while removing the `<h1>` raises nothing:
+
+```text
+h1 then h3: violations ["heading-order"]; page-has-heading-one inapplicable
+h3 only:    violations [];               page-has-heading-one inapplicable
+```
+
+Captures arrive with the behaviour slice: the axe gate needs none, and the screenshots that accompany
+the contrast, `inert` and announcement measurements are taken there.
 
 ## Zero external requests — measured on the built bundle
 
