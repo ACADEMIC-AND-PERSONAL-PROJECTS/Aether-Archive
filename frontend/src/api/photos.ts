@@ -74,10 +74,11 @@ export interface UploadPhotoRequest {
  * layout (`api/queryKeys.ts`): an upload changes what the archive holds, and the two views must never
  * disagree about it.
  *
- * **Only success invalidates.** The callback is `onSuccess`, not `onSettled`: a refused or cancelled
- * upload changed nothing the archive holds, and marking the feed stale would spend a request to confirm
- * it. Both directions are pinned by the hook's tests — a failure leaving the queries untouched is as
- * much a part of the contract as a success invalidating them.
+ * **Only success invalidates.** The callback is `onSuccess`, not `onSettled`. A refused upload stores
+ * nothing; a **cancelled** one can race an accepted body (the workshop header records that race), but
+ * the client cannot know which happened, and marking the feed stale on every cancel would spend a
+ * request to confirm. Both directions are pinned by the hook's tests — a failure leaving the queries
+ * untouched is as much a part of the contract as a success invalidating them.
  *
  * **The splash's per-visit policy is untouched.** It lives on the query (zero `staleTime`, zero
  * `gcTime`), not on the key; invalidation does not resurrect an entry the splash dropped on unmount.
@@ -97,8 +98,12 @@ export function useUploadPhoto() {
         signal: request.signal,
         onProgress: request.onProgress,
       }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.photos });
+    // Deliberately not returned as a promise: the mutation's per-call `onSuccess` (the workshop's
+    // "Added to your archive." and its return to `idle`) runs after this callback settles. Awaiting the
+    // refetch here would gate the success UI on a feed consumer that may not exist — measured in the
+    // review with a deferred `invalidateQueries`: the view stayed `uploading` until it resolved.
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.photos });
     },
   });
 }

@@ -57,8 +57,10 @@ import type { UploadProgress } from "../../api/uploadPhoto";
  * ## The file never outlives the screen
  *
  * The preview is an object URL created from the picked File and revoked when the selection is replaced
- * or the view unmounts; the File itself is state, not storage, and nothing is written to localStorage,
- * IndexedDB or a cache. An in-flight request is aborted on unmount. No file name or content is logged.
+ * or the view unmounts; the File itself is React state, and **nothing is persisted** — no localStorage,
+ * no IndexedDB, no disk. TanStack's mutation cache holds the File in memory until its gc, which is a
+ * cache in RAM, not storage. An in-flight request is aborted on unmount. No file name or content is
+ * logged.
  */
 
 type Phase = "idle" | "selected" | "uploading" | "error";
