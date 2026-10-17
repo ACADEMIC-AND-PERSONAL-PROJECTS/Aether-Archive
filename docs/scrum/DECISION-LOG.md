@@ -945,10 +945,12 @@ token, or flip the glass tint with the text.
 1. **`themeFromBackground(hex)` keeps the page exactly the colour the user picked.** Each text
    direction steps the surface away from the text (darker under light text, lighter under dark text)
    and the text from its neutral base toward its extreme until text-on-page, text-on-surface and
-   text-on-glass all clear 4.5:1. **Both directions are tried** — the nearer base is only a preference
+   text-on-glass all clear 4.5:1. The surface **flips its step at the cube's edge** rather than
+   rendering pure black or pure white: `#010101` and `#fefefe` are accepted, with a non-pure surface
+   that steps toward the page. **Both directions are tried** — the nearer base is only a preference
    — before a page is refused, and the search never returns pure black or pure white text. Pure black
    and pure white **pages** are refused by policy, because the brief's bases stop at
-   `#0B0B0D`/`#E8E6E3`. Measured on a 16³ sRGB cube: **4,094 of 4,096 backgrounds accepted; the two
+   `#0B0B0D`/`#121215`. Measured on a 16³ sRGB cube: **4,094 of 4,096 backgrounds accepted; the two
    refusals are `#000000` and `#ffffff`**, both by that policy. (The first cut committed to one
    direction and refused 90 colours, claiming none had a legible text; #133's review falsified the
    claim by carrying every one of them with the other direction, and this ADR records the corrected

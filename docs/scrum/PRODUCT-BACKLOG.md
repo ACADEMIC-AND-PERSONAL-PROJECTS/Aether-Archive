@@ -501,8 +501,9 @@ opens on tap, feels tactile, and gets out of the way.
 > contrast by construction, a sampled-cube test) and the hex validation; **S4B** is the extraction and
 > merge pipeline that ranks suggestions by pixel share; **S4C** is the picker UI, the live preview, the
 > reset and session persistence. Each slice is independently reviewable and under the PR budget.
-> **ADR-023** records the decisions the spec leaves open: the chosen colour is kept exactly, a measured
-> refusal band exists, the glass tint flips with the text, suggestions merge by summed pixel weight, and
+> **ADR-023** records the decisions the spec leaves open: the chosen colour is kept exactly, both text
+> directions are searched and pure black/white pages are refused by policy (4,094 of 4,096 sampled
+> colours accepted), the glass tint flips with the text, suggestions merge by summed pixel weight, and
 > the aura — only the aura — persists for the browsing session.
 
 *As the curator, I want to choose the dump's background colour, so that the river reflects its mood.*
