@@ -16,15 +16,17 @@
 | 1 | E6-S1 | CI on every PR — backend and frontend jobs, cached, under 8 minutes | 5 | p0 | Done | #123 |
 | 2a | E4-S3A | The order reducer — `moveItem`/`orderedIds`, pure and tested | 1 | p0 | Done | #125 |
 | 2b | E4-S3B | The gesture core — mouse/touch sensors, sortable grid, overlay | 4 | p0 | Done | #126 |
-| 2c | E4-S3C | Motion: drop ≤ 300 ms, auto-scroll, reduced motion (criterion 4) — two PRs | 1 | p0 | In progress | #127 + this PR |
+| 2c | E4-S3C | Motion: drop ≤ 300 ms, auto-scroll, reduced motion (criterion 4) — two PRs | 1 | p0 | In review | #127 + #128 |
+| 2d | E4-S3D | Keyboard and announcements, with the cancel path (criterion 3) | 2 | p0 | Todo | — |
 | 3 | E4-S4 | Aura colour picker — hex input, palette swatches, live glass preview | 5 | p0 | Todo | — |
 | 4 | E4-S5 | Publish dump — `POST /dumps`, optimistic insert, rollback | 5 | p0 | Todo | — |
 | 5 | E6-S2 | Required status checks on `main` and `develop` | 2 | p0 | Todo | — |
 
-**Total: 25 points across 7 slices** (E4-S3 was re-cut at #124's review into 2a/2b/2c — points unchanged).
-E4-S3C is delivered in two PRs at review: the auto-scroll half on its own branch (the ~500-line branch
-budget), and #127 for the drop animation and reduced motion. The slice id and its point are kept
-unchanged so the sprint total does not move for a split that adds no scope.
+**Total: 25 points across 8 slices** (E4-S3 was re-cut at #124's review into 2a/2b/2c, and 2c was
+pre-cut after measuring 928 hand-written lines into motion (2c, 1 pt) and keyboard (2d, 2 pts) — points
+unchanged). E4-S3C's motion is itself delivered in two PRs at review: auto-scroll on its own branch
+(#128) and the drop animation plus reduced motion on #127. The slice id and its 1 point are unchanged,
+so the sprint total does not move for a split that adds no scope.
 The order is deliberate:
 
 - **CI first, not last.** The Sprint 3 retrospective's preview named E4-S3 as the first story; this
@@ -109,3 +111,12 @@ The order is deliberate:
   **238 hand-written**; the review brute-forced it against `arrayMove` (204/204 in-range, 1149/1149
   clamped out-of-range, 0 divergences) and its nits — the wire-shape test, E4-S5's id-provenance work,
   the fix's ownership, the 299-line total — are fixed. S3B is In progress.
+- 2026-10-17 — **E4-S3C was re-cut again at #127's review, and the earlier note's "S3C, 3 pts" is
+  superseded by this entry and the S3D row.** The pre-cut estimated the motion slice at 496, but at the
+  review tip it measured **521 hand-written including 25 record lines** (production 174, tests 206,
+  docs 116, records 25) — 21 past the ~500 branch trigger, with no atomic-story exception claimed. The
+  review offered an exception claim or reverting the records; the branch instead gives up real scope:
+  **auto-scroll moves to its own branch and PR #128** (constant, one `DndContext` prop, an exact-value
+  test, its own probe), and #127 keeps the drop animation, the overlay scrim and reduced motion. The
+  slice id and its 1 point stay unchanged (sprint total still 25); keyboard is **S3D** (2 pts).
+  #127 merges `develop` after #128 and is re-measured at its tip; no exception is claimed.

@@ -409,7 +409,8 @@ opens on tap, feels tactile, and gets out of the way.
 | E4-S2B | Client-side downscale before upload (criterion 2) | p0 | 2 | 3 | Done |
 | E4-S3A | The order reducer (criterion 2, reducer half) | p0 | 1 | 4 | Done |
 | E4-S3B | The gesture core: mouse/touch sensors, sortable grid, overlay (criterion 1) | p0 | 4 | 4 | Done |
-| E4-S3C | Motion: drop ≤ 300 ms, auto-scroll and reduced motion (criterion 4) — two PRs | p0 | 1 | 4 | In progress |
+| E4-S3C | Motion: drop ≤ 300 ms, auto-scroll and reduced motion (criterion 4) — two PRs | p0 | 1 | 4 | In review |
+| E4-S3D | Keyboard and announcements, with the cancel path (criterion 3) | p0 | 2 | 4 | Todo |
 | E4-S4 | Aura colour picker with palette suggestions | p0 | 5 | 4 | Todo |
 | E4-S5 | Publish dump with optimistic UI | p0 | 5 | 4 | Todo |
 
@@ -453,7 +454,7 @@ opens on tap, feels tactile, and gets out of the way.
 - [ ] **(A2)** Uploads run sequentially or bounded-concurrent; one failure never aborts the others silently.
 - [ ] **(A2/B)** Tests for the cap and for the downscale decision function (pure).
 
-### E4-S3 — Drag-and-drop ordering · 8 pts · p0 · **re-cut at review into S3A (1) + S3B (4) + S3C (3)**
+### E4-S3 — Drag-and-drop ordering · 8 pts · p0 · **re-cut at review into S3A (1) + S3B (4) + S3C (1, two PRs) + S3D (2)**
 
 *As the curator, I want to reorder my 6 images by touch, so that the dump tells the story I want.*
 
