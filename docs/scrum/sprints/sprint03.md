@@ -32,7 +32,7 @@
 | 6b | E4-S1B | Single photo upload — send with progress and cancel, then retry and invalidation (criteria 2–4) | 3 | p0 | Done | #115 |
 | 7a | E4-S2A1 | The selection grid surface — one tile, its state and its remove action (criterion 3) | 1 | p0 | Done | #117 |
 | 7b | E4-S2A2 | Multi-select (≤ 6) and the sequential queue (criteria 1, 4) | 2 | p0 | Done | #118 |
-| 7c | E4-S2B | Client-side downscale before upload (criterion 2) | 2 | p0 | In review | #119 |
+| 7c | E4-S2B | Client-side downscale before upload (criterion 2) | 2 | p0 | Done | #119 |
 
 **Total: 12 slices · 28 points** (the row above them is a chore, not a story; E3-S1A/B, E3-S5A/B,
 E4-S1A/B and E4-S2A1/A2/B are each one story, split — see the notes at the end of this section). The order is the
@@ -395,3 +395,10 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   tests now kill both. The probe measured 4000 × 3000 / 3,800,460 B → **2560 × 1920 / 853,780 B
   (22.5 %)**, same JPEG magic, decodes; the progress total carries the sent size, and the line starts
   indeterminate while preparation runs (capture: `reports/e4s2b-preparing-390.png`).
+- 2026-10-17 — **Sprint 3 closed.** All 12 slices delivered (28/28 points, 0 carry-over). Full
+  verification on `develop`: backend **307 tests**, frontend **344**, lint/format/typecheck/build
+  clean. Security audit `reports/security-audit-sprint03.md`: **CLEAR**, 0 blocking, 5 informational
+  notes (one new → E6-S21), 7 carried items. Retrospective `retrospectives/sprint03.md`; release
+  `develop` → `main`, tag `sprint-03`. The retro's three changes for Sprint 4: a visible-behaviour
+  claim ships with its falsifying measurement, size numbers are generated at the tip, and lifecycle
+  changes get a dev-mode probe as well as a built-bundle one.

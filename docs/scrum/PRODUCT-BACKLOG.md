@@ -406,7 +406,7 @@ opens on tap, feels tactile, and gets out of the way.
 | E4-S1B | Single photo upload — send, progress, cancel, retry, invalidation (criteria 2–4) | p0 | 3 | 3 | Done |
 | E4-S2A1 | The selection grid surface (criterion 3) | p0 | 1 | 3 | Done |
 | E4-S2A2 | Multi-select (≤ 6) and the sequential queue (criteria 1, 4) | p0 | 2 | 3 | Done |
-| E4-S2B | Client-side downscale before upload (criterion 2) | p0 | 2 | 3 | In review |
+| E4-S2B | Client-side downscale before upload (criterion 2) | p0 | 2 | 3 | Done |
 | E4-S3 | Drag-and-drop ordering | p0 | 8 | 4 | Todo |
 | E4-S4 | Aura colour picker with palette suggestions | p0 | 5 | 4 | Todo |
 | E4-S5 | Publish dump with optimistic UI | p0 | 5 | 4 | Todo |
@@ -565,6 +565,7 @@ delivery, documentation, and a clean v1.0.
 | E6-S18 | Colour-token parsing robustness (issue #103) | p2 | 2 | — | Todo |
 | E6-S19 | Upload-validation hardening from E4-S1A's review | p2 | 1 | — | Todo |
 | E6-S20 | Static-WebP downscaling, once animation and alpha are detectable | p2 | 2 | — | Todo |
+| E6-S21 | Splash hero URL origin validation | p2 | 1 | — | Todo |
 
 ### E6-S1 — CI on every PR · 5 pts · p0
 
@@ -752,6 +753,21 @@ frame of an animation would be a regression, not a compression (PR #119's review
       re-encode only static opaque WebP, keeping the no-bigger-than-source rule.
 - [ ] Tests for the decision at the animation/alpha boundaries and a Chromium probe of a real static
       WebP; the eligible-type table in `lib/upload/downscale.ts` is the one place that changes.
+
+### E6-S21 — Splash hero URL origin validation · 1 pt · p2
+
+*As a maintainer, I want the client to refuse a photo URL that is not the archive's own, so that the
+zero-external-request rule cannot be broken by a tampered database row or a future absolute URL.*
+
+Sprint 3's security audit (note N1): the splash fetches the API's `Photo.url` without checking that it
+is a relative `/images/` path. The server builds it that way today (`PhotoResponse.from`), so no
+request-reachable path exists; a tampered row or a later story storing an absolute URL would make the
+splash issue an off-machine request — the one thing the rule forbids.
+
+- [ ] Accept only a path beginning `/images/` (or a same-origin URL) before `fetch`; anything else is a
+      quiet failure, never a request.
+- [ ] A test pins the refusal with an absolute and a protocol-relative URL, and a backend test pins the
+      relative guarantee the client relies on.
 
 ---
 
