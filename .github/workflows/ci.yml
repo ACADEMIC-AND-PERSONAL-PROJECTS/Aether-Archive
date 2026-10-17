@@ -3,9 +3,13 @@
 # Supply-chain stance: every action is pinned to a commit SHA (a moving tag can be retargeted), the
 # workflow asks for `contents: read` only, and no secret is referenced anywhere — the suites are
 # hermetic (Testcontainers for PostgreSQL, jsdom + a fake XHR for the frontend). The backend job runs
-# `./mvnw -B verify`, the same command a developer runs; the frontend job runs the same scripts as the
-# `verify` skill. Failing runs upload the reports they produce so a failure is actionable from the
-# Checks tab without a rebuild.
+# `./mvnw -B verify`, the same command a developer runs; the frontend job runs every script the
+# `verify` skill requires, including the format and type checks. Failing runs upload the reports they
+# produce so a failure is actionable from the Checks tab without a rebuild.
+#
+# The pinned SHAs are the current `v4` tags. Run logs warn that some v4 majors are deprecated
+# (setup-java, and the Node 20 runtime under checkout/setup-node); migrating to the current majors and
+# adding Dependabot for Actions is E6-S22, deliberately not bundled into this story.
 name: CI
 
 on:
@@ -52,6 +56,8 @@ jobs:
           path: backend/target/surefire-reports/
           retention-days: 7
           if-no-files-found: ignore
+          # A re-run of a failed job would otherwise fail to upload over the first attempt's artifact.
+          overwrite: true
 
   frontend:
     name: Frontend — lint, format, typecheck, test, build
