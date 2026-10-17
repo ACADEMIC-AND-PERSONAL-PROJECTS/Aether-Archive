@@ -717,15 +717,28 @@ client refuses an oversized pick early, but the server enforces the ceiling (mea
   the authority. Both keys are now documented side by side in `.env.example`, with the mirroring note.
 - The suite is hermetic against that key: `vite.config.ts` pins `VITE_MAX_UPLOAD_MB` beside
   `VITE_API_BASE_URL`, and the size-boundary tests pass `maxBytes` explicitly so they measure the
-  validator rather than the machine. Measured: `VITE_MAX_UPLOAD_MB=20 npx vitest run
-src/lib/upload/validation.test.ts src/features/workshop/WorkshopView.test.tsx` → **19 passed**.
+  validator rather than the machine. Because that pin would hide a hardcoded default, one test
+  re-loads the module under a stubbed `VITE_MAX_UPLOAD_MB=20` (a value the 15 default cannot produce)
+  and asserts the loaded limit; it fails against `MAX_UPLOAD_MB = DEFAULT_MAX_UPLOAD_MB`. Measured:
+
+  ```bash
+  VITE_MAX_UPLOAD_MB=20 npx vitest run src/lib/upload/validation.test.ts \
+    src/features/workshop/WorkshopView.test.tsx
+  # Test Files 2 passed (2) · Tests 21 passed (21)
+  ```
+
 - The selected state is the photo, full-bleed under the theme's scrim, and one glass panel reading
-  "Photo selected." with "Choose another". There is no upload action, progress element, retry or
-  invalidation in this slice; the browser probe found **0 buttons** and no "upload" text on the
-  screen, so nothing promises an action slices B and C have not shipped.
+  "Photo selected." with "Choose another". The preview carries `loading="lazy"` and `decoding="async"`
+  per the rendering rule. There is no upload action, progress element, retry or invalidation in this
+  slice; a test pins **zero buttons** as well as no "upload" text, and the browser probe found
+  **0 buttons** on the screen, so nothing promises an action slices B and C have not shipped.
 - The probe also found a defect the unit tests could not see: a file the client accepts by declared
   type but the browser cannot decode showed Chrome's broken-image glyph through the scrim. The
-  preview is now dropped on `error` while the selection survives, pinned by a test.
+  preview is now dropped on `error` while the selection survives, and the scrim stays mounted so the
+  glass panel still composites over a known backdrop; both are pinned by a test.
+- The name test passes file-shaped objects with real names in both directions (`.png` name declaring
+  `text/plain` → refused; `.txt` name declaring `image/png` → accepted), so it exercises the axis it
+  names rather than only the declaration.
 
 Browser probe: the built bundle under Chromium 152 at 390 × 844 (DPR 3), served same-origin by a
 local static server.
