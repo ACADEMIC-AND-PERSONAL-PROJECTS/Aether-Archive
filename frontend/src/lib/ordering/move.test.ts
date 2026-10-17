@@ -139,11 +139,12 @@ describe("moveItem", () => {
   });
 });
 
-describe("the payload order", () => {
-  it("should project a moved array as ids with displayOrder 0–5", () => {
+describe("the publish payload", () => {
+  it("should project a moved array as the ordered photoIds a dump carries", () => {
     const moved = moveItem(SIX, 0, 3);
 
-    // The future publish payload takes `items.map(item => item.id)` in order — exactly this.
+    // `DumpCreate.photoIds` is the ordered list of ids; the index is the display order, and
+    // `displayOrder` itself is server-side (ADR-011) — the wire carries only the ordered ids.
     expect(orderedIds(moved)).toEqual(moved.map((photo) => photo.id));
     expect(orderedIds(moved)).toEqual([
       "photo-2",
@@ -153,10 +154,7 @@ describe("the payload order", () => {
       "photo-5",
       "photo-6",
     ]);
-
-    const payload = moved.map((photo, displayOrder) => ({ id: photo.id, displayOrder }));
-    expect(payload.map((entry) => entry.displayOrder)).toEqual([0, 1, 2, 3, 4, 5]);
-    expect(payload[3]).toEqual({ id: "photo-1", displayOrder: 3 });
+    expect(orderedIds(moved)).toHaveLength(6);
   });
 
   it("should keep the pick order when nothing has moved", () => {
