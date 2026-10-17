@@ -322,9 +322,11 @@ export function WorkshopView() {
     controllerRef.current = null;
     setUploading(false);
 
-    // A Cancel that landed on the last response — the abort raced an answer that had already arrived —
-    // stops the queue too. The sentence is the user's action, not a claim about what was stored.
-    if (cancelledRef.current) {
+    // A Cancel that landed after the last response had nothing to stop: the queue processed every
+    // file, and the summary — which counts the stored photo — is the honest sentence. Only a cancel
+    // that actually stopped the loop says "cancelled". Measured in review: the old check overwrote a
+    // summary whose 201 the client had already received, while the transport's abort was a no-op.
+    if (cancelledRef.current && added + failed < queue.length) {
       setNotice("Upload cancelled.");
       return;
     }
@@ -357,21 +359,12 @@ export function WorkshopView() {
   };
 
   const cancelUpload = (): void => {
+    // The queue checks the flag before each file and after the last one; the abort covers the request
+    // in flight. With no controller the queue has settled (or is between files), and its own post-loop
+    // sentence — the summary when nothing was stopped — is the right one. Writing "cancelled" here
+    // would overwrite a summary whose photo the archive already stored (the review's measured race).
     cancelledRef.current = true;
-    const controller = controllerRef.current;
-    if (controller !== null) {
-      controller.abort();
-      return;
-    }
-    // No request is in flight (only reachable if the queue settled between the click and this handler):
-    // stop it here and return the tile that looked busy to waiting.
-    setItems((previous) =>
-      previous.map((item) =>
-        item.state === "uploading" ? { ...item, state: "waiting", message: null } : item,
-      ),
-    );
-    setUploading(false);
-    setNotice("Upload cancelled.");
+    controllerRef.current?.abort();
   };
 
   const percent =
