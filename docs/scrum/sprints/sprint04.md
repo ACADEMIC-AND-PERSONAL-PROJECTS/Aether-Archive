@@ -14,8 +14,8 @@
 | # | ID | Story | Points | Priority | Status | PR |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | E6-S1 | CI on every PR — backend and frontend jobs, cached, under 8 minutes | 5 | p0 | Done | #123 |
-| 2a | E4-S3A | The order reducer — `moveItem`/`orderedIds`, pure and tested | 1 | p0 | In review | #125 |
-| 2b | E4-S3B | The gesture core — mouse/touch sensors, sortable grid, overlay | 4 | p0 | Todo | — |
+| 2a | E4-S3A | The order reducer — `moveItem`/`orderedIds`, pure and tested | 1 | p0 | Done | #125 |
+| 2b | E4-S3B | The gesture core — mouse/touch sensors, sortable grid, overlay | 4 | p0 | In progress | — |
 | 2c | E4-S3C | Keyboard, announcements, auto-scroll and motion | 3 | p0 | Todo | — |
 | 3 | E4-S4 | Aura colour picker — hex input, palette swatches, live glass preview | 5 | p0 | Todo | — |
 | 4 | E4-S5 | Publish dump — `POST /dumps`, optimistic insert, rollback | 5 | p0 | Todo | — |
@@ -102,3 +102,7 @@ The order is deliberate:
   **The fix belongs to S3B/C, where the drag code and its tests land**: every activated drag will end
   with a drop/Escape and await the listener release, and the shuffled suite will be run repeatedly,
   not once. #124 was closed unmerged.
+- 2026-10-17 — **E4-S3A merged (`415b4c3`, PR #125)** after APPROVE WITH NITS: the reducer slice at
+  **238 hand-written**; the review brute-forced it against `arrayMove` (204/204 in-range, 1149/1149
+  clamped out-of-range, 0 divergences) and its nits — the wire-shape test, E4-S5's id-provenance work,
+  the fix's ownership, the 299-line total — are fixed. S3B is In progress.
