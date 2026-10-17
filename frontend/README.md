@@ -1099,6 +1099,22 @@ multipart `file` part; Chromium then decoded both the fixture and the received b
   no mobile capture is required. Not measured here: Safari's `OffscreenCanvas`/`toBlob` behaviour and a
   physical phone; the fallback keeps Safari uploadable regardless.
 
+## The display order (E4-S3A)
+
+The workshop's `items` array **is** the dump order: there is no `order` field, no index stored on a
+tile and no sorting at render. Moving a tile produces one new array through `lib/ordering/move.ts`;
+the slot a photo occupies is its index, so the future publish payload is `orderedIds(items)` and
+`displayOrder` is 0–5.
+
+- `moveItem(items, from, to)` clamps both indices, refuses non-integer input (a caller bug cannot
+  truncate a slot), returns the **same reference** when a move changes nothing, and follows
+  `arrayMove`'s contract: the destination is the index in the resulting array.
+- `orderedIds(items)` is the payload projection — ids in display order. It has no production caller
+  until E4-S5 publishes; the tests pin the contract the endpoint will consume.
+
+11 unit tests state every move direction, both clamps, the no-op identity and the ordered-ids
+projection. The drag, touch and keyboard surfaces that write through this reducer are E4-S3B/C.
+
 ## Zero external requests — measured on the built bundle
 
 ```bash

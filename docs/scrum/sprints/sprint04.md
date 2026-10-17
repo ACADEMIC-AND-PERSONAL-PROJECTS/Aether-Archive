@@ -13,13 +13,16 @@
 
 | # | ID | Story | Points | Priority | Status | PR |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | E6-S1 | CI on every PR — backend and frontend jobs, cached, under 8 minutes | 5 | p0 | In review | #123 |
-| 2 | E4-S3 | Drag-and-drop ordering — `@dnd-kit`, a pure reducer, the keyboard path | 8 | p0 | Todo | — |
+| 1 | E6-S1 | CI on every PR — backend and frontend jobs, cached, under 8 minutes | 5 | p0 | Done | #123 |
+| 2a | E4-S3A | The order reducer — `moveItem`/`orderedIds`, pure and tested | 1 | p0 | In progress | — |
+| 2b | E4-S3B | The gesture core — mouse/touch sensors, sortable grid, overlay | 4 | p0 | Todo | — |
+| 2c | E4-S3C | Keyboard, announcements, auto-scroll and motion | 3 | p0 | Todo | — |
 | 3 | E4-S4 | Aura colour picker — hex input, palette swatches, live glass preview | 5 | p0 | Todo | — |
 | 4 | E4-S5 | Publish dump — `POST /dumps`, optimistic insert, rollback | 5 | p0 | Todo | — |
 | 5 | E6-S2 | Required status checks on `main` and `develop` | 2 | p0 | Todo | — |
 
-**Total: 25 points.** The order is deliberate:
+**Total: 25 points across 7 slices** (E4-S3 was re-cut at #124's review into 2a/2b/2c — points unchanged).
+The order is deliberate:
 
 - **CI first, not last.** The Sprint 3 retrospective's preview named E4-S3 as the first story; this
   plan changes it. CI built at the start guards every PR the sprint itself opens, and the workflows are
@@ -84,3 +87,17 @@
   jobs on the same runner minute — frontend 42 s (install 4 s, lint 4, format 2, typecheck 3, test 13,
   build 3), backend 47 s (`./mvnw -B verify`, the step itself 38 s). Well inside the 8-minute budget on
   a cold cache. The failure path (artefacts) is exercised by E6-S2's deliberately failing scratch PR.
+  Merged as `648ea16`; the merge exercised the **push trigger on `develop`** (run
+  [39032754120](https://github.com/ACADEMIC-AND-PERSONAL-PROJECTS/Aether-Archive/actions/runs/39032754120),
+  green in 61 s).
+- 2026-10-17 — **E4-S3 was re-cut at PR #124's review, not defended.** The whole story measured **1,343
+  hand-written** (production 659, tests 600, docs 84) and claimed the exception on block-attributed
+  halves (≈891 / ≈449). The review constructed the cut the PR named (gesture core, 903, green) **and a
+  reducer-only slice at 238, green and under budget** — so "no arrangement reaches the budget" was
+  false. The story is now **E4-S3A** (the reducer, 1 pt), **E4-S3B** (the gesture core, 4 pts, its own
+  measured exception), **E4-S3C** (keyboard/announcements/auto-scroll/motion, 3 pts). The same review
+  found a real defect the author's runs missed: **the shuffled suite is flaky** — 3/5 shuffled full
+  runs failed at the tip against 4/4 at the base — because dnd-kit removes its capture-phase document
+  listener on a 50 ms timer, so an activated drag that ends without a drop leaks into the next test.
+  Every activated drag in the re-cut ends with a drop/Escape and awaits the listener release; the
+  shuffled suite is run repeatedly, not once. #124 was closed unmerged.
