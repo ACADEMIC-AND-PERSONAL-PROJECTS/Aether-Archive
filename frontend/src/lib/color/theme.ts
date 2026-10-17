@@ -76,6 +76,16 @@ const SURFACE_L_MAX = 0.24;
 const SURFACE_C_MAX = 0.06;
 const TEXT_L_MIN = 0.86;
 const TEXT_L_MAX = 0.93;
+
+/**
+ * The two bands a contrast guarantee is only as good as, exported so a test can feed the generator its
+ * **current** worst case rather than a copy of it. A test that hard-codes 0.10–0.18 and 0.86–0.93 keeps
+ * passing if the generator widens, because it is then measuring a range the code no longer produces.
+ */
+export const THEME_BANDS = {
+  bgLightness: { min: BG_L_MIN, max: BG_L_MAX },
+  textLightness: { min: TEXT_L_MIN, max: TEXT_L_MAX },
+} as const;
 const TEXT_CEILING = 0.97;
 const TEXT_C_MAX = 0.02;
 const TEXT_STEP = 0.01;

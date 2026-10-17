@@ -19,9 +19,27 @@ by accident, and supply-chain creep from unnecessary dependencies. Design for th
   3. enforce a size limit (`AETHER_MAX_UPLOAD_MB`),
   4. **regenerate the filename** as a UUID — never reuse the client filename or path,
   5. write inside the configured data directory only, after canonical-path verification.
-- **Path traversal guards**: any path built from data or input must be resolved and checked with
-  `Path.normalize()/toRealPath()` to stay under the data root before read or write. Serve `/images/**`
-  from an explicit resource handler; never build file paths from request parameters.
+- **Path traversal guards**: any path built from data or input must be resolved and checked to stay
+  under the data root before read or write. Serve `/images/**` from an explicit resource handler; never
+  build file paths from request parameters.
+- **Path guards compare what the filesystem resolves to, not what the string spells.** The invariant is that
+  **no resolved path leaves the data root**. Resolve every side that exists — the root and the existing
+  directory chain alike (`Path.toRealPath()`, `os.path.realpath`) — before comparing; comparing the two
+  spellings answers what a path *says*, not where it *goes*, and a symlink is precisely the gap between the
+  two (E1-S10's first cut, Sprint 2's retrospective, change 2). A destination that does not exist yet — an
+  upload target — has no canonical form by definition, so it is checked through its canonical parent plus
+  the generated leaf rather than by resolving the destination (measured: `toRealPath()` on a not-yet-existing
+  target throws `NoSuchFileException`). A leaf that *is* a link is **accepted** at the write site on purpose:
+  `Files.move` with `ATOMIC_MOVE` replaces the link rather than following it, and a delete removes the link
+  rather than its target (measured: `ATOMIC_MOVE` onto a planted link leaves the target's bytes untouched).
+  Do not generalise that to "writing replaces a link" — an `open`-style write (`Files.writeString`,
+  `Files.newOutputStream`) follows it and would land the bytes outside the root. A path guard ships with
+  its adversarial matrix (`.claude/rules/testing.md`), and where it accepts a cell that matrix calls hostile,
+  the test names the cell and the reason — an accepted cell nobody wrote down is indistinguishable from a
+  missed one.
+- **Known open exception, named so this rule is not read as already met:** `/images/**` serving resolves the
+  URL, not the file, so a link under `images/` that resolves outside the data directory *is* followed —
+  **E6-S17 / issue #79** (`p1`), open until that story lands.
 - **No SQL string concatenation.** JPA/derived queries only; native queries with bound parameters.
 - **No `eval`, no `innerHTML`, no `dangerouslySetInnerHTML`** with server or user content.
 - **Dependency discipline**: every new dependency needs a one-line justification in the PR.

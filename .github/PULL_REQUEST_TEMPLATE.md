@@ -16,7 +16,8 @@
 
 -
 
-**Size**: total N changed lines · **hand-written M** (excluded: <generated files, named>).
+**Size**: total N changed lines (**additions + deletions**, as `git diff --stat` prints them) · **hand-written M**
+(excluded: <generated files, named>).
 *Both numbers are required; the ~400 budget applies to the hand-written one (`.claude/rules/git-workflow.md`).*
 
 ## Acceptance criteria

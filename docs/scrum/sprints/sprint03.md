@@ -1,0 +1,404 @@
+# Sprint 03 — The signature entry experience exists: immersive splash, glass menu, first uploads
+
+- **Dates**: 2026-10-16 → 2026-10-30 (UTC). The playbook row had carried an indicative
+  2026-11-16 → 2026-11-27 window — carried since 2026-10-15 and left indicative at Sprint 2 planning, whose
+  note said later rows are re-planned at their own planning. This is that planning: the sprint opens the
+  day Sprint 2 closed and the row, the milestone's `due_on` and this file now carry the real window.
+- **Goal**: The signature entry experience exists: immersive splash, glass menu, first uploads.
+- **Capacity**: **28 points** committed — 7 stories, inside the 25–34 band, six points below the ceiling.
+  Six points is room for one small unplanned pull, not for absorbing an overrunning 5-pointer. The order of
+  sacrifice is named here so it is not improvised at the end: **E4-S2** (5 pts, p0, last in the order) is
+  the first candidate to slip to Sprint 4 and **E3-S4** (2 pts, `p1`, the only `p1`) is second — and since
+  the playbook's escalation clause draws no p0/p1 distinction (its only automatic roll is excess `p2` at
+  planning), either slip is confirmed with the owner when it is taken, not decided here. The entry
+  experience itself does not slip.
+- **Branch base**: `develop`
+- **Milestone**: `Sprint 03 — Splash & Workshop` (already holds exactly these seven issues: #26–#32)
+- **Retrospective of record for the previous sprint**: `retrospectives/sprint02.md`
+
+## Sprint backlog — the delivery order, with reasons
+
+| # | ID | Story | Points | Priority | Status | PR |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0 | S03-C1 | *chore*: land the Sprint-2 working changes in `.claude/` (number provenance, guard canonicalisation, adversarial review control) | — | — | Done | #97 |
+| 1a | E3-S1A | Immersive splash — the photo, its tone, the quiet states (criteria 1, 2, 5) | 3 | p0 | Done | #100 |
+| 1b | E3-S1B | Immersive splash — the tap intent, the pull-to-refresh, the per-visit photo (criteria 3, 4) | 2 | p0 | Done | #101 |
+| 2 | E3-S2 | Glass menu overlay | 5 | p0 | Done | #104 |
+| 3 | E3-S3 | Route transitions & motion system | 3 | p0 | Done | #106 |
+| 4 | E3-S4 | Quiet loading / empty / error states | 2 | p1 | Done | #108 |
+| 5a | E3-S5A | Accessibility — the axe gate (criteria 1, 2) | 1 | p0 | Done | #110 |
+| 5b | E3-S5B | Accessibility — contrast, `inert`, the announcement fix, the manual pass (criteria 3–5) | 2 | p0 | Done | #111 |
+| 6a | E4-S1A | Single photo upload — the picker and the validation (criterion 1) | 2 | p0 | Done | #114 |
+| 6b | E4-S1B | Single photo upload — send with progress and cancel, then retry and invalidation (criteria 2–4) | 3 | p0 | Done | #115 |
+| 7a | E4-S2A1 | The selection grid surface — one tile, its state and its remove action (criterion 3) | 1 | p0 | Done | #117 |
+| 7b | E4-S2A2 | Multi-select (≤ 6) and the sequential queue (criteria 1, 4) | 2 | p0 | Done | #118 |
+| 7c | E4-S2B | Client-side downscale before upload (criterion 2) | 2 | p0 | Done | #119 |
+
+**Total: 12 slices · 28 points** (the row above them is a chore, not a story; E3-S1A/B, E3-S5A/B,
+E4-S1A/B and E4-S2A1/A2/B are each one story, split — see the notes at the end of this section). The order is the
+dependency chain, with the placements worth a sentence:
+
+- **E3-S1 first** — the sprint's goal made visible: the app opens on a full-bleed random photo and nothing
+  else. It needs only the shell (E2-S2) and `GET /photos/random` (E1-S6; in the contract at
+  `_docs/openapi.yml` — checked at planning). Two forward references are named rather than hidden: its
+  "tap anywhere opens the menu" criterion completes when **E3-S2** lands, with the integrated path tested
+  in **E3-S5** — **satisfied**: E3-S2 merged `e7a50d6`; and its empty-archive criterion completes with
+  **E3-S4** — also satisfied: E3-S4 merged `f66fad2` and its issue #29 is closed.
+- **E3-S2 next** — the menu is the tap-target the splash's first criterion names, and it is self-contained:
+  glass overlay, focus trap, keyboard path. `backdrop-filter` and the glass fallback were proven from the
+  shipped CSS in E2-S6 (the `@supports` branch itself is not forceable headless — E2-S6 records that
+  boundary) — reused, not re-litigated.
+- **E3-S3 third, before the remaining animation surfaces** — E3-S2 pins its own numbers by criterion
+  (fade + 12–16 px translate, 300–600 ms); E3-S3 centralises the motion tokens before the upload flows
+  add more, and route transitions span every view.
+- **E3-S4 fourth** — the quiet states are cross-cutting (loading/empty/error); they close E3-S1's
+  empty-archive criterion, and the upload flows consume their feedback patterns.
+- **E3-S5 fifth** — by definition it tests the real S1–S4 code; running it earlier would test placeholders.
+- **E4-S1 then E4-S2** — the upload pipeline lands once (picker → validate → upload → invalidate), in **two
+  slices** (see the note at the end of this section: the criteria are a dependency chain, so the first
+  slice is the only one that can exist alone and it measured 714, over the branch threshold);
+  the multi-select story builds directly on it. **E4-S2 is cut in three**, after the #116 review
+  constructed a criterion-3-only cut that reached the budget: **S2A1** the grid surface (criterion 3),
+  **S2A2** multi-select and the queue (criteria 1 and 4, coupled: a queue of one is E4-S1B and a
+  selection the app cannot send is not the story), **S2B** downscale (criterion 2). The cap and the
+  downscale decision are pure functions, which is also how they are tested (jsdom has no canvas —
+  ADR-018).
+
+**E3-S1 was split at review, and the split is the interesting part.** The story landed 1,516 hand-written
+lines — the largest diff here — claiming the atomic-story exception. The reviewer took the claim apart with
+the rule's own test: I argued a slice would leave "a view that is not interactive", but the overlay is
+E3-S2 and **the unsliced story does not open a menu either**, so the slice failed nothing the whole did not
+also fail (`CLAUDE.md` §5's exception is for a story that cannot be sliced without failing one of its own
+acceptance criteria). The claim was withdrawn and the story re-cut on the reviewer's own line: **E3-S1A**
+(criteria 1, 2, 5 — the photo, its tone, the quiet states, 3 pts) then **E3-S1B** (criteria 3, 4 — the tap
+intent, the pull, the per-visit photo, 2 pts) from an updated `develop`. Points are unchanged at 5.
+
+Both slices merged (E3-S1A `2d8af90`, E3-S1B `79859c4`), so the numbers are final rather than projected, and
+they are the reason this note exists. **The split did not solve the size problem — it made the story 51%
+larger.** 1,367 + 929 = **2,296 total changed lines for one 5-point story** (1,516 for the unsliced branch;
+no generated file is in either diff, so total and hand-written are the same number here). The review's own
+classification, re-run at the merged tips rather than at the tip it first measured: **prose 194 → 766
+(+572), non-prose 1,322 → 1,530 (+208)** — **73% of the split's extra 780 lines is re-stated prose**,
+because each slice writes its own verify report, its own README rows and its own pass over the ADR. One
+further cut was available, by the reviewer's estimate (the cache policy alone, ~250 lines with its prose),
+and would still not have reached ~400.
+
+So the split bought reviewability — three passes found a claim that did not survive, then rebuilt it into
+one that did, then an untested half of the behaviour the slice exists to deliver — at 780 lines of extra
+writing. **That trade, not the split mechanics, is what this sprint should evaluate**: either this
+codebase's documentation density (a third of new source lines are comments carrying decisions and probe
+results) has outgrown a budget written for leaner code, or "one story" needs to mean a smaller feature than
+it currently does. Both readings are defensible and neither is settled by two green PRs.
+
+## Definition of Ready check
+
+All seven pass: each has a value statement and testable criteria (the issue mirror is re-synced from the
+file at planning — see Notes), none exceeds 8 points, priorities match
+the goal, dependencies are `Done` or named in the order above, the contract exists (`/photos/random` and
+the upload path in `_docs/openapi.yml`; `docs/engineering/DESIGN-SYSTEM.md` + `.claude/rules/design-language.md`
+cover the visuals), and every story is verifiable locally (browser probes + screenshots; no external
+service).
+
+## Process commitments carried from Sprint 2's retrospective
+
+The retrospective's three changes are **success criteria for this sprint**, not advice. Their text lands
+in `.claude/` in S03-C1; the practice is checked in every story:
+
+1. **Numbers are pasted from the producing command — or re-measured at the branch tip.** A count, size or
+   ledger in a report, README or PR body is copied from the output that produced it; a number written
+   before the last commit is re-measured after it. Every story PR still carries **both** size numbers
+   (total and hand-written, generated files named and excluded). A review finding of the
+   stale-or-miscounted-number class counts as this change failing.
+2. **Guards canonicalise before comparing — and ship with their adversarial matrix.** Any new path guard
+   canonicalises both sides (`os.path.realpath` or equivalent) and its test includes the matrix: doubled
+   slash, `/.`, `..`, symlinks, environment variants.
+3. **Every review posts at least one adversarial control, with its result** — a mutation, a brute force,
+   or a boundary falsification, run and reported; not only prose findings.
+
+## Risks & assumptions
+
+- **Pull-to-refresh is a touch gesture, and nothing has driven a gesture yet.** The established probe
+  mechanism is the system Chromium CLI's `--screenshot` (E2-S1 §5; used by E2-S3/S6) — screenshots only;
+  Playwright is the documented but unused upgrade path. E3-S1 probes what can drive the gesture; if
+  nothing can, the criterion is proven by the manual 390 px pass that E3-S5 documents anyway.
+- **E3-S3's criterion asks for screenshots/recording, and only screenshots have a mechanism** (the
+  Chromium CLI's `--screenshot`; E2-S1 §5 → E2-S3/S6). Video capture is a new scripted mechanism whose
+  dependency decision — and its justification — lives in that PR, not here. If it cannot record, the
+  review gets the screenshots plus an explicit note — never a silent substitution.
+- **Axe is not in the dependency set.** E3-S5's criterion says "Axe (or equivalent)". If a checker is
+  added, it is a test-only dependency justified in that PR — the precedent is E1-S3's Testcontainers;
+  E2-S4 is the precedent for probing first and adding nothing when the system tooling covers it.
+- **The canvas is absent in jsdom (ADR-018), and E4-S2 downscales through a canvas.** The tests target the
+  pure decision function; the downscale itself is browser code, verified by probe.
+- **Zero external requests remains the sprint's hard constraint** — new views, motion and the upload flows
+  must not break it; the built-asset check stays part of `verify`.
+- **The 404 `empty-archive` on `/photos/random` is a state, not an error** — E3-S4 owns its rendering;
+  until then E3-S1 renders its tone placeholder and never a crash.
+- **Design references remain development-time only.** Nothing fetched during a UI story's research may be
+  copied into code, added as a dependency, or requested at runtime.
+
+## Out of scope (explicitly)
+
+- **E4-S3 and later** — touch ordering (8 pts), the aura picker, publishing: Sprint 4, where the sprint
+  map already places them.
+- **The backend is frozen.** No Java change is in any story; if a contract gap appears mid-story, it stops
+  and asks — it is never patched silently inside a frontend story.
+- **Carried open security items stay out by name** — #71 (cross-site state-changing requests, p1),
+  #72 (Spring Boot EOL decision, p1), #73 (Low-severity hardening, p2), #79 / E6-S17 (static-serving
+  hardening, p1). This sprint has no hardening goal and no spare capacity beyond the sacrifice order;
+  pulling one in is an explicit owner decision, never a silent over-commit. The decision is recorded in
+  the backlog at this planning.
+- **CI (E6-S1)** stays Sprint 4. Every check in this sprint is a local `verify` run, recorded in
+  `reports/`.
+- **A second visual language** — the design system is fixed; a new pattern is either described in
+  `docs/engineering/DESIGN-SYSTEM.md` or explicitly deferred.
+
+## Notes / decisions during the sprint
+
+- 2026-10-16 — Sprint opened. Dates re-planned from the indicative November window to
+  2026-10-16 → 2026-10-30 (Sprint 2's plan said later rows are re-planned at their own planning; the owner
+  opened this sprint the day Sprint 2 closed). The playbook row and the milestone `due_on` are updated.
+- 2026-10-16 — The milestone already held exactly these seven issues — but the planning fact-check found
+  the mirror was not the file: the seeder parsed only the `·` heading form and 26 backlog headings used
+  `|`, so #26 carried E3-S1…S5's criteria concatenated and #27–#32 had empty criteria — the same defect
+  reached 20 issues beyond this sprint (#33–#49, #56, #57, #79) and 8 older mirrors had drifted from their
+  sections. Fixed at planning: the 26 headings were normalised; `scripts/github/seed-backlog.py` now
+  reads both heading forms, refreshes a drifted body instead of skipping it, joins wrapped criteria, and
+  reports unscheduled stories instead of silently dropping them; the mirror was re-synced — 35 updated
+  (including 8 older drifts, e.g. E1-S5's missing SEC-N2 criterion), 9 already correct, 0 created. Spot
+  checks: #26/#27/#32/#79 re-measured against their file sections — 5/5, 5/5, 5/5, 4/4 criteria.
+- 2026-10-16 — Planning checks, executed: `/photos/random` is in the contract (E1-S6) and implemented;
+  `@tanstack/react-query` is already a dependency, so E4-S1's query invalidation adds no package; the
+  carried security items (#71, #72, #73, #79) are kept out by name, with the decision recorded in
+  `docs/scrum/PRODUCT-BACKLOG.md`.
+- 2026-10-16 — **S03-C1 (#97) landed, and its own review is the evidence that change 3 works.** Commit
+  `477574c` added a guard rule whose words were: **"Canonicalise before comparing — both sides"
+  (`Path.toRealPath()`, `os.path.realpath`); a string or prefix comparison is not a guard.** The review
+  compiled a probe against `target/classes`, called `StorageService.requireInside` with the adversarial
+  matrix *that same PR* prescribes, and the rule lost: the guard normalises the candidate lexically, and
+  `toRealPath()` on a not-yet-existing upload target throws `NoSuchFileException`. So the standard indicted
+  correct, reviewed code — a claim about a mechanism that nobody had executed, which is change 3's class of
+  defect rather than change 1's (change 1 is numbers, and it would not have caught this). The fixes:
+  `11d8cd5` states the invariant and names the rule's one open exception (E6-S17 / #79, `p1`); `8306c72`
+  closes the three gaps the new rules left open (the text-only control, the merge-pr gate, the ADR-012
+  description); `e390242` names the API, the directory and the untested cell after a second round found
+  three clauses true only under their author's reading (`Files.move` vs an `open`-style write, link
+  *position*, "pinned by tests" asserted about a suite with no such test). Merged as `da5d9e8` after
+  REQUEST CHANGES → APPROVE WITH NITS, at a cost of 89 changed lines and two review rounds. Worth recording
+  because the shape generalises — a rule, a spec or a report that describes behaviour nobody executed is the
+  defect this project keeps finding, and it is cheapest to catch when the document is the diff.
+- 2026-10-16 — **E3-S1A merged (`2d8af90`, PR #100) after APPROVE WITH NITS; the merge closed #99 unmerged.**
+  The exception claim was withdrawn and re-cut into the two-slice shape described above, and the review
+  judged the new claim by testing *both* possible cuts rather than the one the PR named — the cut that would
+  have failed was the one not argued. Two defects of mine came out of that round and are why the second
+  review's wording is shorter than the first: a size figure measured one commit early, and the README's
+  Playwright sentence reported as corrected when it was byte-identical to `develop` — a relay I had not
+  measured. The rule the sprint already has covers both; the discipline of *running* it is what was missing.
+- 2026-10-16 — **E3-S1B merged (`79859c4`, PR #101) after REQUEST CHANGES**, and it closes the story.
+  The reviewer chose its own mutant rather than re-running one of the four the author ran — delete `gcTime`
+  alone, keep `staleTime: 0` — and **all 172 tests stayed green** while four documents called that constant
+  the load-bearing half of the per-visit policy. The behaviour was right; the test counted requests, which
+  cannot separate "stale" from "gone". The freshness test now asserts the cache is empty on the returning
+  visit, and the mutant fails it. Third distinct defect in three passes on one story, and all three were
+  found by executing something rather than reading it.
+- 2026-10-16 — **E3-S2 (the glass menu) built; four findings routed rather than absorbed.** The story
+  measured the glass instead of asserting it — a real touch tap, a real `Escape`, a real `Tab` walk, an
+  emulated `prefers-reduced-motion`, and the painted pixels of a white photo read back through a canvas —
+  which is how it found that the theme's **muted token paints 4.14:1 on glass** where the text token paints
+  8.07:1. That rule is now a criterion of **E3-S4** (whose glass notice would have inherited the mistake) and
+  the reason its close entry is no longer visually quieter. Three more findings have homes rather than
+  owners yet: the sheet-over-veil pattern belongs in `DESIGN-SYSTEM.md` with **E3-S3** (which centralises the
+  motion pair anyway); `GlassPanel` accepting no `ref` belongs to **E4-S3**'s drag grid; and the fact that the
+  built bundle serialises tokens as 4-/8-digit hex, which `parseColor` cannot parse, is **E6-S18** (issue
+  #103) — latent, because nothing reads a token back at runtime today, and invisible to jsdom, which never
+  runs the minifier. A stale "no font file is shipped" line in the frontend README was corrected in place
+  (five `.woff2` files, 152 kB, since E2-S3).
+- 2026-10-17 — **E3-S2 merged (`e7a50d6`, PR #104) after APPROVE WITH NITS**, closing the state E3-S1B left
+  visible. The exception claim held against four counter-cuts the reviewer built rather than the one the PR
+  argued, and the number that settled it is worth keeping, measured at the merge: **production code alone is
+  425 lines** (418 at the reviewed tip; the review fixes added 7), so no arrangement of tests and
+  documentation reaches the budget while the criteria stand. Sizing, with the multiples rather than the
+  adjective: **E3-S2 is 1,085 hand-written — 2.17× the ~500 branch budget and 2.71× the ~400 PR guideline**
+  — and E3-S1 was 1,516 unsliced (3.03× / 3.79×) or 2,296 as two slices (4.59× in total, though each slice
+  came in under the story-unit reading). Which is the honest form of the pairing: the two points do not say
+  the same thing, they say the *same direction* from different angles — E3-S1 leaves the diagnosis open
+  (documentation density, or "one story" meaning less), and E3-S2's production-only figure bears on that
+  dilemma rather than confirming it.
+  The review's control found the same class of gap as E3-S1B's: **reinstating the splash's old Escape
+  listener left all 37 tests in the menu and splash files green** — that tip's suite was 203 — so the
+  story's most deliberate decision, one owner for the key, was the least checkable thing in it. Twice now, a
+  mutant has found an invariant that was argued in prose and pinned nowhere, and both were decisions the
+  author had called out as deliberate. If the pattern holds it belongs in the next retrospective as a rule:
+  *the more deliberately something is decided, the more likely it is to be described rather than tested.*
+  **One caveat to carry with it**, because it is the reviewer's own and it sharpens the rule: a mutation is
+  aimed by reading what the PR argued, so "deliberate decisions are the ones found unpinned" is partly an
+  artefact of where the mutants point — a decision made silently is equally unpinned and far less likely to
+  be hit. The rule is therefore about *testing what you bothered to argue*, not about arguing being the
+  hazard.
+- 2026-10-17 — **E3-S3 merged (`f84063a`, PR #106) after REQUEST CHANGES whose three blockers were all
+  records, not code.** The first is the most consequential finding of the sprint: the ADR declining Framer
+  Motion cited `CLAUDE.md`, but the mandate is in `_docs/aether_archive_specs.md` three times — line 11, the
+  menu at line 30, and line 95, *"Polish Framer Motion transitions between all routes"* — the spec line
+  this story's criterion 2 implements. `CLAUDE.md` requires an ADR **plus explicit user approval** for a
+  spec change;
+  the ADR had the measurements and no approval, because the mandate had been read from the summary rather
+  than the contract. The owner approved the divergence on the four-build numbers, and the ADR now records
+  it as a divergence with a named revisit trigger. **The generalisable form is the sprint's recurring
+  defect one level up**: a document that points at the contract is not the contract, and a decision recorded
+  against the pointer is a decision recorded against the wrong source.
+- 2026-10-17 — **The sizing signal now has a mechanism, and it is not "decisions are expensive".** The
+  review decomposed E3-S3 as 663 lines of product against 561 of record, and E3-S2 as 137 of record with
+  no committed verify report (`reports/verify-e3-s3-20261017.md` has the classification). The difference
+  between two stories with a similar **total** diff — 1,224 against 1,085, on 3 and 5 points respectively —
+  is therefore largely a
+  **documentation choice nobody estimates**: the DoD asks for the verify report *pasted in the PR*, and a
+  story that commits it adds a few hundred lines to its own diff. That reframing — **documentation is
+  unbounded by estimation** — is the actionable form for the retrospective, and it is why the three data
+  points (5 pts → 1,516; 5 pts → 1,085; 3 pts → 1,190 at review, 1,224 merged) say nothing about the point
+  estimates.
+- 2026-10-17 — **E3-S5 was split at review into E3-S5A (the axe gate, criteria 1-2) and E3-S5B
+  (contrast, `inert`, the announcement fix and the manual pass, criteria 3-5).** The story landed at 551
+  hand-written lines claiming the atomic-story exception; the review found the cut I had not tested — **a
+  cut by criterion, not by surface**. I had argued that criteria 1 and 2 each name two surfaces, so no
+  surface cut could satisfy them; true and irrelevant, because the rule asks whether *a* slice fails a
+  criterion, and delivering criteria 1-2 then 3-5 fails none that the whole does not also defer. The cuts
+  were estimated at ~188 and ~210 lines; they landed at 237 and 496, both still under the ~500 branch
+  threshold (the second by four lines, and over the ~400 ideal by 96 — both numbers, because the review
+  asked for both). **This is the fourth time in this sprint that a "cannot be
+  split" claim has been withdrawn** (E3-S1, E3-S3, E3-S4, here), and the lesson is now a rule rather than a
+  resolution: construct the cut you did not name — by criterion, by state, by surface — before claiming the
+  exception, and if the branch is under ~500 argue the arithmetic instead. E3-S5B closes #30.
+  *Correction, 2026-10-17 — of a correction.* A note added earlier today removed **E3-S3** from this list on
+  the ground that its review "judged the claim to survive". That was wrong, and wrong in the way it claimed
+  to fix: the E3-S3 review's blocker is headed "the atomic-story claim does not survive **as written**", and
+  the author's own response to it says "my claim failed its literal test even though the conclusion
+  survives". So the written claim *was* withdrawn — what survived was the **budget arithmetic** it was
+  restated on, and no split followed. The distinction is worth keeping rather than flattening: **a withdrawn
+  claim can still leave a valid conclusion**, which is exactly the form E3-S4, E3-S5 and E4-S1 now use. The
+  first correction is undone by this entry rather than amended, because history here is append-only — and it
+  is recorded because it is the same defect twice: a record stated from memory without re-reading its
+  source, one day after the same mistake was named.
+- 2026-10-17 — **E3-S5A merged (`97d258b`, PR #110) and E3-S5B (`ed5cd94`, PR #111); the E3 epic is
+  complete.** The split cost is measured rather than asserted, in both of its figures: **656 (+19%) at the
+  review tips, 733 (+33%) after the review fixes** — the extra 77 lines are the review's own findings, so
+  the two numbers answer different questions. What the extra record bought: a gate the
+  reviewer made stronger than it was opened (a loading-state run, `data-state` assertions, a dialog
+  assertion), an `inert` implementation whose failure mode is documented (a dialog nested in the inert
+  subtree is itself ignored), and a status region placed as a **sibling** of `<main>` on the strength of a
+  measurement — it would leave the accessibility tree exactly when the menu is open and it has something to
+  say.
+- 2026-10-17 — **The review's negative control is the line to keep.** In E3-S5B the reviewer mutated
+  `GLASS_ALPHA` 0.4 → 0.1 and the notice test **stayed green**, correctly — the 70 % scrim is the
+  load-bearing layer, so the test was measuring the mechanism it names. Across the last four review rounds
+  (E3-S3, E3-S4, E3-S5A, E3-S5B) a reviewer's own mutant taught more than the author's, and this is the
+  first that proved a test by *not* killing it. A mutation battery that only demonstrates killing is half
+  a battery.
+- 2026-10-17 — **E4-S1 was split into E4-S1A (the picker and the validation, criterion 1, 2 pts) and
+  E4-S1B (send with progress and cancel, then retry and invalidation, criteria 2–4, 3 pts), in that
+  order from an updated `develop`.** The unsliced story measured 1,434 hand-written lines, production
+  alone 711. The #113 review rejected its atomic-story claim **on its own arithmetic** — it priced two
+  slices at ≈450 and ≈200, both under the branch threshold, and then argued from the summed production —
+  and found the suite not hermetic against `VITE_MAX_UPLOAD_MB`: the README tells developers to set the
+  key that broke two tests. Slice A (PR #114, merged `c376404`) measured **714 at review, 776 at its
+  final tip** (production 350, tests 328, docs 82, build/config 16) — 276 over the ~500 branch
+  threshold — so it claims the
+  exception, but in the E3-S3 form: **restated on a measured cut rather than on an inseparability
+  claim.** The cut the review named — by *state*: keep the picker, validation and refusal notice; defer
+  the selected preview, its panel and their tests — was constructed in a throwaway copy at the tip,
+  typechecked, linted, tested (17 against the slice's 21) and measured at **555 hand-written lines**,
+  still 55 over the threshold. No cut reaches the budget while the criteria, their tests and their
+  documentation stay in the slice, so the slice stays whole. The review's estimate (~568) was 13 lines
+  off the measured cut; the measured number is the one recorded. **The commit shape is a post-hoc
+  partition** — four commits within 19 seconds, the first mixing production, tests, README and config —
+  which history cannot fix, so it is recorded here for the retrospective rather than re-cut: it belongs
+  beside Sprint 2's "measure the change, not just the total", since a diff split after the fact makes
+  both numbers true and the story of how they were produced false.
+- 2026-10-17 — **E4-S1B (PR #115, merged `eced081`) carries the send path**: `POST /api/v1/photos` over `XMLHttpRequest`
+  (the only transport with request progress and in-flight cancel), the quiet 2 px progress line, Cancel
+  returning to the same `File`, Try again resending that same object, and one prefix invalidation of
+  `photos` on success only — pinned in both directions, which kills the `onSuccess → onSettled` mutant
+  the #113 review found alive. It measured **1,279 hand-written** at its final tip (production 492,
+  tests 654, docs 133), 2.6× the ~500 branch threshold; the branch total is **1,326** with the 47
+  record lines.
+  Its exception is claimed on a **constructed criterion cut** — defer criterion 3's retry surface, keep
+  criteria 2 and 4 — which typechecks, lints, passes 26 of the slice's 30 tests and measures **1,157 at
+  the final tip** (1,122 at the reviewed tip; the review's independent reconstruction measured 1,115),
+  still 2.3× the threshold. The two surface sums are 588 (API) and 646 (view), and
+  neither is a viable slice (the API alone delivers nothing visible; the view alone cannot send). So no
+  cut reaches the budget, and the claim is stated as that measurement rather than as an inseparability.
+  **The review upheld the exception and found no behavioural defect**; its two blockers were a stale
+  total (the PR carried the record's net growth instead of the branch's gross; re-measured to 1,269) and
+  a missing mobile capture (four now in `reports/e4s1b-{uploading,cancelled,error,success}-390.png`).
+  Its nits found two unpinned behaviours that the author's own mutants missed — a duplicate Upload button
+  inside the uploading branch and three of the four focus transitions survived the suite — both are now
+  pinned, and the awaited-invalidation gating the success UI is pinned by a test with a deferred refetch.
+  The cancelled-upload sentence is visible now (`toBeVisible()` on the panel node, not a hidden one), and
+  the screen never claims the archive stored nothing — a cancel can race `StorageService.store`, which the
+  README and the probe record on both sides; the retry side of the same race (a lost response after a
+  store can duplicate on retry) is documented too. **The five work commits are 2–3 seconds apart** — the
+  same post-hoc partition as E4-S1A, recorded for the retrospective rather than rewritten.
+- 2026-10-17 — **E4-S2 was re-cut at PR #116's review, not defended.** The story had been split by
+  criterion at its start (S2A = criteria 1, 3, 4; S2B = 2), but the review constructed the cut I did
+  not name — criterion 3 alone, on top of E4-S1B — and it is green in every gate at **244 hand-written**,
+  under both budgets. Five "cannot be split" claims have already been withdrawn this sprint; the sixth
+  is not attempted against a measured, tested cut. The story is now **S2A1** (the grid surface, 1 pt,
+  normal budget), **S2A2** (multi-select and the queue, 2 pts, the exception claimed on coupling: a
+  queue of one is E4-S1B and a selection the app cannot send is not the story) and **S2B** (downscale,
+  2 pts). #116 measured **1,742** at its tip (production 810, tests 794, README 82, records 56); its
+  "1,273" cut was author-run and not green, so it is recorded as such. The review's other finding is a
+  real defect, not a record one: `aliveRef` was set false by the effect cleanup and never re-armed, so
+  **uploads died under `StrictMode` in `npm run dev` while the built-bundle probe stayed green** — fixed
+  in S2A2 with a StrictMode-wrapped test. The generalisable form: a probe of the built bundle cannot
+  see development-only double-invocation, and a lifetime ref set only in cleanup is armed by accident.
+- 2026-10-17 — **E4-S2A1 (PR #117, merged `abf514d`) delivered the tile surface.** The picked photo is
+  now one tile with its scrim, named remove and per-file state, on E4-S1B's unchanged send path;
+  **455 hand-written**, under the story threshold. Its review's two blockers were another measured
+  falsification — `min-h-full` "centred" the grid only in the comment: the tile sat at y=24, and the
+  committed capture itself was the evidence — fixed with `justify-center` on the scroll container
+  (301.30 against a computed 301.31) and recaptured; and the slice count (12, not 13). The nits were
+  turned into tests (tile `data-state="error"` on every failure path, URL revocation on replace and
+  remove, the empty-name fallback, focus after a refused replacement).
+- 2026-10-17 — **E4-S2A2 (PR #118, merged `3bf459c`) carries multi-select and the queue**, and with it the fix for the
+  defect #116's review found: `aliveRef` is re-armed in the effect setup, so `npm run dev` uploads again,
+  and a **StrictMode-wrapped test** pins it. It measured **1,721 hand-written** at its tip (production
+  631, tests 970, docs 120) — **1,751** on the branch with the 30 record lines. Its exception is claimed
+  on the **coupling** of criteria 1 and 4, with the cut constructed twice. The author's cut (multi-select,
+  cap and grid, no queue) is green at 24 tests and measures 1,252, but it deletes E4-S1B's send path and
+  its tests; the **review's non-regressing cut** — first tile only, E4-S1B's single-photo send path kept
+  and its tests kept — is green at 28 tests and measures **1,108**, still 2.2× the ~500 threshold (and a
+  real slice would also carry its own docs, so that is a lower bound). The summary's sentence "a
+  regression rather than a slice" was false as a general claim; the conclusion stands on the 1,108. The
+  queue is concurrency one (`maxActive: 1` over six files, every second answered 415), the loop carries
+  on (`continue` mutant killed), retry resends the same objects, and the nine mutants include the
+  StrictMode re-arm, the success-path revocation, the cancel-reset and the alive half of the progress
+  gate. The progress gate is a pure predicate (`lib/upload/progress.ts`) because React 19 no-ops a
+  post-unmount `setState` silently — measured as 0 `console.error`. The review's last real finding was a
+  race: a Cancel landing after the last 201 overwrote the summary with "Upload cancelled." while the
+  transport's abort was a no-op and the photo was stored. The post-loop now compares processed files to
+  the queue length — when every file was processed the summary wins — and a test pins the interleaving
+  (restoring the old check fails it).
+- 2026-10-17 — **E4-S2B (PR #119) closes E4-S2 and the sprint's scope**: `planDownscale` is the pure
+  decision (2560 px long edge or 6 MiB; JPEG/JPG/PNG eligible — WebP joined GIF/AVIF as untouched,
+  because animated WebP would lose frames and alpha WebP would flatten, and the planner cannot tell
+  them apart; JPEG q0.9, PNG preserved for alpha), `downscaleForUpload` the injectable browser edge
+  (EXIF orientation, the encoded blob's own type, the original on every failure **and on a
+  re-encode that does not shrink the file**, raced against a 10 s preparation deadline), and the
+  queue stores the prepared `File` so a retry resends that same object. It measured **885
+  hand-written** (production 370, tests 446, docs 69), **905** on the branch with the 20 record lines.
+  The author's exception argument ("the whole story at 885 is the only eligible subset") was
+  **withdrawn** after the review constructed the bytes-only cut: green at 29 files / 337 tests and
+  **798 hand-written**, with its module and unit tests alone at **585** — over the ~500 threshold, so
+  the conclusion stands on the reviewer's numbers. The review's main defect was real: the encoder was
+  sent unconditionally, so a 6.5 MB PNG became **10.2 MB (1.56×)** and a q50 JPEG **1.77×** — the
+  module now returns the original when the re-encode is not smaller. The two post-preparation guards
+  (cancel and unmount during preparation) survived mutants until the review found it; deferred-edge
+  tests now kill both. The probe measured 4000 × 3000 / 3,800,460 B → **2560 × 1920 / 853,780 B
+  (22.5 %)**, same JPEG magic, decodes; the progress total carries the sent size, and the line starts
+  indeterminate while preparation runs (capture: `reports/e4s2b-preparing-390.png`).
+- 2026-10-17 — **Sprint 3 closed.** All 12 slices delivered (28/28 points, 0 carry-over). Full
+  verification on `develop`: backend **307 tests**, frontend **344**, lint/format/typecheck/build
+  clean. Security audit `reports/security-audit-sprint03.md`: **CLEAR**, 0 blocking, 5 informational
+  notes (one new → E6-S21), 7 carried items. Retrospective `retrospectives/sprint03.md`; release
+  `develop` → `main`, tag `sprint-03`. The retro's three changes for Sprint 4: a visible-behaviour
+  claim ships with its falsifying measurement, size numbers are generated at the tip, and lifecycle
+  changes get a dev-mode probe as well as a built-bundle one.

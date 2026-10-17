@@ -60,9 +60,11 @@ export default defineConfig(({ mode }) => {
       // file (E2-S6). Processing CSS makes Vite answer the raw import with the source.
       css: true,
       // Hermetic: now that Vite reads the repository-root `.env` (`envDir` above), a machine-set
-      // `VITE_API_BASE_URL` would otherwise change test outcomes. A test that wants a configured base
-      // stubs the value itself; `vi.unstubAllEnvs` restores this empty default.
-      env: { VITE_API_BASE_URL: "" },
+      // `VITE_API_BASE_URL` or `VITE_MAX_UPLOAD_MB` would otherwise change test outcomes. Both keys are
+      // pinned here, so the suite is deterministic whatever the machine or `.env` says; a test that wants
+      // a configured value stubs it itself, and `vi.unstubAllEnvs` restores these defaults. The upload
+      // mirror is pinned to the documented 15 MB, the value the boundary tests assert.
+      env: { VITE_API_BASE_URL: "", VITE_MAX_UPLOAD_MB: "15" },
     },
   };
 });

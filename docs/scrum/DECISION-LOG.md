@@ -30,6 +30,8 @@ Statuses: `Proposed` · `Accepted` · `Superseded by ADR-NNN` · `Rejected`.
 | [ADR-018](#adr-018--the-clustering-algorithm-and-the-pipelines-open-readings) | 2026-10-16 | The clustering algorithm and the pipeline's open readings | Accepted |
 | [ADR-019](#adr-019--typography-playfair-display--inter-variable-latin-subsets-1482-kb) | 2026-10-16 | Typography: Playfair Display + Inter Variable, latin subsets, 148.2 kB | Accepted |
 | [ADR-020](#adr-020--the-theme-layer-role-mapping-in-oklch-contrast-by-construction-one-glass-fallback) | 2026-10-16 | The theme layer: role mapping in OKLCh, contrast by construction, one glass fallback | Accepted |
+| [ADR-021](#adr-021--the-splash-hero-a-photo-per-visit-read-once-and-what-the-placeholder-can-be) | 2026-10-16 | The splash hero: a photo per visit, read once, and what the placeholder can be | Accepted |
+| [ADR-022](#adr-022--route-transitions-and-the-motion-vocabulary-css-keyframes-no-animation-library) | 2026-10-17 | Route transitions and the motion vocabulary: CSS keyframes, no animation library | Accepted |
 
 ---
 
@@ -318,6 +320,20 @@ because the files would then live outside the tree the backups copy. This is enf
 boot, so an existing archive keeps starting. The upload ceiling of point 1 is also enforced twice: at the
 servlet container (`spring.servlet.multipart.max-file-size`, wired to the same `AETHER_MAX_UPLOAD_MB`) and
 in the service while streaming, so a request that under-reports its length still meets the ceiling.
+
+**Amendment — 2026-10-16 (S03-C1).** The E1-S4 amendment above describes that enforcement as "every path
+resolved with `toRealPath()` and proved to start with the data root", which is not what the write site does
+and cannot be: an upload destination does not exist yet, and `toRealPath()` on it throws
+`NoSuchFileException` (measured, S03-C1's review). What `StorageService.requireInside` actually does is
+normalise the candidate lexically, resolve the *existing* directory chain through
+`realDirectory`/`toRealPath()`, and refuse a candidate that normalises outside the root — which refuses `..`
+and an `images/` or `tmp/` directory that is itself a link resolving outside the root, and accepts a leaf
+that is itself a link. A link anywhere *else* in the candidate path is not resolved at all, so the guard
+neither follows nor refuses it. That acceptance is deliberate: `Files.move` with `ATOMIC_MOVE` replaces the
+link rather than following it (an `open`-style write such as `Files.writeString` would follow it instead),
+and a delete removes the link rather than its target. The
+invariant in `.claude/rules/security.md` is stated as the invariant for this reason; this line records what
+the code does rather than what one description of it says.
 
 ---
 
@@ -722,6 +738,191 @@ return source text (the drift guard's read); that is a test-harness setting, not
 **Evidence.** `reports/verify-e2-s6-20261016.md` — contrast numbers, both Chromium probe JSONs
 (fallback + derived), the built-CSS inspection (`@supports` branch, both `backdrop-filter` forms),
 screenshots, and the hex-literal audit.
+
+---
+
+## ADR-021 — The splash hero: a photo per visit, read once, and what the placeholder can be
+
+**Date**: 2026-10-16 · **Status**: Accepted
+
+**Context.** E3-S1 is the entry screen: one random photo, full-bleed, decoded before it is revealed, with
+the archive's own tone standing in until then. The specs fix the endpoint (`GET /photos/random`, `Photo`),
+the material (ADR-020's tokens) and the rule that a theme is applied per view (DESIGN-SYSTEM §2.3). What
+they leave open is what this screen does about four things: the cache policy of an endpoint whose whole
+point is a different answer each time, whether the photo crosses the network once or twice, what the
+placeholder can be *before* the bytes exist, and whether the pull gesture may move. The app-wide 30 s
+`staleTime` (ADR-004's client) is right for the feed and wrong here, so this is a decision about one
+query, not about the policy.
+
+**Decision.**
+
+1. **`/photos/random` is per-visit state, not cached state.** `staleTime: 0` **and** `gcTime: 0`, set on
+   this query alone (`api/photos.ts`). Measured across an unmount and a remount inside one client:
+   defaults → 1 request, the policy → 2. `staleTime` alone is not enough: a stale entry is still painted
+   first, so a returning visit would show the previous photo and swap it — the wrong photo, visibly, on
+   the one screen whose promise is a new one. Cost: dev's `StrictMode` double-mounts, so a dev visit
+   issues two requests; the built bundle was measured at exactly one per visit.
+2. **The photo is read once per visit.** `fetch` the bytes → `Blob` → object URL for the `<img>`, with the
+   palette derived from *those* bytes; `decode()` resolves before `src` is handed to the view, and the
+   URL's release is a hand-off the view calls after the swap or on unmount. The alternative was measured
+   before rejecting it: `/images/**` answers `immutable` for a year, so an `<img src>` plus a second
+   extraction fetch would be answered from the browser cache. The reason to keep one read is that a tone
+   derived from the bytes on screen cannot describe a different file, and that there is never a window
+   with two reads of the same photo in flight — not round-trip cost.
+3. **The placeholder is the photo's own tone, and its window is the decode.** Nothing can know a photo's
+   colour before its bytes exist, so the tone lands when they do (~0.3 s before `ready` in the probe) and
+   the stylesheet's neutral set covers the transfer. Two options were considered for covering the
+   transfer as well — (a) remember the last tone and start the next visit in it, (b) a stored per-photo
+   tone from the API — and both are deferred: (a) needs a persisted value and a story that owns "the
+   archive's ambient colour across visits", (b) needs a field `_docs/openapi.yml` does not have
+   (`Photo` is id, url, category, uploadedAt) and therefore a spec change *and* an ADR of its own.
+   The neutral `#0b0b0d` is the answer until one of them exists.
+4. **The pull gesture is silent, and its motion belongs to E3-S3.** Pulling down past a threshold asks for
+   another photo; nothing moves and nothing is drawn. The finger-following transform and the cross-fade
+   are motion, motion tokens and the `prefers-reduced-motion` switch are E3-S3's story, and `matchMedia`
+   does not exist in the test environment — a transform shipped there would be the one part of the gesture
+   nothing verifies. The gesture surface carries `touch-pan-x touch-pinch-zoom`: measured in Chromium with
+   a synthesised touch drag on the built bundle, the default `touch-action: auto` made the browser claim
+   the drag as a scroll and cancel the pointer stream (`pointerdown → pointermove → pointercancel`, no
+   re-roll) — a dead gesture on a phone with a green unit suite, since jsdom never claims a gesture. The
+   narrower `touch-action: none` would also work and was rejected because it takes pinch-zoom away. The
+   tap target the gesture has to coexist with — and its open intent, `aria-expanded` and `Escape` — are
+   this story's; the glass menu it opens, its overlay, focus trap and backdrop tap are **E3-S2**'s.
+5. **The browser's edges are an injected seam, and the browser's own guarantee is probed in a browser.**
+   `lib/image/hero.ts` takes `HeroEnvironment` (bytes, decode, tone); jsdom 30.1.3 has no
+   `HTMLImageElement.decode`, no image events and no canvas, so `prepareHero`'s ordering and error policy
+   run for real against three fakes. `app/App.test.tsx` holds the real environment to two tests of its
+   own: one answers the photo's bytes with a **string** body, so the failure really happens at the missing
+   `decode` — a jsdom `Blob` as a `Response` body rejects earlier, at `Response.blob()` — and one installs
+   a decoder the test controls, which is the only place in the suite where the awaited `decode()` runs.
+   "Decoded before reveal" is a browser fact and is measured there: `state=ready` with a `blob:` src and
+   `naturalWidth` 1200 at the first sampled frame.
+
+**Consequences.** The splash is the only query that ignores the app-wide cache policy; a second one that
+wants per-visit semantics should say so the same way, in `api/`, with the measurement beside it. The
+`gcTime: 0` means a visit always starts from an empty cache — a spinner-free screen that is *never* instant
+on a return, which is the intended trade. `--aura-bg` is invisible whenever a photo covers the viewport, so
+the tone's visible lifetime is the loading window only; a future story that wants ambient colour behind a
+partly-visible photo (the River, E4+) inherits that finding. The injected seam means the pipeline's ordering
+is testable without a decoder, while the one guarantee jsdom cannot make — that the pixels really are
+decoded before the reveal — is only ever claimed from a browser probe; the gesture's `touch-action` is the
+second such fact, pinned in jsdom as a class and proven as an effect only in Chromium. The gesture gets no
+visual feedback until E3-S3: a user who pulls and sees nothing move has only the new photo as confirmation.
+The forward references this story leaves open are named in the view's own doc comment: the glass overlay,
+focus trap and backdrop tap are **E3-S2**, the quiet states' words are **E3-S4**, motion is **E3-S3**.
+
+**Evidence.** `reports/e3s1-splash-390.png` (the built bundle, 390×844); `reports/verify-e3-s1a-20261016.md`
+(the slice that landed the photo) and `reports/verify-e3-s1b-20261016.md` (the slice that landed the intent
+and the gesture); `frontend/README.md`, "The splash hero — measured (E3-S1)" (the freshness counts, the
+cache headers behind the single read, the held-request timeline, the `touch-action` trace, the production
+resource list) and its "Test environment" table (the jsdom probes, including what a `Response` body does
+and how the missing `decode` is installed by hand).
+
+---
+
+## ADR-022 — Route transitions and the motion vocabulary: CSS keyframes, no animation library
+
+**Date**: 2026-10-17 · **Status**: Accepted
+
+**Context.** E3-S3 is the motion story: a token set, route transitions with fade + subtle vertical
+movement, interruptibility, reduced motion. **This ADR is a spec divergence, not merely a stack
+preference.** `_docs/aether_archive_specs.md` names Framer Motion three times — line 11 (the mandated
+frontend stack, "for fluid, tactile animations **and route transitions**"), line 30 (the menu's animation,
+"(Framer Motion)"), and line 95 ("Polish Framer Motion transitions between all routes", which is this
+story's criterion 2). `CLAUDE.md` §1 says a spec change requires an ADR *plus explicit user approval*, so
+this record carries both: **the owner approved the divergence on 2026-10-17**, on the measurements below,
+with the intent of the spec lines — fluid, tactile animations and route transitions — met by the CSS layer
+rather than by the library named for it. The earlier reading of this as a stale `CLAUDE.md` line was
+wrong, and a review found it. `CLAUDE.md` §2 is amended to match, so the two documents agree.
+Three further options are open and each needs a measurement rather than a preference: the library's real
+cost on a mobile-first bundle, the **View Transitions API** that React Router 8.4.0 already drives
+(`viewTransition` on a router update, `useViewTransitionState` for the styles), and where the
+reduced-motion switch lives, given that E2-S3's global freeze rule kills every animation and that
+`matchMedia` does not exist in the test environment (measured: jsdom 30.1.3 has no `matchMedia`, no
+`getAnimations` and no `startViewTransition`). What the story may not choose freely is the vocabulary:
+DESIGN-SYSTEM §5 is the source, so the work is to make the code say what §5 says rather than to invent a
+second language beside it.
+
+**Decision.**
+
+1. **No animation library. The transition is CSS, and the measurement is why.** Four variants of the same
+   App shell, built in one tree (`motion` 14.3.0, `npm run build`, the shared chunk every route loads):
+   no library **286.20 kB / 90.22 kB gzip**; `<motion.div>` keyed on the path **417.98 / 133.31**
+   (+131.78 raw, +43.09 gzip); the same inside `<AnimatePresence>` **422.13 / 134.91** (+135.93, +44.69);
+   `m` inside `<LazyMotion features={domAnimation}>` **370.12 / 119.44** (+83.92, +29.22) — the smallest
+   tree-shaken form still costs a third of the shared chunk. The hand-written layer is the difference
+   between two builds run the same day: **286.69 / 90.37** on this branch against that 286.20 baseline,
+   i.e. **+0.49 kB raw / +0.15 kB gzip** (stylesheet: 17.10 / 4.52 → 18.08 / 4.65, net of the
+   `motion-safe:` utilities it replaced). The library's headline capability also points the wrong way
+   here: `AnimatePresence` exists to keep the **outgoing** view mounted and animate it out, which is
+   precisely the two-full-height-views state the acceptance criterion forbids.
+2. **The mechanism is an entry animation on a keyed wrapper.** `app/RouteTransition.tsx` renders one div
+   keyed on the view's identity; React replaces the view and the keyframe replays on the new element,
+   because a CSS animation runs when its element first exists. Nothing animates out. The key is
+   `viewIdentity(pathname)` (`lib/motion/route.ts`, pure, unit-tested): a trailing slash and a query
+   string are not a new view — a naive `key={pathname}` would remount and re-animate on both.
+3. **`Suspense` stays outside the wrapper**, so the entry animates the real view rather than the
+   fallback. Measured over a cold navigation into a lazy chunk: the fallback never paints —
+   `[role=status]` count **0** in all 74 sampled frames — because React Router's `startTransition` keeps
+   the outgoing view on screen until the chunk resolves.
+4. **`prefers-reduced-motion: reduce` collapses the distance, not the fade.** The criterion says
+   opacity-only, so the entry has to survive; the global freeze rule (§11, E2-S3) would have made it
+   instant instead. The distance is now a custom property (`--motion-distance-enter: 0px` inside the
+   media query) and the freeze rule gains one named exception: `*:not(.motion-enter)`. Measured under
+   emulation, both readings: under `reduce` the entry still runs with **37 distinct opacity values**
+   while every computed transform is `matrix(1,0,0,1,0,0)` or `none` and `maxScrollHeight` **844 =
+   clientHeight**; under `no-preference` the offsets run 16 px → 0 and the scrollable overflow reaches
+   860 = 844 + 16. The menu's entry inherits the same switch — its sheet's `top` is a single value (642)
+   throughout under `reduce`.
+5. **No fill mode, and `transform: none` at the end — the rule is the containing block, not tidiness.**
+   `fill-mode: both` would leave `translateY(0)` behind, and a non-`none` transform makes the element the
+   containing block for its `position: fixed` descendants. The glass menu is one (measured:
+   `wrapper.contains(sheet) === true`): opened while an entry runs, its veil is positioned against the
+   wrapper (`y 3, bottom 847` in an 844 px viewport) and the sheet's own 16 px drift adds to the
+   wrapper's current offset (settled `top` 642 against 658 during the run). Both are bounded by the
+   entry's length and by the drift distance and vanish when it ends. A portal would remove the coupling
+   entirely; that is a finding for **E3-S4** (whose glass notice is the next thing that renders over the
+   menu), not a silent change to E3-S2's structure.
+6. **View Transitions are recorded as the future, on the same tokens.** The API is real here —
+   `document.startViewTransition` is a function in the probe's Chromium 152 — and React Router 8.4.0
+   wraps its updates in it (`dist/development/lib/components.js`: `typeof
+   router.window.document.startViewTransition === "function"`, with a `warnOnce` and *no* transition when
+   the API is missing). It is not used now, for three measured reasons: it animates *both* snapshots
+   (the double-view question again); it does **not** respect reduced motion on its own — under
+   `prefers-reduced-motion: reduce` the probe still counted **5 UA pseudo-element animations at 250 ms
+   each**, identical to `no-preference`, so the author must cancel `::view-transition-*` by hand; and
+   its default 250 ms is not one of §5's durations. A later story may adopt it *on top of* the same
+   `--motion-*` values; it would not replace them.
+7. **The vocabulary is data, and a test holds the data to the CSS.** `lib/motion/tokens.ts` exports the
+   durations, the curve, the distance and three literal class strings — Tailwind scans that file as text,
+   so a class built from a template literal would compile to nothing. `global.css` declares the
+   `--motion-*` properties once. A drift-guard test reads `global.css?raw` and fails on an undeclared
+   `var(--motion-*)`, an `animate-[…]` naming no keyframe, or a keyframe that stopped matching §5. That
+   guard exists because of the failure a green unit suite cannot see: a misspelt `var()` inside
+   `animate-[…]` makes the whole declaration invalid at computed-value time — an animation that silently
+   never runs.
+
+**Consequences.** `CLAUDE.md` §2 no longer lists Framer Motion as installed: the line now carries this ADR
+and its number, because a mandate and a lockfile that disagree is how a stack list stops being read. The
+divergence from `_docs/aether_archive_specs.md` is recorded above with the owner's approval, and **the
+trigger for revisiting it is explicit rather than a matter of taste**: a story that needs **exit
+animations, shared-layout transitions, springs or gesture-driven orchestration** brings the dependency in
+with that story's own measurements. Nothing in Sprints 3–6 as planned does — E4's drag-and-drop is
+`@dnd-kit` and does not need it — so the revisit point is the polish pass (E6-S9) unless a story arrives
+with the need first. The motion
+layer is one tokens file, one keyframe pair and one media query, so a second entry pattern must be a
+token and not a literal: the three class strings are the only place a duration or a curve is written
+outside `global.css`, and both consumers (`app/RouteTransition.tsx`, `features/menu/GlassMenu.tsx`) read
+them. Interruptibility is "restart from the `from` frame", not "resume from the current value": measured
+with a second navigation 90 ms into a run, the first entry was at opacity 0.523 / 7.63 px when it was
+replaced, and the new one ran 0 → 1 while exactly one `<main>` stayed in the DOM. Scroll restoration
+between two scrollable views is still nobody's: leaving a scrolled page lands at 0 because the new view
+is shorter, not because anything reset it — the River (E5-S1) owns that.
+
+**Evidence.** `reports/e3s3-transition-strip-390.png` (six frames of one transition, each labelled with
+the opacity and offset measured at that instant) and `reports/e3s3-transition-mid-390.png`;
+`reports/verify-e3-s3-20261017.md` (every probe, its command and its raw output);
+`docs/engineering/DESIGN-SYSTEM.md` §5 and §14.
 
 ---
 
