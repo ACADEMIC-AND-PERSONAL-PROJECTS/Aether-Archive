@@ -5,6 +5,7 @@ import { ApiError } from "../../api/client";
 import { useUploadPhoto } from "../../api/photos";
 import { GlassPanel } from "../../components/GlassPanel";
 import { ENTER_FADE_BASE, LOADING_PULSE } from "../../lib/motion/tokens";
+import { moveItem } from "../../lib/ordering/move";
 import { downscaleForUpload } from "../../lib/upload/downscale";
 import { isCurrentProgress } from "../../lib/upload/progress";
 import {
@@ -80,6 +81,16 @@ import type { UploadProgress } from "../../api/uploadPhoto";
  * already reached `StorageService.store`. The screen says only that the upload was cancelled, never that
  * the archive stored nothing. Retrying a file that landed before the abort may add a second copy; a
  * server-side idempotency key is a later story, not a client fix.
+ *
+ * ## The order
+ *
+ * `items` is the display order (E4-S3): dragging a tile calls `moveItem` from `lib/ordering/move.ts`,
+ * which returns a new array — or the same one for a no-op — and nothing else. The slot is the index,
+ * so the publish payload this screen will one day build is `items.map(item => item.id)`, with
+ * `displayOrder` 0–5 being that index. Reordering is refused while a batch is uploading: the queue
+ * captured the array when it started, and moving a tile mid-batch would leave the grid disagreeing
+ * with the requests already on the wire. The grid's own header carries the sensors, the keyboard path
+ * and the announcement rules.
  *
  * ## The files never outlive the screen
  *
@@ -230,6 +241,21 @@ export function WorkshopView() {
     }
     // Every refusal is named and every overflow is counted; an empty plan clears the previous sentence.
     setNotice(selectionNotices(plan).join(" "));
+  };
+
+  /**
+   * A drag's outcome, as one array move. The reducer returns the input array for a no-op, so a drag
+   * that ends where it began does not re-render the grid. The guard repeats the grid's `busy`
+   * decision: the queue holds a snapshot of the order, and a move mid-batch must not change it.
+   */
+  const moveSelection = (from: number, to: number): void => {
+    if (uploading) {
+      return;
+    }
+    setItems((previous) => {
+      const moved = moveItem(previous, from, to);
+      return moved === previous ? previous : [...moved];
+    });
   };
 
   const removeItem = (id: string): void => {
@@ -448,6 +474,7 @@ export function WorkshopView() {
               <SelectionGrid
                 items={items}
                 busy={uploading}
+                onMove={moveSelection}
                 onRemove={removeItem}
                 onPreviewError={markPreviewBroken}
               />
@@ -522,8 +549,10 @@ export function WorkshopView() {
 
       {/* The persistent live region, a sibling of `<main>` for the reason E3-S5B measured: a region
           inserted together with its text is not reliably announced. The visible sentences are ordinary
-          paragraphs and a test pins the words equal. */}
-      <p role="status" className="sr-only">
+          paragraphs and a test pins the words equal. Since E4-S3 the sortable grid mounts a second,
+          dnd-kit-owned `role="status"` region for move announcements, so the workshop's own region
+          carries a test id — the two speak for different things and must not be confused. */}
+      <p role="status" data-testid="workshop-status" className="sr-only">
         {announcement}
       </p>
     </>
