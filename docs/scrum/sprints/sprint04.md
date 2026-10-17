@@ -13,7 +13,7 @@
 
 | # | ID | Story | Points | Priority | Status | PR |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | E6-S1 | CI on every PR — backend and frontend jobs, cached, under 8 minutes | 5 | p0 | Todo | — |
+| 1 | E6-S1 | CI on every PR — backend and frontend jobs, cached, under 8 minutes | 5 | p0 | In review | #123 |
 | 2 | E4-S3 | Drag-and-drop ordering — `@dnd-kit`, a pure reducer, the keyboard path | 8 | p0 | Todo | — |
 | 3 | E4-S4 | Aura colour picker — hex input, palette swatches, live glass preview | 5 | p0 | Todo | — |
 | 4 | E4-S5 | Publish dump — `POST /dumps`, optimistic insert, rollback | 5 | p0 | Todo | — |
@@ -78,3 +78,9 @@
 - 2026-10-17 — Sprint opened the day Sprint 3 was released (`sprint-03`, `bb2d4c0`). Capacity at the
   floor (25) with the CI stories first; the Sprint 3 retro's preview is superseded and the reason is
   recorded above.
+- 2026-10-17 — **E6-S1 (PR #123): the first CI run is green.** Run
+  [39032047180](https://github.com/ACADEMIC-AND-PERSONAL-PROJECTS/Aether-Archive/actions/runs/39032047180):
+  **50 s wall**, both
+  jobs on the same runner minute — frontend 42 s (install 4 s, lint 4, format 2, typecheck 3, test 13,
+  build 3), backend 47 s (`./mvnw -B verify`, the step itself 38 s). Well inside the 8-minute budget on
+  a cold cache. The failure path (artefacts) is exercised by E6-S2's deliberately failing scratch PR.
