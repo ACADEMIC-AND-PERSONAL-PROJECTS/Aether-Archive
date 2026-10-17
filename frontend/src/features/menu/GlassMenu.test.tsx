@@ -7,6 +7,7 @@ import { GlassMenu } from "./GlassMenu";
 import { compositeOver, contrastRatio, hexToRgb, parseColor } from "../../lib/color/contrast";
 import { oklchToHex } from "../../lib/color/oklch";
 import { paletteToTheme } from "../../lib/color/theme";
+import { ENTER_DRIFT_BASE, ENTER_FADE_BASE } from "../../lib/motion/tokens";
 
 /**
  * The app's only dialog, asserted where the user can observe it.
@@ -266,20 +267,26 @@ describe("GlassMenu — the material over a photo (the scrim rule)", () => {
 });
 
 describe("GlassMenu — motion (criterion 1)", () => {
-  it("should declare its entry as motion-safe with the criterion's timing", () => {
+  it("should take its entry from the motion vocabulary, not from timings of its own", () => {
     /*
-     * The declaration half. `motion-safe:` compiles to `@media (prefers-reduced-motion: no-preference)`,
-     * so under `reduce` the animation is never applied and the menu is simply on screen — the §5 rule,
-     * and the reason no `matchMedia` is needed (absent in this environment, measured in E2-S1). The
-     * *effect* — animation-name present under `no-preference`, absent under `reduce` — needs a browser
-     * and is measured over CDP by emulating the media feature; this test cannot make that claim.
+     * The declaration half. Since E3-S3 the menu names §5's patterns (`lib/motion/tokens.ts`) instead of
+     * spelling a duration out: the veil fades in place, the sheet fades *and* drifts on `duration-base`.
+     * The classes every surface shares are pinned here so a second, hand-written timing cannot appear on
+     * this component without failing a test.
+     *
+     * Reduced motion is no longer "the animation is never applied" — it is the vocabulary's one rule:
+     * the drift collapses to zero and the fade stays (`global.css` block 5, `lib/motion/tokens.test.ts`).
+     * The *effect* — a still `top` at 642 px across the frames under `reduce`, an unanimated surface
+     * above it otherwise — still needs a browser, and is measured over CDP by emulating the media
+     * feature; this test cannot make that claim.
      */
     renderMenu();
     const panel = screen.getByRole("dialog", { name: "Menu" });
 
-    expect(screen.getByTestId("menu-veil").className).toContain(
-      "motion-safe:animate-[aether-veil-in_320ms_",
-    );
-    expect(panel.className).toContain("motion-safe:animate-[aether-sheet-in_320ms_");
+    expect(screen.getByTestId("menu-veil").className).toContain(ENTER_FADE_BASE);
+    expect(panel.className).toContain(ENTER_DRIFT_BASE);
+    // The two patterns are different on purpose: a full-height veil that drifted would uncover an edge.
+    expect(ENTER_FADE_BASE).not.toContain("aether-enter");
+    expect(screen.getByTestId("menu-veil").className).not.toContain("translate");
   });
 });
