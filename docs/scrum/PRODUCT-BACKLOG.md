@@ -407,7 +407,7 @@ opens on tap, feels tactile, and gets out of the way.
 | E4-S2A1 | The selection grid surface (criterion 3) | p0 | 1 | 3 | Done |
 | E4-S2A2 | Multi-select (≤ 6) and the sequential queue (criteria 1, 4) | p0 | 2 | 3 | Done |
 | E4-S2B | Client-side downscale before upload (criterion 2) | p0 | 2 | 3 | Done |
-| E4-S3A | The order reducer (criterion 2) | p0 | 1 | 4 | In review |
+| E4-S3A | The order reducer (criterion 2, reducer half) | p0 | 1 | 4 | In review |
 | E4-S3B | The gesture core: mouse/touch sensors, sortable grid, overlay (criterion 1) | p0 | 4 | 4 | Todo |
 | E4-S3C | Keyboard, announcements, auto-scroll and motion (criteria 3, 4) | p0 | 3 | 4 | Todo |
 | E4-S4 | Aura colour picker with palette suggestions | p0 | 5 | 4 | Todo |

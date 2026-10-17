@@ -1110,7 +1110,10 @@ the slot a photo occupies is its index, so the future publish payload is `ordere
   truncate a slot), returns the **same reference** when a move changes nothing, and follows
   `arrayMove`'s contract: the destination is the index in the resulting array.
 - `orderedIds(items)` is the payload projection — ids in display order. It has no production caller
-  until E4-S5 publishes; the tests pin the contract the endpoint will consume.
+  until E4-S5 publishes; the tests pin the contract the endpoint will consume. **The ids must be the
+  server's photo UUIDs**: today `SelectionItem.id` is client-local (`selection-N`) and a successful
+  upload removes the tile, so E4-S5 must keep the returned `Photo.id` on the item (or map selection
+  id → photo UUID) before `orderedIds` can produce a valid `DumpCreate.photoIds`.
 
 11 unit tests state every move direction, both clamps, the no-op identity and the ordered-ids
 projection. The drag, touch and keyboard surfaces that write through this reducer are E4-S3B/C.

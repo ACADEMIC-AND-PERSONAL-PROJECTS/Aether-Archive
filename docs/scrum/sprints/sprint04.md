@@ -99,5 +99,6 @@ The order is deliberate:
   found a real defect the author's runs missed: **the shuffled suite is flaky** — 3/5 shuffled full
   runs failed at the tip against 4/4 at the base — because dnd-kit removes its capture-phase document
   listener on a 50 ms timer, so an activated drag that ends without a drop leaks into the next test.
-  Every activated drag in the re-cut ends with a drop/Escape and awaits the listener release; the
-  shuffled suite is run repeatedly, not once. #124 was closed unmerged.
+  **The fix belongs to S3B/C, where the drag code and its tests land**: every activated drag will end
+  with a drop/Escape and await the listener release, and the shuffled suite will be run repeatedly,
+  not once. #124 was closed unmerged.
