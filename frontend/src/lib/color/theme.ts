@@ -277,26 +277,21 @@ export function paletteToTheme(palette: Palette): AuraTheme {
  * A theme from a **chosen** background (E4-S4). Unlike `paletteToTheme`, the page keeps the user's
  * hex exactly; every other token is derived to clear §2.2's floor.
  *
- * Text starts from the nearer neutral base and steps toward its extreme until it passes on the page,
- * the surface and the glass composite. The surface steps **away from the text** (darker under light
- * text, lighter under dark text), so it cannot eat the contrast the page just earned. A background in
- * the narrow mid-tone band where neither near-white nor near-black passes is refused rather than
- * silently darkened: the user picked that colour, and a preview that is not the colour they picked
- * would be lying.
+ * **Both text directions are tried.** From each neutral base the text steps toward its extreme until
+ * it passes on the page, the surface and the glass composite; the direction with the stronger weakest
+ * pair wins. The surface steps **away from the text** (darker under light text, lighter under dark
+ * text) and flips at the cube's edge rather than collapsing into the page or into pure black/white.
+ * The search never returns pure black or pure white text. Pure black and pure white pages are refused
+ * by policy — the brief's bases stop at `#0B0B0D`/`#121215` — and every other page is accepted in at
+ * least one direction (measured on a 16³ cube).
  *
  * The accent is the background's own hue at a usable chroma (the neutral fallback accent when the
  * background has no hue), fitted against the two neutral bases by `fitAccent`.
  *
  * **The glass follows the text.** The app's glass is a black tint, which on a light page would be
- * darker than any text that passes on that page. Each text direction therefore carries its own tint:
- * black under light text, white under dark text (with a dark hairline), so the glass composite stays
- * on the same side of the background as the text it must carry.
- *
- * **Both directions are tried.** The nearer neutral base is only a preference: a colour the first
- * direction cannot carry (the reviewer's `#cc3399` needs white text; `#0066ff` needs white too) is
- * retried with the other base and the other tint before it is refused. Pure black and pure white pages
- * are refused by policy — the brief's bases stop at `#0B0B0D`/`#E8E6E3` — and the search never returns
- * pure black or pure white text.
+ * darker than any text that passes on that page. Each direction therefore carries its own tint: black
+ * under light text, white under dark text (with a dark hairline), so the glass composite stays on the
+ * same side of the background as the text it must carry.
  */
 export function themeFromBackground(value: string): AuraTheme {
   const hex = normalizeHex(value);
@@ -312,8 +307,8 @@ export function themeFromBackground(value: string): AuraTheme {
   const bgOklch = rgbToOklch(bgRgb.r, bgRgb.g, bgRgb.b);
   const lightBaseContrast = contrastRatio(hexToRgb(LIGHT_BASE), bgRgb);
   const darkBaseContrast = contrastRatio(hexToRgb(DARK_BASE), bgRgb);
-  const light = textCandidate(bgRgb, bgOklch, true);
-  const dark = textCandidate(bgRgb, bgOklch, false);
+  const light = textCandidate(hex, bgRgb, bgOklch, true);
+  const dark = textCandidate(hex, bgRgb, bgOklch, false);
   const preferredLight = lightBaseContrast >= darkBaseContrast;
   let chosen = light ?? dark;
   if (light !== null && dark !== null) {
@@ -380,16 +375,29 @@ interface TextCandidate {
 
 /**
  * Searches one text direction for the first non-pure candidate that clears all three pairs: the
- * surface steps away from the text, the text starts at the neutral base and steps toward its extreme.
+ * surface steps away from the text (flipping at the cube's edge so it never collapses into the page
+ * or into pure black/white), and the text starts at the neutral base and steps toward its extreme.
  * `null` means this direction cannot carry the page at 4.5:1.
  */
-function textCandidate(bgRgb: Rgb, bgOklch: Oklch, lightText: boolean): TextCandidate | null {
+function textCandidate(
+  bgHex: string,
+  bgRgb: Rgb,
+  bgOklch: Oklch,
+  lightText: boolean,
+): TextCandidate | null {
   const glassTint: Rgb = lightText ? GLASS_TINT : WHITE_TINT;
-  const surface = oklchToHex({
-    l: clamp(bgOklch.l + (lightText ? -SURFACE_STEP : SURFACE_STEP), 0, 1),
-    c: Math.min(bgOklch.c, SURFACE_C_MAX),
-    h: bgOklch.h,
-  });
+  const surfaceAt = (l: number): string =>
+    oklchToHex({
+      l: clamp(l, 0, 1),
+      c: Math.min(bgOklch.c, SURFACE_C_MAX),
+      h: bgOklch.h,
+    });
+  const away = clamp(bgOklch.l + (lightText ? -SURFACE_STEP : SURFACE_STEP), 0, 1);
+  let surface = surfaceAt(away);
+  // At the cube's edge the away-step clamps; flip instead of collapsing into the page or into pure.
+  if (surface === bgHex || surface === "#000000" || surface === "#ffffff") {
+    surface = surfaceAt(clamp(bgOklch.l + (lightText ? SURFACE_STEP : -SURFACE_STEP), 0, 1));
+  }
   const surfaceRgb = hexToRgb(surface);
   const glassOverBg = compositeOver(glassTint, GLASS_ALPHA, bgRgb);
   const ratios = (candidate: string): number[] => {

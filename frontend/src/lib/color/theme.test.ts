@@ -201,9 +201,23 @@ describe("themeFromBackground", () => {
   it("should refuse pure black and pure white pages by policy", () => {
     expect(() => themeFromBackground("#000000")).toThrow("Pure black and pure white");
     expect(() => themeFromBackground("#ffffff")).toThrow("Pure black and pure white");
-    // The near endpoints are accepted.
-    expect(themeFromBackground("#010101").bg).toBe("#010101");
-    expect(themeFromBackground("#fefefe").bg).toBe("#fefefe");
+  });
+
+  it("should accept the near endpoints with non-pure text and surface", () => {
+    // The away-step flips at the cube's edge (ADR-023): #010101's surface would be pure black and
+    // #fefefe's pure white, so each steps toward the page instead. Every pair still clears 4.5:1.
+    for (const hex of ["#010101", "#fefefe"]) {
+      const theme = themeFromBackground(hex);
+      expect(theme.bg).toBe(hex);
+      expect(theme.text).not.toBe("#000000");
+      expect(theme.text).not.toBe("#ffffff");
+      expect(theme.surface).not.toBe(theme.bg);
+      expect(theme.surface).not.toBe("#000000");
+      expect(theme.surface).not.toBe("#ffffff");
+      for (const ratio of Object.values(contrastReport(theme))) {
+        expect(ratio).toBeGreaterThanOrEqual(CONTRAST_MINIMUM);
+      }
+    }
   });
 
   it("should accept every other sampled colour with every §2.2 pair and non-pure text", () => {
@@ -227,10 +241,11 @@ describe("themeFromBackground", () => {
           // The brief forbids pure black/white text; the search must never return it.
           expect(theme.text).not.toBe("#000000");
           expect(theme.text).not.toBe("#ffffff");
-          // The surface must step away from the page, never collapse into it.
+          // The surface must step away from the page, never collapse into it or into pure black/white.
+          // (At the cube's edge the away-step flips; the direction is asserted on mid-tone pages below.)
           expect(theme.surface).not.toBe(theme.bg);
-          const surfaceDirection = lightness(theme.surface) - lightness(theme.bg);
-          expect(Math.sign(surfaceDirection)).toBe(theme.glass.startsWith("rgba(255") ? 1 : -1);
+          expect(theme.surface).not.toBe("#000000");
+          expect(theme.surface).not.toBe("#ffffff");
           for (const ratio of Object.values(contrastReport(theme))) {
             expect(ratio).toBeGreaterThanOrEqual(CONTRAST_MINIMUM);
           }
