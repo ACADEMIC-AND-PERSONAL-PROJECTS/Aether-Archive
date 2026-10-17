@@ -1163,7 +1163,8 @@ listeners on a **50 ms timer** after a drag detaches — they exist to swallow t
 drag. A test that activated a drag and returned before that timer fired left the listener on the shared
 jsdom document, where it swallowed the next test's first click. Every activated drag in this suite now
 ends with a drop or a cancel and then awaits `settleDragListeners()` (60 ms) before returning; the
-shuffled suite was run **five times**, green each time.
+shuffled suite was run **six times**, green each time (producing command: `npm run test -- --run
+--sequence.shuffle`, repeated).
 
 **Three packages, justified.** `@dnd-kit/core` (sensors, context, overlay), `@dnd-kit/sortable`
 (the sortable context and rect strategy) and `@dnd-kit/utilities` (the transform serialiser

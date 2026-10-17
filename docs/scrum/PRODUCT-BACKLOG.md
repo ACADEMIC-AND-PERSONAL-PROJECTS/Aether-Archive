@@ -462,6 +462,13 @@ opens on tap, feels tactile, and gets out of the way.
 > budget**, so the claim was withdrawn. The same review found the shuffled suite flaky (a leaked dnd-kit
 > document listener between tests), fixed in the re-cut. **S3A** ships the reducer, **S3B** the gesture
 > core (its own measured exception), **S3C** keyboard/announcements/auto-scroll/motion. Points unchanged.
+>
+> **Carried into S3C from S3B's review:** the sort settle (and any drop transition) must respect
+> `prefers-reduced-motion` — `global.css` freezes `animation-duration` only, not `transition-duration`;
+> the overlay's status line needs a scrim or to move inside the lifted surface; `onDragCancel` needs a
+> unit test; dnd-kit's default live region speaks internal ids and must be replaced by the custom
+> announcements/instructions; and a test should pin that a reorder before a batch sends the files in
+> the displayed order (S3C or E4-S5).
 
 - [ ] **(B)** `@dnd-kit` grid: long-press (touch) / drag (mouse) reorder with visual lift, no scroll conflict.
 - [ ] **(A)** Order is a pure reducer in `lib/` (unit-tested) driving `displayOrder` 0–5 in the payload.
