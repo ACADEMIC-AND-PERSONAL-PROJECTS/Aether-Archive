@@ -404,7 +404,7 @@ opens on tap, feels tactile, and gets out of the way.
 | --- | --- | --- | --- | --- | --- |
 | E4-S1A | Single photo upload — the picker and the validation (criterion 1) | p0 | 2 | 3 | Done |
 | E4-S1B | Single photo upload — send, progress, cancel, retry, invalidation (criteria 2–4) | p0 | 3 | 3 | In review |
-| E4-S2A1 | The selection grid surface (criterion 3) | p0 | 1 | 3 | In progress |
+| E4-S2A1 | The selection grid surface (criterion 3) | p0 | 1 | 3 | In review |
 | E4-S2A2 | Multi-select (≤ 6) and the sequential queue (criteria 1, 4) | p0 | 2 | 3 | Todo |
 | E4-S2B | Client-side downscale before upload (criterion 2) | p0 | 2 | 3 | Todo |
 | E4-S3 | Drag-and-drop ordering | p0 | 8 | 4 | Todo |

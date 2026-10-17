@@ -30,7 +30,7 @@
 | 5b | E3-S5B | Accessibility — contrast, `inert`, the announcement fix, the manual pass (criteria 3–5) | 2 | p0 | Done | #111 |
 | 6a | E4-S1A | Single photo upload — the picker and the validation (criterion 1) | 2 | p0 | Done | #114 |
 | 6b | E4-S1B | Single photo upload — send with progress and cancel, then retry and invalidation (criteria 2–4) | 3 | p0 | In review | #115 |
-| 7a | E4-S2A1 | The selection grid surface — one tile, its state and its remove action (criterion 3) | 1 | p0 | In progress | — |
+| 7a | E4-S2A1 | The selection grid surface — one tile, its state and its remove action (criterion 3) | 1 | p0 | In review | #117 |
 | 7b | E4-S2A2 | Multi-select (≤ 6) and the sequential queue (criteria 1, 4) | 2 | p0 | Todo | — |
 | 7c | E4-S2B | Client-side downscale before upload (criterion 2) | 2 | p0 | Todo | — |
 
