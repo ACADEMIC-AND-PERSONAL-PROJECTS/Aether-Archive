@@ -13,8 +13,8 @@
 
 | # | ID | Story | Points | Priority | Status | PR |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | E6-S1 | CI on every PR — backend and frontend jobs, cached, under 8 minutes | 5 | p0 | In review | #123 |
-| 2 | E4-S3 | Drag-and-drop ordering — `@dnd-kit`, a pure reducer, the keyboard path | 8 | p0 | Todo | — |
+| 1 | E6-S1 | CI on every PR — backend and frontend jobs, cached, under 8 minutes | 5 | p0 | Done | #123 |
+| 2 | E4-S3 | Drag-and-drop ordering — `@dnd-kit`, a pure reducer, the keyboard path | 8 | p0 | In progress | — |
 | 3 | E4-S4 | Aura colour picker — hex input, palette swatches, live glass preview | 5 | p0 | Todo | — |
 | 4 | E4-S5 | Publish dump — `POST /dumps`, optimistic insert, rollback | 5 | p0 | Todo | — |
 | 5 | E6-S2 | Required status checks on `main` and `develop` | 2 | p0 | Todo | — |
@@ -84,3 +84,6 @@
   jobs on the same runner minute — frontend 42 s (install 4 s, lint 4, format 2, typecheck 3, test 13,
   build 3), backend 47 s (`./mvnw -B verify`, the step itself 38 s). Well inside the 8-minute budget on
   a cold cache. The failure path (artefacts) is exercised by E6-S2's deliberately failing scratch PR.
+  PR #123 merged as `648ea16`; the merge exercised the **push trigger on `develop`**: run
+  [39032754120](https://github.com/ACADEMIC-AND-PERSONAL-PROJECTS/Aether-Archive/actions/runs/39032754120)
+  green in **61 s**. A PR into `main` will exercise the third trigger at the next release.

@@ -545,7 +545,7 @@ delivery, documentation, and a clean v1.0.
 
 | ID | Story | P | Pts | Sprint | Status |
 | --- | --- | --- | --- | --- | --- |
-| E6-S1 | CI — backend + frontend on every PR | p0 | 5 | 4 | In review |
+| E6-S1 | CI — backend + frontend on every PR | p0 | 5 | 4 | Done |
 | E6-S2 | Required status checks on `main`/`develop` | p0 | 2 | 4 | Todo |
 | E6-S3 | Accessibility audit (WCAG 2.2 AA) | p1 | 3 | 5 | Todo |
 | E6-S4 | Real-device verification pass (LAN) | p0 | 3 | 5 | Todo |
