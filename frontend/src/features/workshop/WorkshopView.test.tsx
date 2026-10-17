@@ -590,6 +590,27 @@ describe("the queue", () => {
     expect(screen.getByRole("button", { name: "Upload" })).toBeVisible();
   });
 
+  it("should keep the batch summary when a cancel lands after the last response", async () => {
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [fileOf(16, "image/png", "a.png")]);
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+    const request = await requestAt(0);
+
+    // The review's measured interleaving: the 201 arrives and Cancel is clicked before the mutation's
+    // continuation renders. The abort is then a no-op and the photo IS stored — so the screen must not
+    // say "Upload cancelled." over a summary whose photo the archive already has.
+    act(() => {
+      request.respond(201, UPLOADED);
+      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("workshop-notice")).toHaveTextContent("Added 1 photo."),
+    );
+    expect(screen.getByTestId("workshop-notice")).not.toHaveTextContent("Upload cancelled.");
+    expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle");
+  });
+
   it("should reset the cancellation flag and upload again after a cancelled batch", async () => {
     renderWorkshop();
     const firstFile = fileOf(16, "image/png", "a.png");
