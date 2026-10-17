@@ -378,12 +378,20 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   the queue length — when every file was processed the summary wins — and a test pins the interleaving
   (restoring the old check fails it).
 - 2026-10-17 — **E4-S2B (PR #119) closes E4-S2 and the sprint's scope**: `planDownscale` is the pure
-  decision (2560 px long edge or 6 MiB; JPEG/JPG/PNG/WebP eligible, GIF/AVIF untouched; JPEG q0.9,
-  PNG preserved for alpha), `downscaleForUpload` the injectable browser edge (EXIF orientation, the
-  encoded blob's own type, the original on every failure), and the queue stores the prepared `File`
-  so a retry resends that same object. It measured **885 hand-written** (production 370, tests 446,
-  docs 69). The exception is the story's **irreducible half**: the executor and its tests alone are
-  **672**, over the ~500 threshold, and without them nothing downscales; the integration half (213)
-  cannot exist without the module. The probe measured 4000 × 3000 / 3,800,460 B → **2560 × 1920 /
-  853,780 B (22.5 %)**, same JPEG magic, decodes; the progress total carries the sent size, and the
-  line starts indeterminate while preparation runs because the sent size is not yet known.
+  decision (2560 px long edge or 6 MiB; JPEG/JPG/PNG eligible — WebP joined GIF/AVIF as untouched,
+  because animated WebP would lose frames and alpha WebP would flatten, and the planner cannot tell
+  them apart; JPEG q0.9, PNG preserved for alpha), `downscaleForUpload` the injectable browser edge
+  (EXIF orientation, the encoded blob's own type, the original on every failure **and on a
+  re-encode that does not shrink the file**, raced against a 10 s preparation deadline), and the
+  queue stores the prepared `File` so a retry resends that same object. It measured **885
+  hand-written** (production 370, tests 446, docs 69), **905** on the branch with the 20 record lines.
+  The author's exception argument ("the whole story at 885 is the only eligible subset") was
+  **withdrawn** after the review constructed the bytes-only cut: green at 29 files / 337 tests and
+  **798 hand-written**, with its module and unit tests alone at **585** — over the ~500 threshold, so
+  the conclusion stands on the reviewer's numbers. The review's main defect was real: the encoder was
+  sent unconditionally, so a 6.5 MB PNG became **10.2 MB (1.56×)** and a q50 JPEG **1.77×** — the
+  module now returns the original when the re-encode is not smaller. The two post-preparation guards
+  (cancel and unmount during preparation) survived mutants until the review found it; deferred-edge
+  tests now kill both. The probe measured 4000 × 3000 / 3,800,460 B → **2560 × 1920 / 853,780 B
+  (22.5 %)**, same JPEG magic, decodes; the progress total carries the sent size, and the line starts
+  indeterminate while preparation runs (capture: `reports/e4s2b-preparing-390.png`).
