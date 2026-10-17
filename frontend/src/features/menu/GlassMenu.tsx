@@ -20,9 +20,11 @@ import { focusTargets, nextFocusIndex } from "../../lib/focus/trap";
  *
  * **Every entry is text, none is muted — measured, not preferred.** `--aura-muted` is the theme's
  * "secondary text / quiet labels" token, and the generator raises it until it clears 4.5:1 *on the
- * background* (§2.2). Over the veil that guarantee does not survive: for the lightest background the
- * generator's bands allow (L 0.18), the veil at 70 % over a *white* photo leaves the panel at
- * `rgb(46, 56, 57)`, where the text token reads 7.97:1 and the muted token **4.11:1** — under AA, and
+ * background* (§2.2). Over the veil that guarantee does not survive: for the generator's worst case —
+ * the lightest background its bands allow (L 0.18) under the veil at 70 % over a *white* photo — the
+ * panel is `rgb(46, 56, 57)`, where the text token reads 7.97:1 and the muted token **4.11:1** (the
+ * probe photo's own theme reads 8.07:1 and 4.14:1, painted; both pairs are in the verification report,
+ * and they are two palettes rather than two measurements of one) — under AA, and
  * under it for the one entry a user reaches when the other two are wrong (`GlassMenu.test.tsx` pins
  * the pair). So the dialog's words sit on `--aura-text`; the muted token's home is the page, not glass.
  *

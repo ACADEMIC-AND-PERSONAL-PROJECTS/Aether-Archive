@@ -359,6 +359,30 @@ describe("SplashView — the glass menu (E3-S2)", () => {
     expect(tapTarget()).toHaveAttribute("aria-expanded", "true");
   });
 
+  it("should own Escape alone, and hand the key back when the menu closes", async () => {
+    stubApi(() => jsonResponse(PHOTO));
+    const add = vi.spyOn(window, "addEventListener");
+    const remove = vi.spyOn(window, "removeEventListener");
+    // Only `keydown` matters here: it is the key this story decided to have exactly one owner of. The
+    // splash's own listener was deleted rather than kept beside the dialog's, because two listeners for
+    // one key close twice or not at all — and *nothing else in the suite could tell the difference*:
+    // measured, reinstating the old listener leaves every other test green. This census is what makes
+    // the decision checkable (the same probe run in Chromium gives the same numbers).
+    const openKeydown = (): number =>
+      add.mock.calls.filter(([type]) => type === "keydown").length -
+      remove.mock.calls.filter(([type]) => type === "keydown").length;
+
+    renderSplash();
+    await screen.findByRole("img", { name: "A photo from your archive" });
+    const idle = openKeydown();
+
+    fireEvent.click(tapTarget());
+    expect(openKeydown() - idle).toBe(1);
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(openKeydown() - idle).toBe(0);
+  });
+
   it("should leave no scroll lock behind when the splash is left with the menu open", async () => {
     stubApi(() => jsonResponse(PHOTO));
     const { unmount } = renderSplash();

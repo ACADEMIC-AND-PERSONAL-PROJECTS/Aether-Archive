@@ -356,6 +356,11 @@ opens on tap, feels tactile, and gets out of the way.
 - [ ] RTL tests for splash (photo rendered, tap opens menu) and menu (a11y roles, Esc, focus return).
 - [ ] Axe (or equivalent) run on the splash and menu with no serious violations.
 - [ ] Contrast verified for every text style over glass and over images (scrim rule).
+- [ ] **Decide `inert` on what the dialog covers.** E3-S2 ships a modal that a keyboard and a pointer
+      cannot reach past, but an assistive-technology virtual cursor still can: `inert` — shipped in the
+      browsers this app targets — is what closes that, and jsdom does not implement it (`el.inert = true`
+      writes no attribute, measured), so it needs a browser check rather than a unit test. The component
+      comment records the trade; this is where it gets an owner.
 - [ ] Manual pass on a 390 px viewport documented in the PR.
 
 ---

@@ -98,11 +98,14 @@ describe("focusTargets", () => {
       control("unsequenced", { tabindex: "-1" }),
       // The dialog container's own markup: a plain element, `tabindex="-1"`, in the list by accident.
       control("container", { tabindex: "-1" }),
+      // Both at once — the case the review measured: `button:not([disabled])` refuses it, then
+      // `[tabindex]` re-admits it, and the selector alone offers a stop that cannot take focus.
+      control("disabled-but-tabindexed", { disabled: "", tabindex: "0" }),
       link("Curate", "/curate"),
     );
 
-    // A trap that walked into any of the first five would move focus to something the user cannot reach
-    // with a finger or a Tab: the disabled control, the invisible ones, and the two `-1`s.
+    // A trap that walked into any of the first six would move focus to something the user cannot reach
+    // with a finger or a Tab: the disabled controls, the invisible ones, and the two `-1`s.
     expect(names(container)).toEqual(["Curate"]);
   });
 

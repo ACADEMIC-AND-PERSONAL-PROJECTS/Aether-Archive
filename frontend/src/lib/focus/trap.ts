@@ -45,7 +45,12 @@ function isTabbable(element: HTMLElement): boolean {
     // asked here rather than only inside the `[tabindex]` clause above.
     element.getAttribute("tabindex") !== "-1" &&
     !element.hasAttribute("hidden") &&
-    element.getAttribute("aria-hidden") !== "true"
+    element.getAttribute("aria-hidden") !== "true" &&
+    // A `[tabindex]` element that is also disabled is admitted by the selector above and cannot take
+    // focus anyway — measured in Chromium: `focus()` on it leaves `activeElement` elsewhere, so a trap
+    // that offered it a stop would move focus nowhere. No entry here can be disabled today; the clause
+    // is what makes the function's contract true rather than true-for-now.
+    !element.hasAttribute("disabled")
   );
 }
 
