@@ -410,7 +410,7 @@ opens on tap, feels tactile, and gets out of the way.
 | E4-S3A | The order reducer (criterion 2, reducer half) | p0 | 1 | 4 | Done |
 | E4-S3B | The gesture core: mouse/touch sensors, sortable grid, overlay (criterion 1) | p0 | 4 | 4 | Done |
 | E4-S3C | Motion: drop ≤ 300 ms, auto-scroll and reduced motion (criterion 4) — two PRs | p0 | 1 | 4 | Done |
-| E4-S3D | Keyboard and announcements, with the cancel path (criterion 3) | p0 | 2 | 4 | Todo |
+| E4-S3D | Keyboard and announcements, with the cancel path (criterion 3) | p0 | 2 | 4 | In progress |
 | E4-S4 | Aura colour picker with palette suggestions | p0 | 5 | 4 | Todo |
 | E4-S5 | Publish dump with optimistic UI | p0 | 5 | 4 | Todo |
 
@@ -568,7 +568,7 @@ delivery, documentation, and a clean v1.0.
 
 | ID | Story | P | Pts | Sprint | Status |
 | --- | --- | --- | --- | --- | --- |
-| E6-S1 | CI — backend + frontend on every PR | p0 | 5 | 4 | In review |
+| E6-S1 | CI — backend + frontend on every PR | p0 | 5 | 4 | Done |
 | E6-S2 | Required status checks on `main`/`develop` | p0 | 2 | 4 | Todo |
 | E6-S3 | Accessibility audit (WCAG 2.2 AA) | p1 | 3 | 5 | Todo |
 | E6-S4 | Real-device verification pass (LAN) | p0 | 3 | 5 | Todo |
