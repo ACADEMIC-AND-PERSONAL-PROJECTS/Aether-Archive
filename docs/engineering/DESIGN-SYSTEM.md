@@ -73,6 +73,13 @@ monotonic lightness for surfaces; **neutral fallback palette** for extraction fa
 outside the theme layer — `lib/color/theme.ts` plus this stylesheet's `:root` block (ADR-020) — is a
 review blocker.
 
+**A glass notice switches its token, because the generated theme is not the fallback theme.** Measured
+(E3-S2): a notice over the menu's veil renders at **4.14:1** in `--aura-muted` — under §8's floor — and
+**8.07:1** in `--aura-text`. The neutral fallback palette happens to clear it; a palette derived from a
+photo does not. So anything that has to be read *through* glass uses `--aura-text`; `--aura-muted` stays
+for quiet labels on an opaque surface. (E3-S4 owns the words the notice says; this rule is what it
+inherits.)
+
 **Fallback values (the token layer's neutral set, E2-S3).** `--aura-bg #0b0b0d` · `--aura-surface
 #121215` · `--aura-glass rgba(0, 0, 0, 0.4)` · `--aura-glass-solid rgba(0, 0, 0, 0.72)` ·
 `--aura-hairline 1px solid rgba(255, 255, 255, 0.08)` ·
@@ -183,16 +190,52 @@ body {
 
 ## 5. Motion
 
+One vocabulary, declared once as custom properties in `styles/global.css` and read from
+`lib/motion/tokens.ts` (decision, alternatives and measurements: ADR-022 and §14).
+
 | Token | Value | Use |
 | --- | --- | --- |
-| `duration-quick` | 180 ms | micro-feedback (tap, hover, focus) |
-| `duration-base` | 320 ms | menus, panels, reveals |
-| `duration-slow` | 600 ms | route transitions, ambient background |
-| `ease-soft` | `cubic-bezier(0.22, 1, 0.36, 1)` | everything by default |
-| `distance-enter` | 12–16 px | vertical drift on entry |
+| `--motion-duration-quick` | 180 ms | micro-feedback (tap, hover, focus) |
+| `--motion-duration-base` | 320 ms | menus, panels, reveals |
+| `--motion-duration-slow` | 600 ms | route transitions, ambient background |
+| `--motion-ease-soft` | `cubic-bezier(0.22, 1, 0.36, 1)` | everything by default |
+| `--motion-distance-enter` | 16 px | vertical drift on entry (the brief's 12–16 px, pinned at 16) |
 
-- Route and overlay transitions: fade + drift; interruptible; no layout jump.
-- `prefers-reduced-motion: reduce` → opacity-only transitions, no transforms, no auto-scroll animation.
+**Two entry patterns, and no others.** Both end at `transform: none` and neither uses a fill mode.
+
+| Keyframe | Shape | Used by |
+| --- | --- | --- |
+| `aether-enter` | `opacity 0 → 1` + `translateY(var(--motion-distance-enter)) → 0` | a view entering (`duration-slow`); a sheet entering (`duration-base`) |
+| `aether-fade` | `opacity 0 → 1`, no transform | a full-screen veil; anything that must not move |
+
+A component names one of the three class strings in `lib/motion/tokens.ts` — `ENTER_DRIFT_SLOW`,
+`ENTER_DRIFT_BASE`, `ENTER_FADE_BASE` — and writes no duration, curve or keyframe of its own. The
+strings are literal because Tailwind scans the file as text: a class built from a template literal
+compiles to nothing at all.
+
+- **Route transitions are entry-only.** `app/RouteTransition.tsx` keys one wrapper on the view's
+  identity (`lib/motion/route.ts`), so React replaces the view and the entry replays on the new
+  element. The outgoing view is deliberately **not** kept on screen: two full-height views in the DOM
+  is how a second scrollbar appears, and that is the criterion the transition has to satisfy.
+- **No fill mode, on purpose.** `animation-fill-mode: both` would leave `translateY(0)` behind, and a
+  non-`none` transform makes an element the containing block for every `position: fixed` descendant.
+  The glass menu is one; measured during an entry, its veil sits 3 px off a 844 px viewport. Settled,
+  the wrapper is `transform: none` with no running animation — the rule, not a side effect.
+- **The sheet-over-veil pattern** (E3-S2, now expressed in this vocabulary): a full-screen veil of
+  `--aura-bg` at 70 % carrying `aether-fade`, and the sheet above it carrying `aether-enter` at
+  `duration-base`. The veil must not drift — a full-bleed surface that moves reads as the page moving.
+- **Interruptibility is "restart", not "resume".** A view replaced mid-entry starts again from its own
+  `from` frame; nothing is left half-faded and nothing queues. Measured: with a second navigation 90 ms
+  into a run, the first entry was at opacity 0.523 / 7.63 px when it was replaced, and the new one ran
+  from 0 / 16 px to completion.
+- `prefers-reduced-motion: reduce` → **opacity only, no movement**: `--motion-distance-enter`
+  collapses to `0px`, so one keyframe serves both readings, and the global freeze rule (§11) exempts
+  the entry classes so a screen still fades instead of appearing. Auto-scroll animation stays off.
+  Two measured details this phrasing has to carry rather than round off: the transform does not become
+  `none` — it resolves to the identity matrix, because the keyframe still declares `translateY(0)` — and
+  a non-`none` transform is still a containing block, so a `position: fixed` element inside the wrapper is
+  positioned against it for the entry's duration under `reduce` exactly as under `no-preference`.
+  "No movement" is the accurate claim; "no transforms" is not.
 - Nothing loops unless it communicates state (a subtle pulse for loading is the only exception).
 
 ## 6. Layout & rhythm
@@ -226,7 +269,7 @@ body {
 | Theme generation | `frontend/src/lib/color/{theme,contrast}.ts` |
 | Tokens & typography | `frontend/src/styles/global.css` |
 | Glass material | `frontend/src/styles/glass.css` + `components/GlassPanel.tsx` |
-| Motion tokens | `frontend/src/lib/motion/` |
+| Motion tokens & route transition | `frontend/src/lib/motion/{tokens,route}.ts` + `frontend/src/app/RouteTransition.tsx` |
 | Tests & fixtures | `frontend/src/lib/color/__fixtures__/`, `*.test.ts` |
 | Verification page | `frontend/src/features/check/CheckView.tsx` (`/check`) |
 
@@ -239,6 +282,10 @@ body {
   in the PR (`reports/e2s6-check-*.png`).
 - Network panel check: **zero external requests** on a loaded page (also part of `verify`) — the E2-S6
   probe reports every request same-origin.
+- Motion is the one area jsdom cannot see (`getAnimations`, `matchMedia`, computed `transform`): the
+  unit suite pins the *vocabulary* (which class a component carries, what the tokens are, that the
+  keyframes exist and match the tokens) and every claim about what a transition *looks like* comes from
+  a Chromium probe over the built bundle (§14, `reports/e3s3-transition-strip-390.png`).
 
 ## 11. The CSS foundation (E2-S3)
 
@@ -261,9 +308,11 @@ and measurements: `reports/verify-e2-s3-20261016.md`).
 - **The app owns its edges.** `html` carries the background and `overscroll-behavior: none`; every
   scroller has its scrollbar hidden.
 - **Motion degrades globally (§5).** Under `prefers-reduced-motion: reduce` animations freeze at their
-  end state (a state-communicating pulse becomes a still frame) and smooth scrolling is off;
-  transitions that move are the component's responsibility, switched with `motion-safe:` /
-  `motion-reduce:` variants.
+  end state (a state-communicating pulse becomes a still frame), smooth scrolling is off, and
+  `--motion-distance-enter` collapses to `0px` — so movement is removed *by the token*, not by a
+  variant per component. The one exception is the entry class (`*:not(.motion-enter)`), which keeps
+  its fade; E3-S3 replaced E2-S3's `motion-safe:`/`motion-reduce:` pairing, which left every entry
+  frozen solid under `reduce` and duplicated the decision in each component (§14, ADR-022).
 - **Tailwind emits `@theme` variables lazily** — only used steps ship; a `var(--token)` reference in
   any compiled CSS counts as a use, which keeps raw-CSS consumers (`glass.css`, later) working.
 
@@ -330,3 +379,37 @@ measurements: `reports/verify-e2-s6-20261016.md`).
   page background, and the five contrast readouts (pass/FAIL against 4.5:1); buttons apply the demo
   palette, the fallback theme, or clear back to the stylesheet, and `?theme=demo` seeds the derived
   state so the headless probe screenshots it without a click.
+
+## 14. Motion & route transitions (E3-S3)
+
+`lib/motion/` holds the §5 vocabulary (decision: ADR-022; probes and measurements:
+`reports/verify-e3-s3-20261017.md`).
+
+- **The tokens are declared once, in CSS, and read from TypeScript.** `global.css`'s `:root` block
+  carries the five `--motion-*` values; `tokens.ts` carries the class strings three components build
+  from them. A drift-guard test reads `global.css?raw` and fails when a `var(--motion-*)` a class
+  references is undeclared, when an `animate-[…]` names no `@keyframes`, or when `aether-enter` stops
+  matching the shape §5 declares — a misspelt `var()` inside an `animate-[…]` makes the whole
+  declaration invalid at computed-value time, which is an animation that silently never runs.
+- **The view's identity is a pure function.** `viewIdentity(pathname)` folds a trailing slash and
+  ignores the query string: `/river` and `/river/` are the same view, and picking a filter is not a
+  navigation. A naive `key={pathname}` would remount — and re-animate — on both.
+- **`Suspense` sits outside the transition wrapper**, so the entry animates the real view rather than
+  the fallback. Measured across a cold navigation into a lazy chunk: the fallback never appears
+  (`[role=status]` count 0 in all 74 frames) because React Router's `startTransition` keeps the
+  outgoing view painted until the chunk resolves.
+- **What "no layout jump" was measured to mean.** Across the run the document's scrollable overflow
+  grows by the drift distance and returns (`scrollHeight` 860 → 844 against a 844 px viewport) and no
+  scrollbar is ever painted (`clientWidth === innerWidth` in every frame, 0 overflowing scrollers).
+  Leaving a scrolled page (`/check` at `scrollY 400`) lands at 0 because the new view is simply not
+  scrollable — the browser clamps, no scroll API is called. Scroll *restoration* between two
+  scrollable views is not implemented here and is not claimed: it belongs to the River (E5-S1).
+- **Reduced motion, measured both ways** under `Emulation.setEmulatedMedia`. Under `reduce`: the entry
+  still runs with 37 distinct opacity values and every computed transform is `matrix(1,0,0,1,0,0)` or
+  `none` (zero vertical offset in every frame), `maxScrollHeight` 844 = `clientHeight`. Under
+  `no-preference`: 38 distinct offsets, 16 px → 0. The menu's own entry follows the same switch — its
+  sheet's `top` is a single value (642) throughout under `reduce`, and `aether-fade` on the veil is
+  unchanged because it never moved.
+- **The cost of the motion layer is one measured line.** No animation library ships (ADR-022): the
+  shared chunk every route loads is 286.69 kB / 90.37 kB gzip against 286.18 / 90.21 before — **+0.51 kB
+  raw, +0.16 kB gzip** — and the stylesheet 18.08 kB / 4.65 gzip, +0.96 / +0.12.

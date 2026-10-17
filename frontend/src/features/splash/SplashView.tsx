@@ -44,11 +44,12 @@ import { GlassMenu } from "../menu/GlassMenu";
  *   visible sentence, the glass notice and the retry affordance are E3-S4's. Today `loading`, `empty`
  *   and `error` all render the same thing — the tone placeholder and the tap target — which is silent
  *   and never a crash, but is not the finished state.
- * - **Motion — E3-S3.** The photo is inserted, not animated in: the reveal is exact because the pixels
- *   are decoded before `src` exists, and the tone placeholder is what it fades from. A cross-fade and
- *   the pull's finger-following transform need the motion tokens and the reduced-motion switch that
- *   story centralises; the menu's own entry (fade + drift, `motion-safe:`) is pinned by E3-S2's
- *   criterion in `styles/global.css` and belongs in that story's token set, not in a second one here.
+ * - **Motion — E3-S3, landed.** The photo is still inserted rather than animated in: the reveal is exact
+ *   because the pixels are decoded before `src` exists, and the tone placeholder is what it fades from.
+ *   The menu's entry now reads `lib/motion/tokens.ts` like everything else — E3-S3 moved it out of
+ *   `styles/global.css`'s own timings — and this view is one of the two consumers. The pull's
+ *   finger-following transform is still unbuilt: it needs the gesture to own a live offset, which
+ *   nothing in this slice does.
  */
 
 /** The archive's code for "there is no photo to show" (ADR-013) — a state, not a failure. */

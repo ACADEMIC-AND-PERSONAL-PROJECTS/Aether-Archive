@@ -3,6 +3,7 @@ import { Link } from "react-router";
 
 import { GlassPanel } from "../../components/GlassPanel";
 import { focusTargets, nextFocusIndex } from "../../lib/focus/trap";
+import { ENTER_DRIFT_BASE, ENTER_FADE_BASE } from "../../lib/motion/tokens";
 
 /**
  * The glass menu — the app's only dialog (E3-S2), and the screen the splash's tap target promises.
@@ -48,9 +49,12 @@ import { focusTargets, nextFocusIndex } from "../../lib/focus/trap";
  *   attribute), so behaviour built on it would be the one part of this story nothing could test. The
  *   APG allows `aria-modal` only when the code really does block the rest: the trap is that blocking,
  *   and it is tested.
- * - **Not the route change.** The two destinations are `Link`s; leaving the splash is the close, and
- *   there is no exit animation — the entry is this story's criterion, and the motion vocabulary
- *   (tokens, enter/exit pairing, route transitions) is E3-S3's.
+ * - **Not the route change.** The two destinations are `Link`s, and leaving the splash is the close:
+ *   this component unmounts with the view that owns it, which is also what releases the scroll lock.
+ * - **Not its own timings.** The entry is §5's vocabulary (`lib/motion/tokens.ts`): the same fade the
+ *   route transition uses, one duration step faster. Under `reduce` it fades and does not move — the
+ *   app has one reduced-motion rule, not two (E3-S3; the change from "no animation at all" is named in
+ *   `docs/scrum/DECISION-LOG.md` ADR-022).
  */
 
 export interface GlassMenuProps {
@@ -68,26 +72,29 @@ export interface GlassMenuProps {
  * The veil: full-screen scrim, and the whole backdrop-tap target. A sibling of the panel rather than
  * its parent, which is what makes "outside" unambiguous — no `stopPropagation`, no comparing
  * `event.target` with `event.currentTarget`.
+ *
+ * Its entry is §5's fade-in-place (`ENTER_FADE_BASE`) — the drift is the panel's, so the scrim never
+ * uncovers an edge.
  */
-const VEIL_CLASS =
-  "fixed inset-0 z-30 bg-aura-bg/70 motion-safe:animate-[aether-veil-in_320ms_cubic-bezier(0.22,1,0.36,1)_both]";
+const VEIL_CLASS = `fixed inset-0 z-30 bg-aura-bg/70 ${ENTER_FADE_BASE}`;
 
 /**
  * The panel's box: a floating sheet, 16 px clear of the sides and of the home indicator (the safe
- * inset is read as a variable, so the gap survives the notch), centred and capped on wider screens.
- *
- * The drift is declared here, not on the veil: a full-screen veil translated by 16 px would uncover a
- * strip of photo along one edge for the length of the animation.
+ * inset is read as a variable, so the gap survives the notch), centred and capped on wider screens,
+ * entering on §5's fade + drift at `duration-base` (`ENTER_DRIFT_BASE`) — the same pattern the route
+ * transition uses, one step faster.
  */
-const SHEET_CLASS =
-  "fixed inset-x-4 bottom-[calc(var(--safe-bottom)_+_1rem)] z-40 mx-auto max-w-md outline-none motion-safe:animate-[aether-sheet-in_320ms_cubic-bezier(0.22,1,0.36,1)_both]";
+const SHEET_CLASS = `fixed inset-x-4 bottom-[calc(var(--safe-bottom)_+_1rem)] z-40 mx-auto max-w-md outline-none ${ENTER_DRIFT_BASE}`;
 
 /**
  * One entry: 56 px tall, full width, no gap between rows (a tap between two entries is still a tap),
  * and on the text token — see the class doc above for the measured reason none of them is muted.
+ *
+ * The press feedback is §5's `duration-quick`, read as the variable rather than as `180ms`, so a
+ * change to the token moves this too.
  */
 const ENTRY_CLASS =
-  "flex min-h-14 w-full items-center rounded-xl px-5 text-lg text-aura-text transition-colors duration-[180ms] active:bg-aura-text/6 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/50";
+  "flex min-h-14 w-full items-center rounded-xl px-5 text-lg text-aura-text transition-colors duration-[var(--motion-duration-quick)] active:bg-aura-text/6 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/50";
 
 export function GlassMenu({ onClose, returnFocusTo }: GlassMenuProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
