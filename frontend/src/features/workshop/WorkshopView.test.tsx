@@ -8,11 +8,28 @@ import { FakeXhr } from "../../api/__fixtures__/fakeXhr";
 import { PROBLEM_413_TOO_LARGE, PROBLEM_415_UNSUPPORTED } from "../../api/__fixtures__/problems";
 import { queryKeys } from "../../api/queryKeys";
 import { createQueryClient } from "../../app/queryClient";
+import { downscaleForUpload } from "../../lib/upload/downscale";
 import { MAX_SELECTION } from "../../lib/upload/selection";
 import { ACCEPT_ATTRIBUTE, MAX_UPLOAD_BYTES } from "../../lib/upload/validation";
 import { runAxe, violationSummary } from "../../test/axe";
 
 import type { Photo } from "../../types/api";
+
+/**
+ * The browser edge is not available in jsdom (no `createImageBitmap`, no canvas — ADR-018), so the
+ * component tests replace exactly that one export with a controllable function. The planner and the
+ * real decode/draw/encode path keep their own tests (`lib/upload/downscale.test.ts` and the Chromium
+ * probe); these tests pin what the queue does with whatever the edge returns.
+ */
+vi.mock("../../lib/upload/downscale", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    downscaleForUpload: vi.fn(async (file: File) => file),
+  };
+});
+
+const mockedDownscale = vi.mocked(downscaleForUpload);
 
 /**
  * The workshop's multi-select and sequential-queue behaviour (E4-S2A2), as the user observes it.
@@ -130,6 +147,9 @@ beforeEach(() => {
     previewCount += 1;
     return `blob:preview-${previewCount}`;
   });
+  // The default is the library's own ineligible/within-bounds answer: send the picked File as-is.
+  mockedDownscale.mockReset();
+  mockedDownscale.mockImplementation(async (file: File) => file);
 });
 
 afterEach(() => {
@@ -611,6 +631,58 @@ describe("the queue", () => {
     expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle");
   });
 
+  it("should open no request when the batch is cancelled during preparation", async () => {
+    // The story moved the request behind async work; these are the windows it opened. The reviewing
+    // pass removed each post-await guard and the suite stayed green — hence this deferred edge.
+    let release: (file: File) => void = () => {};
+    const file = fileOf(16, "image/png", "slow.png");
+    mockedDownscale.mockImplementationOnce(
+      () =>
+        new Promise<File>((resolve) => {
+          release = resolve;
+        }),
+    );
+
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [file]);
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Cancel" })).toBeVisible());
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await act(async () => {
+      release(file);
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("workshop-notice")).toHaveTextContent("Upload cancelled."),
+    );
+    expect(FakeXhr.instances).toHaveLength(0);
+    expect(tileFor("slow.png")).toHaveAttribute("data-state", "waiting");
+  });
+
+  it("should open no request after unmount during preparation", async () => {
+    let release: (file: File) => void = () => {};
+    const file = fileOf(16, "image/png", "slow.png");
+    mockedDownscale.mockImplementationOnce(
+      () =>
+        new Promise<File>((resolve) => {
+          release = resolve;
+        }),
+    );
+
+    const { unmount } = renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [file]);
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Cancel" })).toBeVisible());
+
+    unmount();
+    await act(async () => {
+      release(file);
+    });
+
+    expect(FakeXhr.instances).toHaveLength(0);
+  });
+
   it("should reset the cancellation flag and upload again after a cancelled batch", async () => {
     renderWorkshop();
     const firstFile = fileOf(16, "image/png", "a.png");
@@ -741,6 +813,73 @@ describe("the queue", () => {
     await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle"));
     expect(screen.getByTestId("workshop-notice")).toHaveTextContent("Added 1 photo.");
     expect(invalidate).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("downscaling before upload", () => {
+  it("should send the prepared File and report its size, not the original's", async () => {
+    const original = fileOf(8192, "image/png", "big.png");
+    const prepared = fileOf(2048, "image/png", "big.png");
+    mockedDownscale.mockResolvedValueOnce(prepared);
+
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [original]);
+    const request = await startUpload();
+
+    expect(mockedDownscale).toHaveBeenCalledWith(original);
+    const sent = multipartBody(request).get("file");
+    // A distinct object with the prepared size — the queue sends what the edge returned.
+    expect(sent).not.toBe(original);
+    expect(sent).toBe(prepared);
+    expect((sent as File).size).toBe(2048);
+    // The line's initial total comes from the file actually sent (8192 would mean the source).
+    expect(screen.getByRole("progressbar")).toHaveAttribute("data-total", "2048");
+    // The tile keeps painting the user's own photo, not the re-encode.
+    expect(document.querySelector("main img")).toHaveAttribute("src", "blob:preview-1");
+
+    await respond(request, 201, UPLOADED);
+    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle"));
+  });
+
+  it("should resend the same prepared File on retry instead of downscaling twice", async () => {
+    const original = fileOf(4096, "image/png", "a.png");
+    const prepared = fileOf(1024, "image/png", "a.png");
+    const reWrapped = fileOf(512, "image/png", "a.png");
+    let calls = 0;
+    mockedDownscale.mockImplementation(async () => {
+      calls += 1;
+      return calls === 1 ? prepared : reWrapped;
+    });
+
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [original]);
+    const first = await startUpload();
+    await respond(first, 415, PROBLEM_415_UNSUPPORTED, "application/problem+json");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Try again" })).toBeVisible());
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    const retry = await requestAt(1);
+
+    // Identity, not equivalence: a second encode would return `reWrapped`.
+    expect(multipartBody(retry).get("file")).toBe(prepared);
+    expect(calls).toBe(1);
+    expect(screen.getByRole("progressbar")).toHaveAttribute("data-total", "1024");
+  });
+
+  it("should send the original, unchanged, when downscaling rejects", async () => {
+    const original = fileOf(4096, "image/png", "a.png");
+    mockedDownscale.mockRejectedValueOnce(new Error("no canvas in this environment"));
+
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [original]);
+    const request = await startUpload();
+
+    expect(multipartBody(request).get("file")).toBe(original);
+    expect(screen.getByRole("progressbar")).toHaveAttribute("data-total", "4096");
+
+    await respond(request, 201, UPLOADED);
+    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle"));
+    expect(screen.getByTestId("workshop-notice")).toHaveTextContent("Added 1 photo.");
   });
 });
 

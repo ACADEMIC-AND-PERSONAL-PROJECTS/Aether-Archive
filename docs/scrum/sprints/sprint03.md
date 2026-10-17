@@ -31,8 +31,8 @@
 | 6a | E4-S1A | Single photo upload — the picker and the validation (criterion 1) | 2 | p0 | Done | #114 |
 | 6b | E4-S1B | Single photo upload — send with progress and cancel, then retry and invalidation (criteria 2–4) | 3 | p0 | Done | #115 |
 | 7a | E4-S2A1 | The selection grid surface — one tile, its state and its remove action (criterion 3) | 1 | p0 | Done | #117 |
-| 7b | E4-S2A2 | Multi-select (≤ 6) and the sequential queue (criteria 1, 4) | 2 | p0 | In review | #118 |
-| 7c | E4-S2B | Client-side downscale before upload (criterion 2) | 2 | p0 | Todo | — |
+| 7b | E4-S2A2 | Multi-select (≤ 6) and the sequential queue (criteria 1, 4) | 2 | p0 | Done | #118 |
+| 7c | E4-S2B | Client-side downscale before upload (criterion 2) | 2 | p0 | In review | #119 |
 
 **Total: 12 slices · 28 points** (the row above them is a chore, not a story; E3-S1A/B, E3-S5A/B,
 E4-S1A/B and E4-S2A1/A2/B are each one story, split — see the notes at the end of this section). The order is the
@@ -358,7 +358,7 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   (301.30 against a computed 301.31) and recaptured; and the slice count (12, not 13). The nits were
   turned into tests (tile `data-state="error"` on every failure path, URL revocation on replace and
   remove, the empty-name fallback, focus after a refused replacement).
-- 2026-10-17 — **E4-S2A2 (PR #118) carries multi-select and the queue**, and with it the fix for the
+- 2026-10-17 — **E4-S2A2 (PR #118, merged `3bf459c`) carries multi-select and the queue**, and with it the fix for the
   defect #116's review found: `aliveRef` is re-armed in the effect setup, so `npm run dev` uploads again,
   and a **StrictMode-wrapped test** pins it. It measured **1,721 hand-written** at its tip (production
   631, tests 970, docs 120) — **1,751** on the branch with the 30 record lines. Its exception is claimed
@@ -377,3 +377,21 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   transport's abort was a no-op and the photo was stored. The post-loop now compares processed files to
   the queue length — when every file was processed the summary wins — and a test pins the interleaving
   (restoring the old check fails it).
+- 2026-10-17 — **E4-S2B (PR #119) closes E4-S2 and the sprint's scope**: `planDownscale` is the pure
+  decision (2560 px long edge or 6 MiB; JPEG/JPG/PNG eligible — WebP joined GIF/AVIF as untouched,
+  because animated WebP would lose frames and alpha WebP would flatten, and the planner cannot tell
+  them apart; JPEG q0.9, PNG preserved for alpha), `downscaleForUpload` the injectable browser edge
+  (EXIF orientation, the encoded blob's own type, the original on every failure **and on a
+  re-encode that does not shrink the file**, raced against a 10 s preparation deadline), and the
+  queue stores the prepared `File` so a retry resends that same object. It measured **885
+  hand-written** (production 370, tests 446, docs 69), **905** on the branch with the 20 record lines.
+  The author's exception argument ("the whole story at 885 is the only eligible subset") was
+  **withdrawn** after the review constructed the bytes-only cut: green at 29 files / 337 tests and
+  **798 hand-written**, with its module and unit tests alone at **585** — over the ~500 threshold, so
+  the conclusion stands on the reviewer's numbers. The review's main defect was real: the encoder was
+  sent unconditionally, so a 6.5 MB PNG became **10.2 MB (1.56×)** and a q50 JPEG **1.77×** — the
+  module now returns the original when the re-encode is not smaller. The two post-preparation guards
+  (cancel and unmount during preparation) survived mutants until the review found it; deferred-edge
+  tests now kill both. The probe measured 4000 × 3000 / 3,800,460 B → **2560 × 1920 / 853,780 B
+  (22.5 %)**, same JPEG magic, decodes; the progress total carries the sent size, and the line starts
+  indeterminate while preparation runs (capture: `reports/e4s2b-preparing-390.png`).
