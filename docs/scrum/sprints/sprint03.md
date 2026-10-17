@@ -23,7 +23,7 @@
 | 0 | S03-C1 | *chore*: land the Sprint-2 working changes in `.claude/` (number provenance, guard canonicalisation, adversarial review control) | — | — | Done | #97 |
 | 1a | E3-S1A | Immersive splash — the photo, its tone, the quiet states (criteria 1, 2, 5) | 3 | p0 | Done | #100 |
 | 1b | E3-S1B | Immersive splash — the tap intent, the pull-to-refresh, the per-visit photo (criteria 3, 4) | 2 | p0 | Done | #101 |
-| 2 | E3-S2 | Glass menu overlay | 5 | p0 | Todo | — |
+| 2 | E3-S2 | Glass menu overlay | 5 | p0 | Done | #104 |
 | 3 | E3-S3 | Route transitions & motion system | 3 | p0 | Todo | — |
 | 4 | E3-S4 | Quiet loading / empty / error states | 2 | p1 | Todo | — |
 | 5 | E3-S5 | View tests & accessibility pass | 3 | p0 | Todo | — |
@@ -202,3 +202,15 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   #103) — latent, because nothing reads a token back at runtime today, and invisible to jsdom, which never
   runs the minifier. A stale "no font file is shipped" line in the frontend README was corrected in place
   (five `.woff2` files, 152 kB, since E2-S3).
+- 2026-10-17 — **E3-S2 merged (`e7a50d6`, PR #104) after APPROVE WITH NITS**, closing the state E3-S1B left
+  visible. The exception claim held against four counter-cuts the reviewer built rather than the one the PR
+  argued, and the number that settled it is worth keeping: **production code alone is 418 lines**, so no
+  arrangement of tests and documentation reaches the budget while the criteria stand. That is the second
+  consecutive story at roughly twice the guideline — with E3-S1's split, the sprint has now produced two
+  data points that say the same thing about sizing, which is what the retrospective should act on.
+  The review's control found the same class of gap as E3-S1B's: **reinstating the splash's old Escape
+  listener left all 37 tests green**, so the story's most deliberate decision — one owner for the key — was
+  the least checkable thing in it. Twice now, a mutant has found an invariant that was argued in prose and
+  pinned nowhere, and both were decisions the author had called out as deliberate. If the pattern holds it
+  belongs in the next retrospective as a rule: *the more deliberately something is decided, the more likely
+  it is to be described rather than tested.*

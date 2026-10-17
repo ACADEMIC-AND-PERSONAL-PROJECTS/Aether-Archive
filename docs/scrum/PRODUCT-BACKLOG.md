@@ -283,7 +283,7 @@ opens on tap, feels tactile, and gets out of the way.
 | ID | Story | P | Pts | Sprint | Status |
 | --- | --- | --- | --- | --- | --- |
 | E3-S1 | Immersive splash view | p0 | 5 | 3 | Done |
-| E3-S2 | Glass menu overlay | p0 | 5 | 3 | Todo |
+| E3-S2 | Glass menu overlay | p0 | 5 | 3 | Done |
 | E3-S3 | Route transitions & motion system | p0 | 3 | 3 | Todo |
 | E3-S4 | Quiet loading / empty / error states | p1 | 2 | 3 | Todo |
 | E3-S5 | View tests & accessibility pass | p0 | 3 | 3 | Todo |
