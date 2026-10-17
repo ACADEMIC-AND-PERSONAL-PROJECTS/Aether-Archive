@@ -277,18 +277,16 @@ export function WorkshopView() {
           </div>
         ) : (
           <>
-            {/* The grid scrolls; the panel does not. `min-h-full` centres a short grid and still lets a
-                tall one scroll from its first row instead of clipping it. One tile today; the surface
-                multi-select grows into. */}
-            <div className="relative z-10 flex-1 overflow-y-auto">
-              <div className="flex min-h-full flex-col justify-center px-4 py-6">
-                <SelectionGrid
-                  items={selection === null ? [] : [selection]}
-                  busy={phase === "uploading"}
-                  onRemove={removeSelected}
-                  onPreviewError={() => setPreviewBroken(true)}
-                />
-              </div>
+            {/* The grid scrolls; the panel does not. The scroll container itself centres a short grid —
+                measured at the review: the tile's top lands on the computed centre (a `min-h-full`
+                percentage does not resolve inside a flex-sized scroller, which put it at the top). */}
+            <div className="relative z-10 flex flex-1 flex-col justify-center overflow-y-auto px-4 py-6">
+              <SelectionGrid
+                items={selection === null ? [] : [selection]}
+                busy={phase === "uploading"}
+                onRemove={removeSelected}
+                onPreviewError={() => setPreviewBroken(true)}
+              />
             </div>
 
             <div className="relative z-10 mx-auto w-full max-w-md shrink-0 px-4 pb-4">
