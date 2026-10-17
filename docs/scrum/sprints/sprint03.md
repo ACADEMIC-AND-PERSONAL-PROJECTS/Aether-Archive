@@ -256,9 +256,14 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   were estimated at ~188 and ~210 lines; they landed at 237 and 496, both still under the ~500 branch
   threshold (the second by four lines, and over the ~400 ideal by 96 — both numbers, because the review
   asked for both). **This is the fourth time in this sprint that a "cannot be
-  split" claim has been withdrawn** (E3-S1, E3-S3, E3-S4, here), and the lesson is now a rule rather than a
+  split" claim has been withdrawn** (E3-S1, E3-S4, here), and the lesson is now a rule rather than a
   resolution: construct the cut you did not name — by criterion, by state, by surface — before claiming the
   exception, and if the branch is under ~500 argue the arithmetic instead. E3-S5B closes #30.
+  *Correction, 2026-10-17:* an earlier version of this sentence listed **E3-S3** among the withdrawn claims.
+  It should not have: that review judged the claim to **survive** and asked only that its *wording* move from
+  inseparability to the budget arithmetic — the form the repo has used since. The error was mine, made by
+  summarising three reviews from memory while writing a fourth note; it surfaced when a later review checked
+  a PR that cited E3-S3 as precedent and found the record contradicting it.
 - 2026-10-17 — **E3-S5A merged (`97d258b`, PR #110) and E3-S5B (`ed5cd94`, PR #111); the E3 epic is
   complete.** The split cost is measured rather than asserted, in both of its figures: **656 (+19%) at the
   review tips, 733 (+33%) after the review fixes** — the extra 77 lines are the review's own findings, so
