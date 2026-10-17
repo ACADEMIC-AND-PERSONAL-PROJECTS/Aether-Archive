@@ -409,7 +409,7 @@ opens on tap, feels tactile, and gets out of the way.
 | E4-S2B | Client-side downscale before upload (criterion 2) | p0 | 2 | 3 | Done |
 | E4-S3A | The order reducer (criterion 2, reducer half) | p0 | 1 | 4 | Done |
 | E4-S3B | The gesture core: mouse/touch sensors, sortable grid, overlay (criterion 1) | p0 | 4 | 4 | Done |
-| E4-S3C | Motion: drop ≤ 300 ms, auto-scroll, reduced motion (criterion 4) | p0 | 1 | 4 | In progress |
+| E4-S3C | Motion: drop ≤ 300 ms, auto-scroll, reduced motion (criterion 4) | p0 | 1 | 4 | In review |
 | E4-S3D | Keyboard and announcements, with the cancel path (criterion 3) | p0 | 2 | 4 | Todo |
 | E4-S4 | Aura colour picker with palette suggestions | p0 | 5 | 4 | Todo |
 | E4-S5 | Publish dump with optimistic UI | p0 | 5 | 4 | Todo |
