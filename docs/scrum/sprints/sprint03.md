@@ -312,7 +312,7 @@ in `.claude/` in S03-C1; the practice is checked in every story:
   returning to the same `File`, Try again resending that same object, and one prefix invalidation of
   `photos` on success only — pinned in both directions, which kills the `onSuccess → onSettled` mutant
   the #113 review found alive. It measured **1,279 hand-written** at its final tip (production 492,
-  tests 654, docs 133), 2.6× the ~500 branch threshold; the branch total is **1,325** with the 46
+  tests 654, docs 133), 2.6× the ~500 branch threshold; the branch total is **1,326** with the 47
   record lines.
   Its exception is claimed on a **constructed criterion cut** — defer criterion 3's retry surface, keep
   criteria 2 and 4 — which typechecks, lints, passes 26 of the slice's 30 tests and measures **1,157 at
