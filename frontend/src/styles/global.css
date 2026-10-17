@@ -160,6 +160,7 @@
   --motion-duration-quick: 180ms;
   --motion-duration-base: 320ms;
   --motion-duration-slow: 600ms;
+  --motion-duration-pulse: 2400ms;
   --motion-ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-distance-enter: 16px;
 
@@ -298,6 +299,23 @@ body {
   }
 
   to {
+    opacity: 1;
+  }
+}
+
+/*
+ * §7's loading state: the placeholder's breath. Opacity only — there is no transform to remove under
+ * `reduce`, and because the class that names it carries no `motion-enter` marker, block 5's freeze rule
+ * turns it into the still frame the element's own `opacity-25` describes. The 25 % / 100 % pair is the
+ * theme's surface tone, so the pulse is the photo's own colour family (§2.1) rather than a second one.
+ */
+@keyframes aether-breathe {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+
+  50% {
     opacity: 1;
   }
 }
