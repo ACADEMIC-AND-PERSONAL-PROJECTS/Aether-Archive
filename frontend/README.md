@@ -42,11 +42,16 @@ test together. Anything that needs a different major version records the evidenc
 | `globals`                                                     | 17.13.0                   | Browser/Node global sets for the flat config.                                                                                                       |
 | `@types/*` (`react`, `react-dom`, `node`)                     | 19.3.0 / 19.3.0 / 22.20.5 | Types for React, the DOM side of it, and `vite.config.ts`.                                                                                          |
 
-Not installed on purpose yet: Framer Motion and `@dnd-kit` (E4/E5, one story each), Fontsource packages
-(E2-S5). A dependency lands with the story that needs it. E2-S2's two additions were installed the way
-this table was proven: `npm ci` from the lockfile with **no peer warnings and 0 vulnerabilities**, and
-the registry's own peer ranges checked against the installed React 19.3.1
-(`reports/verify-e2-s2-20261016.md`).
+Not installed on purpose yet: `@dnd-kit` (E4), Fontsource packages (E2-S5). A dependency lands with the
+story that needs it. E2-S2's two additions were installed the way this table was proven: `npm ci` from
+the lockfile with **no peer warnings and 0 vulnerabilities**, and the registry's own peer ranges checked
+against the installed React 19.3.1 (`reports/verify-e2-s2-20261016.md`).
+
+**Framer Motion is deliberately not installed**, although `CLAUDE.md` §2 lists it: E3-S3 measured four
+builds of this app with and without it and shipped the motion layer as CSS instead — the smallest
+tree-shaken form costs +83.92 kB raw / +29.22 kB gzip on the shared chunk, the ergonomic one +131.78 /
++43.09, against +0.49 / +0.15 for what shipped. The numbers, the View Transitions alternative and the
+reduced-motion policy are ADR-022; no code here imports it.
 
 ## Where the API lives — one origin, in every environment
 
@@ -362,13 +367,15 @@ on the veil likewise neither re-rolled the photo nor closed the menu; a tap on t
 open; a tap on the veil closed it and returned focus to the trigger. The sibling placement is what makes this
 true, and a test dies if the menu is ever nested inside `<main>`.
 
-**`prefers-reduced-motion`, emulated rather than assumed** (`Emulation.setEmulatedMedia`). Under `reduce`:
-`animation-name: none` for both the veil and the sheet, and the sheet's `top` is 642 px in **all 43** frames
-sampled over 700 ms. Under `no-preference`: `aether-veil-in` / `aether-sheet-in`,
+**`prefers-reduced-motion`, emulated rather than assumed** (`Emulation.setEmulatedMedia`). Under `reduce`,
+as measured _then_: `animation-name: none` for both the veil and the sheet, and the sheet's `top` is 642 px
+in **all 43** frames sampled over 700 ms. Under `no-preference`: `aether-veil-in` / `aether-sheet-in`,
 `0.32s cubic-bezier(0.22, 1, 0.36, 1) both`, and the sheet's `top` runs **658 → 642** — the criterion's
 12–16 px drift, measured over 42 frames with 9 distinct values. No `matchMedia` is needed: `motion-safe:`
 compiles to `@media (prefers-reduced-motion: no-preference)`, which is why the layer is a stylesheet
-declaration and not a hook.
+declaration and not a hook. **E3-S3 replaced this pair**: `motion-safe:` froze every entry under `reduce`
+instead of keeping its fade, and the timings were spelled out per component. The keyframes, the tokens and
+the policy in force are in the next section.
 
 **The contrast model the tests use is the browser's own.** With a photo that is white in the lower half (so
 the sheet sits over pure white) and the theme coming from the dark half, the screenshot was read back as
@@ -394,6 +401,53 @@ extractor, so the tokens fall back to `#0b0b0d` / `#e8e6e3` rather than inventin
 **Nothing off this origin.** 18 requests across the run's two page loads (the second is the capture reload),
 every one to the probe's own origin; `off-origin (none expected): []`. The second load re-asked
 `/api/v1/photos/random` (#2) and re-used the cached `/images/**` bytes, as E3-S1 measured.
+
+## The route transition — measured (E3-S3)
+
+The vocabulary lives in `lib/motion/` (tokens + the view-identity rule) with the keyframes and the
+`--motion-*` properties in `global.css`; the decision is ADR-022 and the vocabulary DESIGN-SYSTEM §5/§14.
+Everything below was measured on the built bundle in headless Chromium 152 at 390 × 844
+(`Emulation.setDeviceMetricsOverride`), served by a stub for `/api/**` and `/images/**`.
+
+**Why no animation library.** Four variants of the same App shell, built in one tree with `motion` 14.3.0
+installed, cost **+83.92 kB raw / +29.22 kB gzip** for the smallest tree-shaken form and **+131.78 /
++43.09** for `motion.div` on the shared chunk every route loads — the table is in ADR-022. What shipped
+instead builds to **286.69 kB / 90.37 kB gzip** and 18.08 kB / 4.65 kB of CSS, +0.49 / +0.15 on the chunk.
+
+**One transition, frame by frame** — the same run as `reports/e3s3-transition-strip-390.png`:
+
+```text
+before the click   /        opacity 1      offset 0 px     menu open over the splash
+  0 ms             /river   opacity 0      offset 16 px    the new view exists, nothing painted yet
+ 60 ms             /river   opacity 0.438  offset 8.99 px
+150 ms             /river   opacity 0.718  offset 4.52 px
+280 ms             /river   opacity 0.89   offset 1.75 px
+600 ms             /river   opacity 1      offset 0 px     settled; 0 running animations
+```
+
+Across 74 sampled frames of a cold navigation into a lazy chunk: exactly one `<main>` and `[role=status]`
+count **0** — the Suspense fallback never paints, because React Router's `startTransition` keeps the
+outgoing view until the chunk resolves. `scrollHeight` runs 860 → 844 against an 844 px viewport (the drift
+itself) and returns; `documentElement.clientWidth === innerWidth` with 0 overflowing scrollers in every
+frame, so no scrollbar is ever painted. Settled: `transform: none`, `animation-fill-mode: none`.
+
+**Interrupted 90 ms in.** The first entry was at opacity 0.523 / 7.63 px when the second navigation
+replaced it; the new view ran 0 → 1 from its own `from` frame, with one `<main>` in the DOM throughout.
+"Interruptible" here means _restart_, not _resume_ — nothing is left half-faded and nothing queues.
+
+**Reduced motion, both readings** (`Emulation.setEmulatedMedia`), same navigation: under `reduce` the
+entry still runs — 37 distinct opacity values — while every computed transform is `matrix(1,0,0,1,0,0)` or
+`none` and `maxScrollHeight` **844 === `clientHeight`**; the menu keeps `aether-fade` on its veil and its
+sheet's `top` is a single value (642) throughout. Under `no-preference`: 38 distinct offsets, 16 px → 0,
+document overflow 860. The switch is one custom property, not a variant per component.
+
+**Two side effects, both bounded.** While the wrapper carries a transform it is the containing block for
+its `position: fixed` descendants, and the glass menu is one of them (`wrapper.contains(sheet)` is `true`):
+opening the menu 120 ms after a `history.back()` put the veil at `y 3, bottom 847` in an 844 px viewport
+(`y 0, bottom 844` once the entry finished), and the sheet's own 16 px drift adds to the wrapper's current
+offset (top 658 → 642). Leaving `/check` at `scrollY 400` lands at 0 because the browser clamps as the
+shorter view replaces the taller one — no scroll API is called, and scroll restoration between two
+scrollable views is E5-S1's.
 
 ## Zero external requests — measured on the built bundle
 
@@ -431,4 +485,5 @@ safe-area insets, ≥ 44 px targets); theme colours from the extracted palette (
 component; fonts only via Fontsource NPM packages; **a request leaving the machine is a bug**.
 
 Rules: `.claude/rules/frontend.md` · design language: `.claude/rules/design-language.md` · decisions of
-these stories: `docs/scrum/DECISION-LOG.md` ADR-014 and ADR-015 (E2-S1), ADR-016 (E2-S2), ADR-021 (E3-S1).
+these stories: `docs/scrum/DECISION-LOG.md` ADR-014 and ADR-015 (E2-S1), ADR-016 (E2-S2), ADR-021 (E3-S1),
+ADR-022 (E3-S3).

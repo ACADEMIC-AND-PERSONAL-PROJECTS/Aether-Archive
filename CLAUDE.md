@@ -31,7 +31,12 @@ user approval; the specs are the contract the backlog is built from.
 - **Database**: PostgreSQL 17, run locally as a Docker container. Dev uses `docker-compose.dev.yml`;
   v1.0 ships the whole stack containerized (`docs/engineering/DEPLOYMENT.md`, ADR-009/010).
 - **Storage**: local filesystem only. Database + images never leave this machine.
-- **Frontend**: React + Vite + TypeScript, Tailwind CSS, Framer Motion, `@dnd-kit`, TanStack Query.
+- **Frontend**: React + Vite + TypeScript, Tailwind CSS, `@dnd-kit`, TanStack Query.
+  **Framer Motion is deliberately not installed** — a substitution under this section's own rule, decided
+  with four-build measurements in **ADR-022**: the smallest tree-shaken `motion` import costs +83.9 kB raw
+  / +29.2 kB gzip against +0.49 kB for the CSS token layer that does the same job. Motion is
+  `lib/motion/tokens.ts` + the `--motion-*` properties in `global.css`. Revisit only with new numbers.
+  `@dnd-kit` arrives with E4-S3's drag-and-drop.
 - **Typography**: Fontsource NPM packages only. Zero external network requests at runtime.
 - **Serving images**: Spring maps `/images/**` to the local data directory (no external CDN, ever).
 
