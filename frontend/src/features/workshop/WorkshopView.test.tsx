@@ -157,6 +157,21 @@ function dragActivators(): readonly HTMLElement[] {
   return screen.getAllByTestId("drag-activator");
 }
 
+/**
+ * dnd-kit's live region, told apart from the workshop's by `aria-atomic`: dnd-kit sets it, the
+ * workshop's persistent status region does not. Both are `role="status"`, and during a drag only this
+ * one changes — which is the contract the keyboard tests pin.
+ */
+function dragAnnouncement(): HTMLElement {
+  const region = screen
+    .getAllByRole("status")
+    .find((node) => node.getAttribute("aria-atomic") === "true");
+  if (region === undefined) {
+    throw new Error("dnd-kit mounted no live region");
+  }
+  return region;
+}
+
 /** The drag surface inside a named tile, found through the tile's remove button. */
 function activatorFor(name: string): HTMLElement {
   const activator = tileFor(name).querySelector<HTMLElement>('[data-testid="drag-activator"]');
@@ -611,11 +626,12 @@ describe("reordering", () => {
     expect(first).toHaveClass("touch-manipulation");
     expect(screen.getByRole("button", { name: "Photo 3 of 3: c.png" })).toBeVisible();
 
-    // The instructions the tile points at come from dnd-kit's built-in accessibility; the custom
-    // position-based copy is the follow-up slice (E4-S3D1), not this one.
+    // The instructions the tile points at are ours, not dnd-kit's default: they name the arrow keys.
     const instructions = first.getAttribute("aria-describedby");
     expect(instructions).not.toBeNull();
-    expect(document.getElementById(instructions ?? "")).toHaveTextContent("space bar");
+    expect(document.getElementById(instructions ?? "")).toHaveTextContent(
+      "To move a photo, press Space or Enter to pick it up.",
+    );
 
     // The remove control is a sibling of the drag surface, so a pointer-down on it reaches no sensor.
     const remove = screen.getByRole("button", { name: "Remove a.png" });
@@ -623,7 +639,7 @@ describe("reordering", () => {
     expect(remove.contains(first)).toBe(false);
   });
 
-  it("should move a tile down with the keyboard", async () => {
+  it("should move a tile down with the keyboard and announce both positions", async () => {
     renderWorkshop();
     pickFiles(screen.getByLabelText("Choose photos"), sixFiles());
     stubGridRects();
@@ -642,9 +658,18 @@ describe("reordering", () => {
     expect(screen.getByTestId("drag-overlay")).toBeVisible();
     expect(screen.getByTestId("workshop-status")).toHaveTextContent("6 photos selected.");
 
-    // The stubbed three-column pitch puts `d` directly under `a`; the drop lands on position 4.
+    // The first `over` in a keyboard drag is the tile itself; the pick-up sentence survives it.
+    expect(dragAnnouncement()).toHaveTextContent("Photo 1 of 6 picked up.");
+    expect(dragAnnouncement().textContent).not.toContain("selection-");
+
+    // The stubbed three-column pitch puts `d` directly under `a`; the announcement names positions
+    // from the current array, never dnd-kit's generated ids.
     await pressKey(document, "ArrowDown", "ArrowDown");
+    expect(dragAnnouncement()).toHaveTextContent("Photo 1 of 6 moved to position 4.");
+    expect(dragAnnouncement().textContent).not.toContain("selection-");
+    expect(screen.getByTestId("workshop-status")).toHaveTextContent("6 photos selected.");
     await pressKey(document, "Space", " ");
+    expect(dragAnnouncement()).toHaveTextContent("Photo 4 of 6 dropped.");
     expect(tileLines()).toEqual([
       "b.png: Waiting",
       "c.png: Waiting",
@@ -657,7 +682,7 @@ describe("reordering", () => {
     await settleDragListeners();
   });
 
-  it("should move a tile up with the keyboard", async () => {
+  it("should move a tile up with the keyboard and announce both positions", async () => {
     renderWorkshop();
     pickFiles(screen.getByLabelText("Choose photos"), sixFiles());
     stubGridRects();
@@ -667,7 +692,9 @@ describe("reordering", () => {
     await pressKey(fourth, "Space", " ");
 
     await pressKey(document, "ArrowUp", "ArrowUp");
+    expect(dragAnnouncement()).toHaveTextContent("Photo 4 of 6 moved to position 1.");
     await pressKey(document, "Space", " ");
+    expect(dragAnnouncement()).toHaveTextContent("Photo 1 of 6 dropped.");
     expect(tileLines()).toEqual([
       "d.png: Waiting",
       "a.png: Waiting",
@@ -691,14 +718,39 @@ describe("reordering", () => {
     expect(first).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByTestId("drag-overlay")).toBeVisible();
     await pressKey(document, "ArrowRight", "ArrowRight");
+    expect(dragAnnouncement()).toHaveTextContent("Photo 1 of 3 moved to position 2.");
     await pressKey(document, "Escape", "Escape");
 
+    expect(dragAnnouncement()).toHaveTextContent(
+      "Move cancelled. Photo 1 of 3 is back in position 1.",
+    );
     expect(tileLines()).toEqual(["a.png: Waiting", "b.png: Waiting", "c.png: Waiting"]);
     // dnd-kit clears its own overlay and the source slot's dragging state on cancel; the array never
     // saw the move, so the order is untouched.
     expect(screen.queryByTestId("drag-overlay")).toBeNull();
     expect(document.querySelector('[data-dragging="true"]')).toBeNull();
     expect(first).not.toHaveAttribute("aria-pressed");
+    await settleDragListeners();
+  });
+
+  it("should announce a step back to the origin position after a move away", async () => {
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), threeFiles());
+    stubGridRects();
+
+    const first = activatorFor("a.png");
+    first.focus();
+    await pressKey(first, "Space", " ");
+    await pressKey(document, "ArrowRight", "ArrowRight");
+    expect(dragAnnouncement()).toHaveTextContent("Photo 1 of 3 moved to position 2.");
+
+    // The return to the pickup position is a real move, not the pickup frame's self-`over`: the
+    // handler tracks the last announced destination rather than the original position.
+    await pressKey(document, "ArrowLeft", "ArrowLeft");
+    expect(dragAnnouncement()).toHaveTextContent("Photo 1 of 3 moved to position 1.");
+    expect(dragAnnouncement().textContent).not.toContain("selection-");
+
+    await pressKey(document, "Escape", "Escape");
     await settleDragListeners();
   });
 
