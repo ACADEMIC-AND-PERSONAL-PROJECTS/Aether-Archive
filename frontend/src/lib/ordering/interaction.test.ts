@@ -10,9 +10,9 @@ import {
 } from "./interaction";
 
 /**
- * The gesture envelope (E4-S3B) and the motion it settles with (E4-S3C). These are the numbers the
- * Chromium probe measures; pinning them in a unit test means the probe and the component cannot drift
- * apart silently.
+ * The gesture envelope (E4-S3B), auto-scroll's band and the motion it settles with (E4-S3C). These
+ * are the numbers the Chromium probe measures; pinning them in a unit test means the probe and the
+ * component cannot drift apart silently.
  */
 describe("the drag envelope", () => {
   it("should keep the mouse threshold small and the touch press long", () => {

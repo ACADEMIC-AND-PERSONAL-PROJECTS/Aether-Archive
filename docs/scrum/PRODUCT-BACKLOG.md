@@ -409,7 +409,7 @@ opens on tap, feels tactile, and gets out of the way.
 | E4-S2B | Client-side downscale before upload (criterion 2) | p0 | 2 | 3 | Done |
 | E4-S3A | The order reducer (criterion 2, reducer half) | p0 | 1 | 4 | Done |
 | E4-S3B | The gesture core: mouse/touch sensors, sortable grid, overlay (criterion 1) | p0 | 4 | 4 | Done |
-| E4-S3C | Motion: drop ≤ 300 ms, auto-scroll, reduced motion (criterion 4) | p0 | 1 | 4 | In review |
+| E4-S3C | Motion: drop ≤ 300 ms, auto-scroll and reduced motion (criterion 4) — two PRs | p0 | 1 | 4 | In review |
 | E4-S3D | Keyboard and announcements, with the cancel path (criterion 3) | p0 | 2 | 4 | Todo |
 | E4-S4 | Aura colour picker with palette suggestions | p0 | 5 | 4 | Todo |
 | E4-S5 | Publish dump with optimistic UI | p0 | 5 | 4 | Todo |
@@ -454,7 +454,7 @@ opens on tap, feels tactile, and gets out of the way.
 - [ ] **(A2)** Uploads run sequentially or bounded-concurrent; one failure never aborts the others silently.
 - [ ] **(A2/B)** Tests for the cap and for the downscale decision function (pure).
 
-### E4-S3 — Drag-and-drop ordering · 8 pts · p0 · **re-cut at review into S3A (1) + S3B (4) + S3C (1) + S3D (2)**
+### E4-S3 — Drag-and-drop ordering · 8 pts · p0 · **re-cut at review into S3A (1) + S3B (4) + S3C (1, two PRs) + S3D (2)**
 
 *As the curator, I want to reorder my 6 images by touch, so that the dump tells the story I want.*
 
@@ -464,11 +464,19 @@ opens on tap, feels tactile, and gets out of the way.
 > document listener between tests), fixed in the re-cut. **S3A** ships the reducer, **S3B** the gesture
 > core (its own measured exception), **S3C** keyboard/announcements/auto-scroll/motion. Points unchanged.
 >
-> **Carried from S3B's review, now owned:** **S3C** (motion) covers the sort settle and any drop
-> transition under `prefers-reduced-motion` (`global.css` froze `animation-duration` only, not
-> `transition-duration`), the overlay status line's scrim, and the reorder-before-batch order test.
-> **S3D** (keyboard) covers `onDragCancel` and replaces dnd-kit's internal-id live region with the
-> custom announcements/instructions.
+> Re-cut again at PR #127's review: the motion slice had grown to **521 hand-written including records,
+> 21 past the ~500 branch trigger**, after the pre-cut had measured it at 496. Rather than claim an
+> exception the reviewer could falsify, auto-scroll is delivered on its own branch (constant, one
+> `DndContext` prop, an exact-value test, its own probe) and #127 keeps the drop animation, the overlay
+> scrim and reduced motion. Same slice id and point, so the sprint total does not move; keyboard is
+> **S3D**.
+>
+> **Carried into S3C from S3B's review:** the sort settle (and any drop transition) must respect
+> `prefers-reduced-motion` — `global.css` freezes `animation-duration` only, not `transition-duration`;
+> the overlay's status line needs a scrim or to move inside the lifted surface; `onDragCancel` needs a
+> unit test; dnd-kit's default live region speaks internal ids and must be replaced by the custom
+> announcements/instructions; and a test should pin that a reorder before a batch sends the files in
+> the displayed order (S3C or E4-S5).
 
 - [ ] **(B)** `@dnd-kit` grid: long-press (touch) / drag (mouse) reorder with visual lift, no scroll conflict.
 - [ ] **(A)** Order is a pure reducer in `lib/` (unit-tested) driving `displayOrder` 0–5 in the payload.
@@ -582,7 +590,6 @@ delivery, documentation, and a clean v1.0.
 | E6-S20 | Static-WebP downscaling, once animation and alpha are detectable | p2 | 2 | — | Todo |
 | E6-S21 | Splash hero URL origin validation | p2 | 1 | — | Todo |
 | E6-S22 | GitHub Actions majors and Dependabot | p2 | 1 | — | Todo |
-| E6-S23 | Drag overlay stacking at short viewports | p2 | 1 | — | Todo |
 
 ### E6-S1 — CI on every PR · 5 pts · p0
 
@@ -798,18 +805,6 @@ Node 24; current majors are checkout v7, setup-java v6, setup-node v7 and upload
 - [ ] Migrate the workflow to the current major of each action, pinned by SHA, and re-run the suite.
 - [ ] Add `.github/dependabot.yml` for `github-actions` (and optionally `npm`/`maven`) with a weekly
       schedule; review the first PR it opens rather than auto-merging.
-
-### E6-S23 — Drag overlay stacking at short viewports · 1 pt · p2
-
-*As the curator on a short screen, I want the lifted tile to stay above the panel, so the photo I am
-holding is never cut by the control surface.*
-
-E4-S3C's probe (390 × 300): the grid's scroll container and the upload panel are both `relative z-10`
-siblings, so the fixed drag clone (z-index 999) lives inside the earlier stacking context and paints
-**under** the panel; at 390 × 844 they do not overlap. Recorded rather than changed inside the story.
-
-- [ ] Raise the scroller's stacking context (or portal the overlay) so the clone always wins; a probe
-      at 390 × 300 pins it, and the existing dnd geometry tests stay green.
 
 ---
 

@@ -616,15 +616,18 @@ describe("reordering", () => {
     await settleDragListeners();
     unmount();
 
-    // jsdom has no matchMedia; the stubbed query reports the preference the hook then reads.
+    // jsdom has no matchMedia; the stubbed query reports the preference the hook then reads, and the
+    // listener spies pin the effect's lifecycle (subscribe on mount, unsubscribe on unmount).
+    const addEventListener = vi.fn();
+    const removeEventListener = vi.fn();
     const matchMedia = vi.fn().mockReturnValue({
       matches: true,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
+      addEventListener,
+      removeEventListener,
     });
     vi.stubGlobal("matchMedia", matchMedia);
 
-    renderWorkshop();
+    const reduced = renderWorkshop();
     pickFiles(screen.getByLabelText("Choose photos"), [
       fileOf(16, "image/png", "a.png"),
       fileOf(16, "image/png", "b.png"),
@@ -649,6 +652,12 @@ describe("reordering", () => {
     await act(async () => {});
     expect(tileLines()).toEqual(["b.png: Waiting", "a.png: Waiting"]);
     await settleDragListeners();
+
+    // The motion-preference listener is a lifecycle addition: it must be subscribed while the grid is
+    // mounted and released with it, or a long-lived page accumulates one listener per mount.
+    expect(addEventListener).toHaveBeenCalledWith("change", expect.any(Function));
+    reduced.unmount();
+    expect(removeEventListener).toHaveBeenCalledWith("change", expect.any(Function));
   });
 
   it("should refuse a drag while the batch is uploading", async () => {

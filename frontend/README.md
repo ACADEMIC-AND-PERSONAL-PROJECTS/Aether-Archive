@@ -1135,9 +1135,9 @@ applies `moveItem` from the previous section. The array is still the only order.
   has actually started a drag.
 - The tiles settle with a **200 ms** inline transition on `cubic-bezier(0.22, 1, 0.36, 1)`
   (`SORT_SETTLE_MS`, `EASE_SOFT`).
-- Auto-scroll, the tuned drop animation and the reduced-motion reading were **not** in S3B; they are
-  E4-S3C's motion slice and are measured in the next section. The keyboard sensor, announcements and
-  screen-reader instructions are E4-S3D, not here.
+- Auto-scroll, the tuned drop animation and the reduced-motion reading were **not** in S3B: auto-scroll
+  landed on its own branch (#128), the tuned drop and the reduced-motion reading on #127 — both
+  E4-S3C. The keyboard sensor, announcements and screen-reader instructions are E4-S3D, not here.
 
 **The overlay.** `DragOverlay` renders a presentational clone — scrim, preview, state line — raised with
 the one soft shadow and a hairline edge; the source slot keeps its measured space and paints nothing
@@ -1202,19 +1202,12 @@ has no travel).
 Not measured here: a physical phone's long-press feel and Safari's `touch-action` handling. The
 reduced-motion drop arrived with E4-S3C's motion slice and is measured in the next section.
 
-## Auto-scroll and reduced motion — measured (E4-S3C, motion slice)
+## Drop animation and reduced motion — measured (E4-S3C, motion branch)
 
-This slice keeps a long drag scrolling and stops the motion for readers who ask it to. The array is
-still the only order, and the queue sends the displayed order. Keyboard moves and announcements are
-E4-S3D and are not part of this tree.
-
-**Auto-scroll.** `AUTO_SCROLL_OPTIONS` — edge bands at 15 % / 18 %, acceleration 8, interval 5 — is
-passed to `DndContext`. At 390 × 300 the document has 448 px of content in a 300 px viewport, so it
-can travel 148 px. Holding the first tile 8 px above the bottom edge took the document from 0 to
-**148 px, its maximum, by the first 100 ms sample**, and kept it there for the rest of the hold; the
-grid's own scroller stayed at 0 (its `scrollHeight` equals its `clientHeight` at this viewport, so the
-document is the only scroller with travel). Dropping on the last fully visible tile moved photo 1 from
-position 1 to position 6: `[1,2,3,4,5,6]` → `[2,3,4,5,6,1]`.
+This branch tunes the drop and stops the motion for readers who ask it to. Auto-scroll landed on its
+own branch (#128) and is measured in the section below; the array is still the only order, and the
+queue sends the displayed order. Keyboard moves and announcements are E4-S3D and are not part of this
+tree.
 
 **The drop animation.** `DROP_ANIMATION_MS` is 250 with `EASE_SOFT`, under the story's 300 ms ceiling.
 Recorded by wrapping `Element.prototype.animate` before the app loads: one call,
@@ -1244,17 +1237,15 @@ on the composited scrim, **mean 8.57:1, worst pixel 7.45:1** — above the 4.5:1
   `[2,3,1,4,5,6]`.
 
 Probe: headless Chromium **153.0.8010.12**, built `dist/` on `vite preview`, scripts outside the
-repository, 390 × 844 DPR 3 except the auto-scroll scenario at 390 × 300.
+repository, 390 × 844 DPR 3.
 
 | Scenario (built bundle)      | Evidence                                                                                                                                                                                                                 |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Auto-scroll, 390 × 300       | document `scrollTop` 0 → **148** (maximum) and held; grid scroller 0; drop on the last visible tile → `[2,3,4,5,6,1]`                                                                                                    |
 | Drop animation               | overlay `data-drop-animation="250ms"`; neighbour settle `transform 0.2s cubic-bezier(0.22, 1, 0.36, 1)`; one `Element.prototype.animate` call: duration **250 ms**, same easing; order `[1,2,3,4,5,6]` → `[2,3,1,4,5,6]` |
 | Reduced motion, pointer drag | `matchMedia` true; computed tile `transition` `1e-05s`; `data-drop-animation="none"`; **0** animate calls; reorder `[2,3,1,4,5,6]`                                                                                       |
 
-0 off-origin requests and 0 page/console exceptions in every scenario. Capture:
-`reports/e4s3-autoscroll-390.png` (document at 148 px while the pointer holds the bottom edge); the S3B
-captures stay. The keyboard slice's capture is not part of this tree.
+0 off-origin requests and 0 page/console exceptions in every scenario. The S3B captures stay; the
+auto-scroll capture belongs to #128. The keyboard slice's capture is not part of this tree.
 
 **Layering note, measured at 390 × 300.** The grid's scroll container and the upload panel are both
 `relative z-10` siblings, so the fixed drag clone (z-index 999) lives inside the earlier stacking
@@ -1264,15 +1255,17 @@ behind it. If the clone should always win, raising the scroller's stacking conte
 change — recorded as **E6-S23** rather than silently changed here.
 
 Tests added or rewritten: 3 in `WorkshopView.test.tsx` (the reduced-motion reading, the queue's
-displayed order, and a StrictMode pointer reorder), 3 in `reduced.test.ts`, 2 in `interaction.test.ts`
-and 1 in `tokens.test.ts`. Two pieces are **probe-covered rather than suite-covered**, stated because
-a passing suite is not evidence for them: dnd-kit's WAAPI drop gating (jsdom's zero geometry makes
-dnd-kit skip the drop animation entirely, so a test assertion would pass with or without the gate) and
-the `autoScroll` prop's wiring (the tuned values are pinned exactly in `interaction.test.ts`; whether
-`DndContext` receives them is measured in the probe). The full suite is **32 files / 372 tests**; the shuffled suite was run
-**three times** (`npm run test -- --run --sequence.shuffle`), green each time.
+displayed order, and a StrictMode pointer reorder), 3 in `reduced.test.ts`, 1 in
+`interaction.test.ts` (the drop ceiling) and 1 in `tokens.test.ts`. One piece is **probe-covered
+rather than suite-covered**, stated because a passing suite is not evidence for it: dnd-kit's WAAPI
+drop gating (jsdom's zero geometry makes dnd-kit skip the drop animation entirely, so a test assertion
+would pass with or without the gate). The `autoScroll` wiring is stated in the auto-scroll section
+below. The full suite is **32 files / 372 tests**; the shuffled suite was run **three times**
+(`npm run test -- --run --sequence.shuffle`), green each time.
 
-Bundle delta, two production builds with and without this slice in `dist/`:
+Bundle delta for the whole E4-S3C motion work — auto-scroll, drop animation and reduced motion —
+two production builds with and without it in `dist/` (measured before the auto-scroll split; the
+auto-scroll share is one constant and one prop, so it is a negligible part of the delta):
 
 | Chunk                 | Before                    | After                     | Delta                        |
 | --------------------- | ------------------------- | ------------------------- | ---------------------------- |
@@ -1283,10 +1276,31 @@ Bundle delta, two production builds with and without this slice in `dist/`:
 The cost lands in the lazily loaded workshop chunk and the new gradient utilities; first paint is
 unchanged.
 
-Not measured here: a physical phone's auto-scroll feel while a finger holds a tile at the edge (the
-probe drives a synthetic mouse pointer), and Safari/iOS's `prefers-reduced-motion` reading (the probe
-emulates it through CDP in Chromium) — **SKIPPED**. The keyboard path and announcements are E4-S3D's
-other slice.
+Not measured here: Safari/iOS's `prefers-reduced-motion` reading (the probe emulates it through CDP in
+Chromium) — **SKIPPED**. The keyboard path and announcements are E4-S3D's other slice.
+
+## Auto-scroll — measured (E4-S3C, auto-scroll branch)
+
+`AUTO_SCROLL_OPTIONS` — edge bands at 15 % / 18 %, acceleration 8, interval 5 — is passed to
+`DndContext`; the values are pinned **exactly** in `interaction.test.ts`, because a range check would
+pass with dnd-kit's defaults and the tuning the probe measured could disappear silently. At 390 × 300
+the document has 448 px of content in a 300 px viewport, so it can travel 148 px. The probe moved the
+pointer to y = 292 (8 px above the viewport's bottom edge) and sampled `scrollTop` every 100 ms: the
+first sample was already **148 px, the maximum**, and all 14 samples held it for the rest of the
+drag; the grid's own scroller stayed at 0 (its `scrollHeight` equals its `clientHeight` at this
+viewport, so the document is the only scroller with travel). Dropping on the last fully visible tile
+moved photo 1 from position 1 to position 6: `[1,2,3,4,5,6]` → `[2,3,4,5,6,1]`.
+
+The `autoScroll` prop's **wiring** is probe-covered rather than suite-covered: the shipped suite does
+not mock `DndContext`, so nothing pins that the prop is received, and jsdom cannot perform the scroll
+either — measured here instead. Capture: `reports/e4s3-autoscroll-390.png` (1170 × 900, 390 × 300
+DPR 3). The drop animation and the reduced-motion reading are on the other E4-S3C PR, not this branch.
+
+Tests added: 1 in `interaction.test.ts` (the exact-value pin); the full suite is **32 files /
+372 tests** at this branch's tip. Probe: headless Chromium **153.0.8010.12**, built `dist/` on
+`vite preview`, scripts outside the repository. Not measured here: a physical phone's auto-scroll feel
+while a finger holds a tile at the edge (the probe drives a synthetic mouse pointer) and Safari/iOS's
+scroll behaviour — **SKIPPED**, tracked with E6-S4.
 
 ## Zero external requests — measured on the built bundle
 

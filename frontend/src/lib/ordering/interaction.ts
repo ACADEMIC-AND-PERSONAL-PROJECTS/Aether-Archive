@@ -37,9 +37,10 @@ export const SORT_SETTLE_MS = 200;
 export const DROP_ANIMATION_MS = 250;
 
 /**
- * Auto-scroll: the distance from the scroll container's edge, as a fraction of its height, at which
- * the grid starts moving, and how quickly it accelerates. Passed to `DndContext`'s `autoScroll`,
- * which walks up from the dragged tile to the `overflow-y-auto` grid scroller.
+ * Auto-scroll: the distance from the scroll container's edge, as a fraction of its width (`x`) and
+ * height (`y`), at which the grid starts moving, and how quickly it accelerates. Passed to
+ * `DndContext`'s `autoScroll`, which walks up from the dragged tile to the nearest scrollable
+ * ancestor — the document at the probed viewport, where the grid's own scroller has no travel.
  */
 export const AUTO_SCROLL_OPTIONS = {
   threshold: { x: 0.15, y: 0.18 },
