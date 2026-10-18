@@ -999,6 +999,10 @@ mutants were each applied, observed red, and reverted:
 | `alive` half of the progress gate defeated           | 1 failed — `expected true to be false`                                                    |
 | old post-loop cancel check restored                  | 1 failed — "Upload cancelled." overwrote "Added 1 photo." after a stored 201              |
 
+E4-S5A retires the `success-path revokePreview deleted` mutant above: a success no longer revokes its
+preview, so that mutant no longer exists to run — the preview test now pins the reverse (kept until
+the tile is removed, its only exit).
+
 Browser probe (development-time, headless Chromium 152, 390 × 844 DPR 3, built `dist/` served by a
 local stub; scripts outside the repository; the stub answers every second upload with 415
 `unsupported-image-type` after 400 ms):
@@ -1113,9 +1117,9 @@ the slot a photo occupies is its index, so the future publish payload is `ordere
   `arrayMove`'s contract: the destination is the index in the resulting array.
 - `orderedIds(items)` is the payload projection — ids in display order. Its production caller arrives
   with the publish (E4-S5B); the tests pin the contract the endpoint will consume. **The ids must be
-  the server's photo UUIDs**: `SelectionItem.id` is client-local (`selection-N`), which is why since
-  E4-S5A a successful upload keeps the returned `Photo` on the item — the six stored photos, in
-  display order, are what `orderedIds` will project into a valid `DumpCreate.photoIds`.
+  the server's photo UUIDs**: `SelectionItem.id` is client-local (`selection-N`) and `orderedIds` maps
+  that field, so the publish projects each tile's `photo.id` — which is why since E4-S5A a successful
+  upload keeps the returned `Photo` on the item before `DumpCreate.photoIds` is built.
 
 11 unit tests state every move direction, both clamps, the no-op identity and the ordered-ids
 projection. The drag and touch surfaces that write through this reducer arrived in E4-S3B — the next

@@ -992,9 +992,10 @@ client mirrors before sending, and what the optimistic write means for a cache w
 1. **A successful upload keeps its tile.** The queue marks the tile `added` and keeps the returned
    `Photo` on it; its preview lives until the tile is removed or the view unmounts. The tiles **are**
    the draft and their display order **is** the publish order: the payload is `orderedIds` over the six
-   stored photos, with `displayOrder` 0–5 being the index. E4-S2A2's "the success is the tile leaving
-   the grid" is retired; an uploaded photo the curator abandons stays in the archive as an unassigned
-   photo, which is what it was.
+   stored photos — each tile's `photo.id`, since `orderedIds` maps the item's `id` field — with
+   `displayOrder` 0–5 being the index. E4-S2A2's "the success is the tile leaving the grid" is retired;
+   an uploaded photo the curator abandons stays in the archive as an unassigned photo, which is what it
+   was.
 2. **The publish is a second, explicit action.** "Upload" stays the store action the single-photo flow
    uses; "Save archive" (the spec's step 4) publishes the draft. The publish group appears once the
    draft holds six tiles — the dump's shape — and a refused click is answered with one sentence, not a
