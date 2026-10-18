@@ -10,6 +10,13 @@ import type { PaletteColor } from "../lib/color/types";
  * The curator's aura as React state (E4-S4C): the chosen colour, where the suggestions come from and
  * where the preview lands.
  *
+ * ## Only the aura persists (ADR-023 decision 4)
+ *
+ * `chosen` is initialised from one `sessionStorage` key and written back on every change — the hex
+ * and nothing else; the picked `File`s never touch storage. A refresh restores the colour over an
+ * empty workshop. Storage can be unavailable (private modes): every access is guarded and the aura
+ * then simply lives for the view's life.
+ *
  * ## Extraction is keyed to membership, not to the array
  *
  * The workshop replaces its `items` array on every upload state change, so keying extraction to its
@@ -27,6 +34,9 @@ import type { PaletteColor } from "../lib/color/types";
  * so every swatch offered is applicable. The theme is applied on `targetRef` — the workshop's root —
  * and cleared when the choice changes or the hook unmounts, as the splash does (ADR-023 decision 4).
  */
+
+/** ADR-023 decision 4: one key, one value, for the browsing session only. */
+export const AURA_STORAGE_KEY = "aether-archive:aura";
 
 /** The shape the workshop's selection already has: `id` is the membership key, `file` the source. */
 export interface AuraSource {
@@ -66,6 +76,33 @@ function isCarriable(hex: string): boolean {
   }
 }
 
+/** The stored aura, re-validated: a hand-edited or stale value the engine refuses is ignored. */
+function readStoredAura(): string | null {
+  try {
+    const stored = window.sessionStorage.getItem(AURA_STORAGE_KEY);
+    if (stored === null) {
+      return null;
+    }
+    const hex = normalizeHex(stored);
+    return hex !== null && isCarriable(hex) ? hex : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Persists the chosen hex (or clears it) — one key for the browsing session. */
+function writeStoredAura(hex: string | null): void {
+  try {
+    if (hex === null) {
+      window.sessionStorage.removeItem(AURA_STORAGE_KEY);
+    } else {
+      window.sessionStorage.setItem(AURA_STORAGE_KEY, hex);
+    }
+  } catch {
+    // A blocked Storage is a lost session, not a broken workshop.
+  }
+}
+
 /** Identity by the fields the picker reads, so an unchanged ranking causes no re-render. */
 function sameSuggestions(a: readonly PaletteColor[], b: readonly PaletteColor[]): boolean {
   return (
@@ -80,7 +117,7 @@ export function useAura(
   options: AuraOptions = {},
 ): Aura {
   const { enabled = true } = options;
-  const [chosen, setChosen] = useState<string | null>(null);
+  const [chosen, setChosen] = useState<string | null>(readStoredAura);
   const [suggestions, setSuggestions] = useState<readonly PaletteColor[]>([]);
 
   const sourcesRef = useRef(sources);
@@ -125,7 +162,8 @@ export function useAura(
       try {
         applyTheme(themeFromBackground(chosen), target);
       } catch {
-        // Unreachable through `choose` (it validates first); it guards the E4-S4C2 stored value.
+        // Both entrances validate through the same engine check; this is the belt for a future
+        // divergence, not a known shape.
       }
     }
     return () => clearTheme(target);
@@ -139,12 +177,14 @@ export function useAura(
     if (!isCarriable(hex)) {
       return { status: "refused" };
     }
+    writeStoredAura(hex);
     setChosen(hex);
     return { status: "applied", hex };
   }, []);
 
   const reset = useCallback((): void => {
     const next = suggestions[0]?.hex ?? null;
+    writeStoredAura(next);
     setChosen(next);
   }, [suggestions]);
 

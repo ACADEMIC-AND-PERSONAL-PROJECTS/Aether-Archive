@@ -920,7 +920,9 @@ under the tile prefixed `sr-only` by the file's own name. Remove buttons are dis
 running, not removed: the queue holds a snapshot of the files, and a tile vanishing mid-batch would
 leave the summary counting something invisible. The scroll container keeps A1's measured centring
 (`justify-center` on the scroller; the tile's top lands on the computed centre). Preview URLs are
-revoked on removal, **on success** and on unmount; the `File`s are state and nothing is persisted.
+revoked on removal, **on success** and on unmount; the `File`s are state and **only the aura
+persists** — one `sessionStorage` value the curator chose (E4-S4C, ADR-023 decision 4), never a
+`File`.
 
 ### The queue — one request at a time, failures isolated
 
