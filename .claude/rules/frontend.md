@@ -68,8 +68,9 @@ styles/      global.css (tokens + base), theme.css, glass.css
   `docs/engineering/DESIGN-SYSTEM.md`. Never hardcode a hex value in a component.
 - The Tailwind scan is explicit (`source(none)` + `@source` in `global.css`): a new top-level input
   that can carry class names must be registered there; documents are never scanned.
-- One glass primitive (`GlassPanel`): `backdrop-filter: blur(15px)` + `rgba(0,0,0,0.4)`; on browsers
-  without `backdrop-filter` fall back to a solid tint — never leave text unreadable.
+- One glass primitive (`GlassPanel`): `backdrop-filter: blur(15px)` + the theme's tint (`rgba(0,0,0,0.4)` in
+  the neutral set; a curator-chosen page flips it with the text — ADR-023). Browsers without
+  `backdrop-filter` fall back to a solid tint — never leave text unreadable.
 
 ## Testing
 

@@ -117,7 +117,8 @@ accent **8.46:1** — every pair ≥ 4.5:1 (§8).
   tokens from `themeFromBackground` (ADR-023), which flips to the inverse white tint and dark hairline
   under dark text so the glass keeps carrying 4.5:1 text.
 - Fallback when `backdrop-filter` is unsupported: the `@supports` branch in `glass.css` swaps
-  `--aura-glass` for `--aura-glass-solid` (`rgba(0, 0, 0, 0.72)`) so text stays readable.
+  `--aura-glass` for `--aura-glass-solid` (`rgba(0, 0, 0, 0.72)` in the neutral set; white under a light
+  theme's dark text) so text stays readable.
 - No drop shadows beyond a soft `0 8px 24px rgba(0,0,0,0.24)` when elevation must be communicated.
 - Scrim rule: text over an image always sits on a gradient scrim or glass — never directly on pixels.
 
