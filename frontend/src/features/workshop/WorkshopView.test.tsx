@@ -8,11 +8,13 @@ import { FakeXhr } from "../../api/__fixtures__/fakeXhr";
 import { PROBLEM_413_TOO_LARGE, PROBLEM_415_UNSUPPORTED } from "../../api/__fixtures__/problems";
 import { queryKeys } from "../../api/queryKeys";
 import { createQueryClient } from "../../app/queryClient";
+import { suggestPalette } from "../../lib/color/suggest";
 import { downscaleForUpload } from "../../lib/upload/downscale";
 import { MAX_SELECTION } from "../../lib/upload/selection";
 import { ACCEPT_ATTRIBUTE, MAX_UPLOAD_BYTES } from "../../lib/upload/validation";
 import { runAxe, violationSummary } from "../../test/axe";
 
+import type { PaletteColor } from "../../lib/color/types";
 import type { Photo } from "../../types/api";
 
 /**
@@ -30,6 +32,22 @@ vi.mock("../../lib/upload/downscale", async (importOriginal) => {
 });
 
 const mockedDownscale = vi.mocked(downscaleForUpload);
+
+/**
+ * The aura's browser edge (E4-S4C) gets the same treatment: `suggestPalette` needs
+ * `createImageBitmap`, so these tests replace exactly it and pin what the picker does with whatever
+ * ranking it returns. The real pipeline keeps its own tests (`lib/color/suggest.test.ts`) and the
+ * Chromium probe.
+ */
+vi.mock("../../lib/color/suggest", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    suggestPalette: vi.fn(async () => []),
+  };
+});
+
+const mockedSuggest = vi.mocked(suggestPalette);
 
 /**
  * The workshop's multi-select and sequential-queue behaviour (E4-S2A2), as the user observes it.
@@ -92,6 +110,11 @@ function threeFiles(): readonly File[] {
 /** The full six-photo grid the keyboard announcements count against. */
 function sixFiles(): readonly File[] {
   return ["a", "b", "c", "d", "e", "f"].map((name) => fileOf(16, "image/png", `${name}.png`));
+}
+
+/** One ranked suggestion, in the shape the extraction edge returns (the picker reads hex + weight). */
+function suggestion(hex: string, weight: number): PaletteColor {
+  return { hex, oklch: { l: 0.5, c: 0.05, h: 200 }, weight };
 }
 
 function renderWorkshop(): { client: QueryClient; unmount: () => void } {
@@ -249,6 +272,9 @@ beforeEach(() => {
   // The default is the library's own ineligible/within-bounds answer: send the picked File as-is.
   mockedDownscale.mockReset();
   mockedDownscale.mockImplementation(async (file: File) => file);
+  // The aura: no suggestions unless a test arranges them.
+  mockedSuggest.mockReset();
+  mockedSuggest.mockImplementation(async () => []);
 });
 
 afterEach(() => {
@@ -644,9 +670,10 @@ describe("reordering", () => {
     pickFiles(screen.getByLabelText("Choose photos"), sixFiles());
     stubGridRects();
 
-    // Two persistent regions, each owning one conversation: the workshop's says what the queue is
-    // doing, dnd-kit's says where the photo is. A drag changes no upload state, so only one speaks.
-    expect(screen.getAllByRole("status")).toHaveLength(2);
+    // Three persistent regions, each owning one conversation: the workshop's says what the queue
+    // is doing, dnd-kit's says where the photo is, and the picker's speaks its verdict — kept
+    // mounted and empty between messages (E3-S5B). A drag changes no upload state, so only one speaks.
+    expect(screen.getAllByRole("status")).toHaveLength(3);
     expect(screen.getByTestId("workshop-status")).toHaveTextContent("6 photos selected.");
 
     const first = activatorFor("a.png");
@@ -1453,10 +1480,148 @@ describe("StrictMode", () => {
 
     expect(tileLines()).toEqual(["strict-b.png: Waiting", "strict-a.png: Waiting"]);
   });
+
+  it("should count one extraction after a pick under the double mount", async () => {
+    // The empty double mount extracts nothing; the pick's single real answer stands and applies.
+    mockedSuggest.mockResolvedValue([suggestion("#1f7a7a", 1)]);
+    render(
+      <StrictMode>
+        <QueryClientProvider client={createQueryClient()}>
+          <WorkshopView />
+        </QueryClientProvider>
+      </StrictMode>,
+    );
+    pickFiles(screen.getByLabelText("Choose photos"), [fileOf(16, "image/png", "strict.png")]);
+    fireEvent.click(await screen.findByRole("button", { name: "Use #1f7a7a, 100% mean share" }));
+    expect(mockedSuggest.mock.calls.length).toBe(1);
+    expect(screen.getByRole("main").style.getPropertyValue("--aura-bg")).toBe("#1f7a7a");
+  });
+});
+
+describe("the aura picker", () => {
+  it("should offer the ranked suggestions as swatches that theme the workshop", async () => {
+    mockedSuggest.mockResolvedValue([suggestion("#1f7a7a", 0.55), suggestion("#c2542a", 0.45)]);
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [
+      fileOf(16, "image/png", "a.png"),
+      fileOf(16, "image/png", "b.png"),
+    ]);
+
+    // Ranked by confidence: display order is rank order, and each swatch reads out its mean share.
+    const palette = await screen.findAllByRole("button", { name: /mean share/ });
+    expect(palette.map((swatch) => swatch.getAttribute("aria-label"))).toEqual([
+      "Use #1f7a7a, 55% mean share",
+      "Use #c2542a, 45% mean share",
+    ]);
+
+    const second = palette[1];
+    if (second === undefined) {
+      throw new Error("the picker offered fewer than two swatches");
+    }
+    fireEvent.click(second);
+    const main = screen.getByRole("main");
+    expect(main.style.getPropertyValue("--aura-bg")).toBe("#c2542a");
+    expect(second).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("should drop a refused suggestion before it is offered", async () => {
+    // Pure black would be a dead control: its press lands on the refusal and no theme.
+    mockedSuggest.mockResolvedValue([suggestion("#000000", 0.6), suggestion("#c2542a", 0.4)]);
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [fileOf(16, "image/png", "a.png")]);
+    const palette = await screen.findAllByRole("button", { name: /mean share/ });
+    expect(palette.map((swatch) => swatch.getAttribute("aria-label"))).toEqual([
+      "Use #c2542a, 40% mean share",
+    ]);
+  });
+
+  it("should apply a typed hex live, and report the invalid and refused shapes", async () => {
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [fileOf(16, "image/png", "a.png")]);
+    const field = screen.getByLabelText("Aura");
+    const main = screen.getByRole("main");
+
+    // Complete and accepted: the preview follows the seventh character — there is no save step.
+    fireEvent.change(field, { target: { value: "#1F7A7A" } });
+    expect(main.style.getPropertyValue("--aura-bg")).toBe("#1f7a7a");
+
+    // Still typing: quiet. Committing an incomplete value reports it, and the last good value stands.
+    fireEvent.change(field, { target: { value: "#12345" } });
+    expect(screen.queryByText(/Not a colour/)).toBeNull();
+    fireEvent.keyDown(field, { key: "Enter" });
+    expect(screen.getByText(/Not a colour/)).toBeVisible();
+    expect(main.style.getPropertyValue("--aura-bg")).toBe("#1f7a7a");
+
+    // Leaving the field commits too: the same incomplete value reports it on blur.
+    fireEvent.change(field, { target: { value: "#12345" } });
+    fireEvent.blur(field);
+    expect(screen.getByText(/Not a colour/)).toBeVisible();
+
+    // A pure page is refused by policy (ADR-023) the moment its shape completes.
+    fireEvent.change(field, { target: { value: "#000000" } });
+    expect(screen.getByText(/outside the palette/)).toBeVisible();
+    expect(main.style.getPropertyValue("--aura-bg")).toBe("#1f7a7a");
+  });
+
+  it("should reset to the top suggestion, and to neutral when nothing was extracted", async () => {
+    mockedSuggest
+      .mockResolvedValueOnce([suggestion("#1f7a7a", 0.6), suggestion("#c2542a", 0.4)])
+      .mockResolvedValueOnce([]);
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [
+      fileOf(16, "image/png", "a.png"),
+      fileOf(16, "image/png", "b.png"),
+    ]);
+    const main = screen.getByRole("main");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Use #c2542a, 40% mean share" }));
+    expect(main.style.getPropertyValue("--aura-bg")).toBe("#c2542a");
+
+    fireEvent.click(screen.getByRole("button", { name: "Reset to extracted" }));
+    expect(main.style.getPropertyValue("--aura-bg")).toBe("#1f7a7a");
+
+    // Removing a photo re-extracts; the empty second answer leaves no swatches, and the reset still
+    // has a job: clearing the aura back to the neutral set.
+    fireEvent.click(screen.getByRole("button", { name: "Remove b.png" }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: /mean share/ })).toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
+    expect(main.style.getPropertyValue("--aura-bg")).toBe("");
+  });
+
+  it("should keep the aura and skip re-extraction when the grid is reordered", async () => {
+    mockedSuggest.mockResolvedValue([suggestion("#1f7a7a", 0.8), suggestion("#c2542a", 0.2)]);
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), threeFiles());
+    fireEvent.click(await screen.findByRole("button", { name: "Use #1f7a7a, 80% mean share" }));
+    const main = screen.getByRole("main");
+    const extractions = mockedSuggest.mock.calls.length;
+
+    // The pointer reorder E4-S3B measured, to the third slot.
+    stubGridRects();
+    const first = dragActivators()[0];
+    if (first === undefined) {
+      throw new Error("the first tile has no drag activator");
+    }
+    fireEvent.mouseDown(first, { clientX: 56, clientY: 56, button: 0 });
+    fireEvent.mouseMove(document, { clientX: 66, clientY: 56 });
+    await act(async () => {});
+    fireEvent.mouseMove(document, { clientX: 296, clientY: 56 });
+    await act(async () => {});
+    fireEvent.mouseUp(document, { clientX: 296, clientY: 56 });
+    await act(async () => {});
+    await settleDragListeners();
+
+    expect(tileLines()[2]).toBe("a.png: Waiting");
+    // Membership is unchanged by a reorder, so the photos are not decoded again…
+    expect(mockedSuggest.mock.calls.length).toBe(extractions);
+    // …and the chosen aura still themes the workshop.
+    expect(main.style.getPropertyValue("--aura-bg")).toBe("#1f7a7a");
+  });
 });
 
 describe("accessibility", () => {
   it("should have no structural violations while idle, sortable and uploading", async () => {
+    mockedSuggest.mockResolvedValue([suggestion("#1f7a7a", 0.55), suggestion("#c2542a", 0.45)]);
     const { unmount } = renderWorkshop();
     expect(violationSummary(await runAxe(document.body))).toEqual([]);
 
@@ -1465,6 +1630,8 @@ describe("accessibility", () => {
       fileOf(4096, "image/png", "b.png"),
     ]);
     expect(screen.getByRole("main")).toHaveAttribute("data-state", "selected");
+    // The full aura picker — swatches, field, and the reset once a colour is chosen — joins the sweep.
+    fireEvent.click(await screen.findByRole("button", { name: "Use #1f7a7a, 55% mean share" }));
     expect(violationSummary(await runAxe(document.body))).toEqual([]);
 
     const request = await startUpload();

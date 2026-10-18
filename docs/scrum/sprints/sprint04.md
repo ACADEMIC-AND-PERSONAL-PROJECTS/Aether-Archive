@@ -21,7 +21,7 @@
 | 2e | E4-S3D1 | Position-based announcement copy and instructions (criterion 3) | 1 | p0 | Done | #132 |
 | 3a | E4-S4A | The chosen-background theme engine — hex validation, contrast by construction | 1 | p0 | Done | #133 |
 | 3b | E4-S4B | Palette suggestions from the selected photos, merged and ranked | 2 | p0 | Done | #135 |
-| 3c | E4-S4C | The Aura picker UI, live preview, reset and session persistence | 2 | p0 | Todo | — |
+| 3c | E4-S4C | The Aura picker UI, live preview, reset and session persistence | 2 | p0 | In progress | — |
 | 4 | E4-S5 | Publish dump — `POST /dumps`, optimistic insert, rollback | 5 | p0 | Todo | — |
 | 5 | E6-S2 | Required status checks on `main` and `develop` | 2 | p0 | Todo | — |
 
