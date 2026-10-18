@@ -413,7 +413,7 @@ opens on tap, feels tactile, and gets out of the way.
 | E4-S3D | Keyboard path and cancel, with dnd-kit's default announcements (criterion 3) | p0 | 1 | 4 | Done |
 | E4-S3D1 | Position-based announcement copy and instructions (criterion 3) | p0 | 1 | 4 | Done |
 | E4-S4A | The chosen-background theme engine — hex validation, contrast by construction (criterion 2) | p0 | 1 | 4 | Done |
-| E4-S4B | Palette suggestions from the selected photos, merged and ranked (criterion 1) | p0 | 2 | 4 | Todo |
+| E4-S4B | Palette suggestions from the selected photos, merged and ranked (criterion 1) | p0 | 2 | 4 | In progress |
 | E4-S4C | The Aura picker UI, live preview, reset and session persistence (criteria 1–4) | p0 | 2 | 4 | Todo |
 | E4-S5 | Publish dump with optimistic UI | p0 | 5 | 4 | Todo |
 

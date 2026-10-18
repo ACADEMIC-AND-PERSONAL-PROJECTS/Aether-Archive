@@ -955,8 +955,10 @@ refuse light backgrounds, per-surface text tokens, or flip the glass tint with t
    glass; the token layer already owns the tint tokens per theme, so the flip is data, not a component.
 3. **Suggestions merge across the selected photos.** Each palette is extracted (E2-S4, 64 px edge);
    colours are pooled, deduped by normalised hex and ranked by summed weight — confidence is the
-   colour's share of the selected pixels. The top eight are offered; a failed extraction is skipped,
-   and if all fail there are no swatches (the hex input remains).
+   colour's mean share across the photos, per-photo shares averaged (a `Palette` carries no pixel
+   counts; this is the closest computable reading of "share of the selected pixels", and the two
+   differ only when the photos' working areas do). The top eight are offered; a failed extraction is
+   skipped, and if all fail there are no swatches (the hex input remains).
 4. **The aura persists for the browsing session, nothing else.** It lives in `sessionStorage` under
    one key and is restored on refresh; the picked `File`s never persist. The preview applies the theme
    on the workshop's root and clears it on unmount, as the splash does.
