@@ -27,6 +27,15 @@ export function hexToRgb(hex: string): Rgb {
   return { r: (value >> 16) & 0xff, g: (value >> 8) & 0xff, b: value & 0xff };
 }
 
+/**
+ * A user-entered `#RRGGBB` — case-insensitive, surrounding spaces allowed — normalised to lowercase;
+ * `null` when it is not one. The E4-S4 hex input validates with this before it reaches the theme.
+ */
+export function normalizeHex(value: string): string | null {
+  const trimmed = value.trim().toLowerCase();
+  return HEX.test(trimmed) ? trimmed : null;
+}
+
 /** A token string back to channels + alpha — `#rrggbb` or `rgba(...)`, the forms §2.2 uses. */
 export function parseColor(value: string): { rgb: Rgb; alpha: number } {
   if (HEX.test(value)) {

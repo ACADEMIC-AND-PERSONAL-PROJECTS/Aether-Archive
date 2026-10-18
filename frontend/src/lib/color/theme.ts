@@ -18,13 +18,14 @@ import {
   compositeOver,
   contrastRatio,
   hexToRgb,
+  normalizeHex,
   parseColor,
   rgbaString,
   type Rgb,
 } from "./contrast";
-import { oklchToHex } from "./oklch";
+import { oklchToHex, rgbToOklch } from "./oklch";
 
-import type { Palette, PaletteColor } from "./types";
+import type { Oklch, Palette, PaletteColor } from "./types";
 
 export interface AuraTheme {
   readonly bg: string;
@@ -63,9 +64,12 @@ const LIGHT_BASE = "#e8e6e3";
 
 /* The glass material's constants (§3): a black tint at two opacities, plus the hairline. */
 const GLASS_TINT: Rgb = { r: 0, g: 0, b: 0 };
+const WHITE_TINT: Rgb = { r: 255, g: 255, b: 255 };
 const GLASS_ALPHA = 0.4;
 const GLASS_SOLID_ALPHA = 0.72;
 const HAIRLINE = "1px solid rgba(255, 255, 255, 0.08)";
+/* The inverse hairline for the light-glass theme (`themeFromBackground` on a light page). */
+const LIGHT_HAIRLINE = "1px solid rgba(0, 0, 0, 0.08)";
 
 /* The generator's bands — the §2.1/§2.2 rules made numeric, one comment each in place. */
 const BG_L_MIN = 0.1;
@@ -267,6 +271,174 @@ export function paletteToTheme(palette: Palette): AuraTheme {
     accent,
     accentContrast,
   };
+}
+
+/**
+ * A theme from a **chosen** background (E4-S4). Unlike `paletteToTheme`, the page keeps the user's
+ * hex exactly; every other token is derived to clear §2.2's floor.
+ *
+ * **Both text directions are tried.** From each neutral base the text steps toward its extreme until
+ * it passes on the page, the surface and the glass composite; the direction with the stronger weakest
+ * pair wins. The surface steps **away from the text** (darker under light text, lighter under dark
+ * text) and flips at the cube's edge rather than collapsing into the page or into pure black/white.
+ * The search never returns pure black or pure white text. Pure black and pure white pages are refused
+ * by policy — the brief's bases stop at `#0B0B0D`/`#121215` — and every other page is accepted in at
+ * least one direction (measured on a 16³ cube).
+ *
+ * The accent is the background's own hue at a usable chroma (the neutral fallback accent when the
+ * background has no hue), fitted against the two neutral bases by `fitAccent`.
+ *
+ * **The glass follows the text.** The app's glass is a black tint, which on a light page would be
+ * darker than any text that passes on that page. Each direction therefore carries its own tint: black
+ * under light text, white under dark text (with a dark hairline), so the glass composite stays on the
+ * same side of the background as the text it must carry.
+ */
+export function themeFromBackground(value: string): AuraTheme {
+  const hex = normalizeHex(value);
+  if (hex === null) {
+    throw new Error(`Not a #rrggbb colour: ${value}`);
+  }
+  if (hex === "#000000" || hex === "#ffffff") {
+    throw new Error(
+      "Pure black and pure white are outside the brief's palette: choose #010101 or #fefefe.",
+    );
+  }
+  const bgRgb = hexToRgb(hex);
+  const bgOklch = rgbToOklch(bgRgb.r, bgRgb.g, bgRgb.b);
+  const lightBaseContrast = contrastRatio(hexToRgb(LIGHT_BASE), bgRgb);
+  const darkBaseContrast = contrastRatio(hexToRgb(DARK_BASE), bgRgb);
+  const light = textCandidate(hex, bgRgb, bgOklch, true);
+  const dark = textCandidate(hex, bgRgb, bgOklch, false);
+  const preferredLight = lightBaseContrast >= darkBaseContrast;
+  let chosen = light ?? dark;
+  if (light !== null && dark !== null) {
+    chosen =
+      light.minRatio > dark.minRatio || (light.minRatio === dark.minRatio && preferredLight)
+        ? light
+        : dark;
+  }
+  if (chosen === null) {
+    throw new Error(`${hex} cannot carry 4.5:1 text in either direction.`);
+  }
+
+  const textRgb = hexToRgb(chosen.text);
+  let mutedAlpha = MUTED_ALPHA;
+  let mutedOverBg = compositeOver(textRgb, mutedAlpha, bgRgb);
+  while (contrastRatio(mutedOverBg, bgRgb) < CONTRAST_MINIMUM && mutedAlpha < 1) {
+    mutedAlpha = Math.round((mutedAlpha + MUTED_STEP) * 100) / 100;
+    mutedOverBg = compositeOver(textRgb, mutedAlpha, bgRgb);
+  }
+
+  const fallbackAccentRgb = hexToRgb(FALLBACK_THEME.accent);
+  const fallbackAccentOklch = rgbToOklch(
+    fallbackAccentRgb.r,
+    fallbackAccentRgb.g,
+    fallbackAccentRgb.b,
+  );
+  const accentOklch =
+    bgOklch.c < 0.01
+      ? fallbackAccentOklch
+      : {
+          l: chosen.lightText ? 0.72 : 0.42,
+          c: Math.max(0.08, Math.min(bgOklch.c, 0.14)),
+          h: bgOklch.h,
+        };
+  const accentSource: PaletteColor = {
+    hex: oklchToHex(accentOklch),
+    oklch: accentOklch,
+    weight: 1,
+  };
+  const { accent, accentContrast } = fitAccent(accentSource);
+
+  return {
+    bg: hex,
+    surface: chosen.surface,
+    glass: rgbaString(chosen.glassTint, GLASS_ALPHA),
+    glassSolid: rgbaString(chosen.glassTint, GLASS_SOLID_ALPHA),
+    hairline: chosen.hairline,
+    text: chosen.text,
+    muted: rgbaString(textRgb, mutedAlpha),
+    accent,
+    accentContrast,
+  };
+}
+
+/** One direction's answer: its text, its surface, its tint, and the weakest of the three ratios. */
+interface TextCandidate {
+  readonly text: string;
+  readonly surface: string;
+  readonly glassTint: Rgb;
+  readonly hairline: string;
+  readonly lightText: boolean;
+  readonly minRatio: number;
+}
+
+/**
+ * Searches one text direction for the first non-pure candidate that clears all three pairs: the
+ * surface steps away from the text (flipping at the cube's edge so it never collapses into the page
+ * or into pure black/white), and the text starts at the neutral base and steps toward its extreme.
+ * `null` means this direction cannot carry the page at 4.5:1.
+ */
+function textCandidate(
+  bgHex: string,
+  bgRgb: Rgb,
+  bgOklch: Oklch,
+  lightText: boolean,
+): TextCandidate | null {
+  const glassTint: Rgb = lightText ? GLASS_TINT : WHITE_TINT;
+  const surfaceAt = (l: number): string =>
+    oklchToHex({
+      l: clamp(l, 0, 1),
+      c: Math.min(bgOklch.c, SURFACE_C_MAX),
+      h: bgOklch.h,
+    });
+  const away = clamp(bgOklch.l + (lightText ? -SURFACE_STEP : SURFACE_STEP), 0, 1);
+  let surface = surfaceAt(away);
+  // At the cube's edge the away-step clamps; flip instead of collapsing into the page or into pure.
+  if (surface === bgHex || surface === "#000000" || surface === "#ffffff") {
+    surface = surfaceAt(clamp(bgOklch.l + (lightText ? SURFACE_STEP : -SURFACE_STEP), 0, 1));
+  }
+  const surfaceRgb = hexToRgb(surface);
+  const glassOverBg = compositeOver(glassTint, GLASS_ALPHA, bgRgb);
+  const ratios = (candidate: string): number[] => {
+    const rgb = hexToRgb(candidate);
+    return [
+      contrastRatio(rgb, bgRgb),
+      contrastRatio(rgb, surfaceRgb),
+      contrastRatio(rgb, glassOverBg),
+    ];
+  };
+
+  const base = lightText ? LIGHT_BASE : DARK_BASE;
+  const baseRgb = hexToRgb(base);
+  const baseOklch = rgbToOklch(baseRgb.r, baseRgb.g, baseRgb.b);
+  const step = lightText ? 0.01 : -0.01;
+  let textL = baseOklch.l;
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    const candidate = oklchToHex({
+      l: textL,
+      c: Math.min(baseOklch.c, TEXT_C_MAX),
+      h: baseOklch.h,
+    });
+    const values = ratios(candidate);
+    const minRatio = Math.min(...values);
+    // Pure black/white are outside the brief; the search keeps stepping instead of returning them.
+    if (candidate !== "#000000" && candidate !== "#ffffff" && minRatio >= CONTRAST_MINIMUM) {
+      return {
+        text: candidate,
+        surface,
+        glassTint,
+        hairline: lightText ? HAIRLINE : LIGHT_HAIRLINE,
+        lightText,
+        minRatio,
+      };
+    }
+    if (lightText ? textL >= 0.995 : textL <= 0.005) {
+      break;
+    }
+    textL = clamp(textL + step, 0, 1);
+  }
+  return null;
 }
 
 /**

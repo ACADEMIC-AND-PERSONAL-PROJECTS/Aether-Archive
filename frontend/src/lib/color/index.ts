@@ -6,6 +6,7 @@ export {
   compositeOver,
   contrastRatio,
   hexToRgb,
+  normalizeHex,
   parseColor,
   relativeLuminance,
   rgbaString,
@@ -24,6 +25,7 @@ export {
   contrastReport,
   FALLBACK_THEME,
   paletteToTheme,
+  themeFromBackground,
   THEME_PROPERTIES,
 } from "./theme";
 export type { AuraTheme, ContrastReport } from "./theme";
