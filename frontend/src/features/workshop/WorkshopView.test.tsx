@@ -8,6 +8,7 @@ import { FakeXhr } from "../../api/__fixtures__/fakeXhr";
 import { PROBLEM_413_TOO_LARGE, PROBLEM_415_UNSUPPORTED } from "../../api/__fixtures__/problems";
 import { queryKeys } from "../../api/queryKeys";
 import { createQueryClient } from "../../app/queryClient";
+import { AURA_STORAGE_KEY } from "../../hooks/useAura";
 import { suggestPalette } from "../../lib/color/suggest";
 import { downscaleForUpload } from "../../lib/upload/downscale";
 import { MAX_SELECTION } from "../../lib/upload/selection";
@@ -272,9 +273,10 @@ beforeEach(() => {
   // The default is the library's own ineligible/within-bounds answer: send the picked File as-is.
   mockedDownscale.mockReset();
   mockedDownscale.mockImplementation(async (file: File) => file);
-  // The aura: no suggestions unless a test arranges them.
+  // The aura: no suggestions unless a test arranges them, and no session outlives its test.
   mockedSuggest.mockReset();
   mockedSuggest.mockImplementation(async () => []);
+  window.sessionStorage.clear();
 });
 
 afterEach(() => {
@@ -1522,6 +1524,9 @@ describe("the aura picker", () => {
     const main = screen.getByRole("main");
     expect(main.style.getPropertyValue("--aura-bg")).toBe("#c2542a");
     expect(second).toHaveAttribute("aria-pressed", "true");
+    // The aura — one sessionStorage value — is the only thing this view persists (ADR-023).
+    expect(window.sessionStorage.length).toBe(1);
+    expect(window.sessionStorage.getItem(AURA_STORAGE_KEY)).toBe("#c2542a");
   });
 
   it("should drop a refused suggestion before it is offered", async () => {
@@ -1586,6 +1591,43 @@ describe("the aura picker", () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: /mean share/ })).toBeNull());
     fireEvent.click(screen.getByRole("button", { name: "Reset" }));
     expect(main.style.getPropertyValue("--aura-bg")).toBe("");
+  });
+
+  it("should restore a stored aura on mount, clear it on unmount, and survive blocked storage", async () => {
+    window.sessionStorage.setItem(AURA_STORAGE_KEY, "#c2542a");
+    const view = renderWorkshop();
+    const main = screen.getByRole("main");
+    expect(main.style.getPropertyValue("--aura-bg")).toBe("#c2542a");
+
+    // The field follows the session value once the panel is on screen.
+    pickFiles(screen.getByLabelText("Choose photos"), [fileOf(16, "image/png", "a.png")]);
+    expect(screen.getByLabelText("Aura")).toHaveValue("#c2542a");
+
+    view.unmount();
+    expect(main.style.getPropertyValue("--aura-bg")).toBe("");
+
+    // A hand-edited value the engine refuses is ignored: the neutral set stays, and the field — the
+    // one place the stored choice is shown — starts empty once the panel is on screen.
+    window.sessionStorage.setItem(AURA_STORAGE_KEY, "#000000");
+    const refused = renderWorkshop();
+    expect(screen.getByRole("main").style.getPropertyValue("--aura-bg")).toBe("");
+    pickFiles(screen.getByLabelText("Choose photos"), [fileOf(16, "image/png", "a.png")]);
+    expect(screen.getByLabelText("Aura")).toHaveValue("");
+    refused.unmount();
+
+    // A storage that throws (private modes) must not break the view: the aura lives for the view's life.
+    const blockedGet = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    const blockedSet = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [fileOf(16, "image/png", "a.png")]);
+    fireEvent.change(screen.getByLabelText("Aura"), { target: { value: "#1f7a7a" } });
+    expect(screen.getByRole("main").style.getPropertyValue("--aura-bg")).toBe("#1f7a7a");
+    blockedGet.mockRestore();
+    blockedSet.mockRestore();
   });
 
   it("should keep the aura and skip re-extraction when the grid is reordered", async () => {
