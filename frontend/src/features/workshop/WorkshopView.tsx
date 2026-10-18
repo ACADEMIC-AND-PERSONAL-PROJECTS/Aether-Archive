@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 
+import { QUIET_ACTION } from "./actions";
+import { AuraPicker } from "./AuraPicker";
 import { SelectionGrid, type SelectionItem } from "./SelectionGrid";
 import { ApiError } from "../../api/client";
 import { useUploadPhoto } from "../../api/photos";
 import { GlassPanel } from "../../components/GlassPanel";
+import { useAura } from "../../hooks/useAura";
 import { ENTER_FADE_BASE, LOADING_PULSE } from "../../lib/motion/tokens";
 import { moveItem } from "../../lib/ordering/move";
 import { downscaleForUpload } from "../../lib/upload/downscale";
@@ -119,10 +122,6 @@ function failureSentence(error: unknown): string {
   return "That photo couldn't be added.";
 }
 
-/** The quiet action grammar: text, a 44 px target, a 180 ms press, an inset focus ring. */
-const QUIET_ACTION =
-  "flex min-h-11 shrink-0 cursor-pointer items-center rounded-[10px] px-3 text-sm text-aura-text underline decoration-aura-text/40 underline-offset-4 transition-colors duration-[var(--motion-duration-quick)] active:bg-aura-text/6 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/50";
-
 /** The hidden-input label's focus ring, shared by the idle picker and the panel's "Add photos". */
 const PICKER_LABEL_FOCUS =
   "peer-focus-visible:outline peer-focus-visible:outline-1 peer-focus-visible:-outline-offset-4 peer-focus-visible:outline-aura-text/50";
@@ -145,6 +144,8 @@ export function WorkshopView() {
   const primaryRef = useRef<HTMLButtonElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
   const previousPhase = useRef<Phase>("idle");
+  /** The workshop's root: where a chosen aura's preview lands, and only there (ADR-023 decision 4). */
+  const mainRef = useRef<HTMLElement>(null);
 
   const upload = useUploadPhoto();
 
@@ -160,6 +161,13 @@ export function WorkshopView() {
       : items.length > 0
         ? "selected"
         : "idle";
+
+  /*
+   * The aura (E4-S4C): suggestions off the selection, the preview on this view's root, and the one
+   * thing the workshop stores. Extraction rests while the queue runs (`enabled`), so a success that
+   * shrinks the grid mid-upload never re-decodes the photos behind the progress line.
+   */
+  const aura = useAura(items, mainRef, { enabled: !uploading });
 
   // Leaving the view cancels the request nobody is watching and releases every preview URL. The File
   // objects need no cleanup: they are references, and React drops them with the component.
@@ -443,7 +451,11 @@ export function WorkshopView() {
 
   return (
     <>
-      <main data-state={phase} className="relative flex flex-1 flex-col overflow-hidden bg-aura-bg">
+      <main
+        ref={mainRef}
+        data-state={phase}
+        className="relative flex flex-1 flex-col overflow-hidden bg-aura-bg"
+      >
         <h1 className="sr-only">Curator&rsquo;s Workshop</h1>
 
         {phase === "idle" ? (
@@ -543,6 +555,12 @@ export function WorkshopView() {
                         <span className={PICKER_LABEL_FOCUS}>Add photos</span>
                       </label>
                     </div>
+                    <AuraPicker
+                      chosen={aura.chosen}
+                      suggestions={aura.suggestions}
+                      onChoose={aura.choose}
+                      onReset={aura.reset}
+                    />
                   </>
                 )}
               </GlassPanel>
