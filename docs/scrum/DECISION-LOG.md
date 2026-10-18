@@ -33,6 +33,7 @@ Statuses: `Proposed` · `Accepted` · `Superseded by ADR-NNN` · `Rejected`.
 | [ADR-021](#adr-021--the-splash-hero-a-photo-per-visit-read-once-and-what-the-placeholder-can-be) | 2026-10-16 | The splash hero: a photo per visit, read once, and what the placeholder can be | Accepted |
 | [ADR-022](#adr-022--route-transitions-and-the-motion-vocabulary-css-keyframes-no-animation-library) | 2026-10-17 | Route transitions and the motion vocabulary: CSS keyframes, no animation library | Accepted |
 | [ADR-023](#adr-023--the-aura-picker-the-chosen-page-colour-is-kept-the-glass-flips-suggestions-merge-by-pixel-share) | 2026-10-17 | The aura picker: the chosen page colour is kept, the glass flips, suggestions merge by pixel share | Accepted |
+| [ADR-024](#adr-024--the-draft-survives-its-upload-the-workshop-keeps-the-six-it-stored-and-the-publish-reads-them-in-order) | 2026-10-18 | The draft survives its upload: the workshop keeps the six it stored, and the publish reads them in order | Accepted |
 
 ---
 
@@ -968,6 +969,59 @@ a legible text colour. The light-glass variant makes "dark glassmorphism" "contr
 glassmorphism" for user-chosen pages; `.claude/rules/design-language.md` and `DESIGN-SYSTEM.md` §3 point
 at this ADR. Further divergence (per-surface text tokens, pure pages/text, dark glass on light pages,
 cross-session persistence) needs a new ADR.
+
+---
+
+## ADR-024 — The draft survives its upload: the workshop keeps the six it stored, and the publish reads them in order
+
+**Date**: 2026-10-18 · **Status**: Accepted
+
+**Context.** E4-S5 publishes a dump. `POST /api/v1/dumps` takes a title (optional), a `#RRGGBB`
+background and **exactly six distinct, uncurated photo ids in display order**; ADR-011 §3 settled that
+an upload creates an *unassigned* photo and publishing attaches six of them. The spec's workshop flow —
+Selection, Canvas, Aura, Publish — was written against the narrative's one-shot multipart endpoint, but
+the contract of record splits it into `POST /photos` (one file per request) and `POST /dumps` (ids
+only), so the client must hold the six stored photos at the moment it publishes. E4-S2A2 shipped the
+opposite: a successful upload removed the tile — and the frontend README (E4-S3A) named that as E4-S5's
+work ("a successful upload removes the tile, so E4-S5 must keep the returned `Photo.id` on the item […]
+before `orderedIds` can produce a valid `DumpCreate.photoIds`"). Open: where the ids live, what the
+client mirrors before sending, and what the optimistic write means for a cache with no consumer yet.
+
+**Decision.**
+
+1. **A successful upload keeps its tile.** The queue marks the tile `added` and keeps the returned
+   `Photo` on it; its preview lives until the tile is removed or the view unmounts. The tiles **are**
+   the draft and their display order **is** the publish order: the payload is `orderedIds` over the six
+   stored photos — each tile's `photo.id`, since `orderedIds` maps the item's `id` field — with
+   `displayOrder` 0–5 being the index. E4-S2A2's "the success is the tile leaving the grid" is retired;
+   an uploaded photo the curator abandons stays in the archive as an unassigned photo, which is what it
+   was.
+2. **The publish is a second, explicit action.** "Upload" stays the store action the single-photo flow
+   uses; "Save archive" (the spec's step 4) publishes the draft. The publish group appears once the
+   draft holds six tiles — the dump's shape — and a refused click is answered with one sentence, not a
+   disabled button: a photo still un-stored, an aura not yet chosen.
+3. **The client mirrors the server's checks before the request.** Exactly six tiles, every one stored,
+   the six photos distinct, and a chosen aura (the spec's aura step is the publish's precondition,
+   mirroring `@NotBlank` + `@Pattern`); the title is optional — blank reads as `null`, ≤ 80 characters
+   (ADR-011 §2). A blocked plan sends nothing.
+4. **The optimistic insert is scoped to `queryKeys.dumps` and is reversible.** The publish inserts a
+   draft `Dump` at the head of the list (newest first, the server's order) before the request; a
+   failure restores the previous value — removing the entry entirely when there was none — and the
+   panel carries one discreet sentence. Success replaces the optimistic entry with the server's dump;
+   nothing is invalidated, because the response is canonical.
+5. **Publishing locks the draft and returns where the workshop was entered from.** While the request is
+   in flight the grid and the button are disabled ("Saving…"), so a double submit is impossible; on
+   success the view navigates back (`navigate(-1)` — the workshop is reached from the splash's menu),
+   on failure it stays — the draft intact, the sentence visible — so a retry costs one press and never
+   a re-upload.
+
+**Consequences.** The canvas is the draft: after a batch, adding more photos counts the stored tiles
+against the six-photo cap, and the draft is cleared by removing tiles or by leaving the view. The
+publish's failure modes are all recoverable client-side: the six photos exist server-side before the
+publish ever runs, so no rollback ever needs to un-store a file. The e2e evidence is jsdom-level (the
+criterion names a mocked API); the narrative spec's one-shot multipart publish stays unimplemented
+(ADR-011 §1). Further divergence — publishing fewer than six photos, editing a published dump's title,
+a server idempotency key for retried uploads — needs a new ADR.
 
 ---
 
