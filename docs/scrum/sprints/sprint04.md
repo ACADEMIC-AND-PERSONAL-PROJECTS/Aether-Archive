@@ -22,15 +22,20 @@
 | 3a | E4-S4A | The chosen-background theme engine — hex validation, contrast by construction | 1 | p0 | Done | #133 |
 | 3b | E4-S4B | Palette suggestions from the selected photos, merged and ranked | 2 | p0 | Done | #135 |
 | 3c | E4-S4C | The Aura picker UI, live preview, reset and session persistence | 2 | p0 | Done | #137 + #139 + #141 |
-| 4 | E4-S5 | Publish dump — `POST /dumps`, optimistic insert, rollback | 5 | p0 | Todo | — |
+| 4a | E4-S5A | The draft survives its upload — the tile keeps its stored photo | 1 | p0 | Todo | — |
+| 4b | E4-S5B | The publish plan — six stored distinct photos, aura, optional title, pure | 1 | p0 | Todo | — |
+| 4c | E4-S5C | The dump wire — `createDump`, optimistic insert, rollback | 1 | p0 | Todo | — |
+| 4d | E4-S5D | "Save archive" — the publish group, pending state, return, e2e | 2 | p0 | Todo | — |
 | 5 | E6-S2 | Required status checks on `main` and `develop` | 2 | p0 | Todo | — |
 
-**Total: 25 points across 11 slices** (E4-S3 was re-cut at #124's review into 2a/2b/2c, and 2c was
+**Total: 25 points across 14 slices** (E4-S3 was re-cut at #124's review into 2a/2b/2c, and 2c was
 pre-cut after measuring 928 hand-written lines into motion (2c, 1 pt) and keyboard (2d, 2 pts) — points
 unchanged; 2d was split again at #131's review into the keyboard path (2d, 1 pt) and the custom
 announcement copy (2e, 1 pt), the cut the reviewer built and measured green at 260 lines — points
 unchanged; E4-S4 was pre-cut before implementation into the theme engine (3a, 1 pt), suggestions (3b,
-2 pts) and the picker UI (3c, 2 pts) — points unchanged). E4-S3C's motion is itself delivered in two
+2 pts) and the picker UI (3c, 2 pts) — points unchanged; E4-S5 was pre-cut before implementation into
+the draft (4a, 1 pt), the publish plan (4b, 1 pt), the wire (4c, 1 pt) and Save archive (4d, 2 pts) —
+points unchanged). E4-S3C's motion is itself delivered in two
 PRs at review: auto-scroll on its own branch (#128) and the drop animation plus reduced motion on #127.
 Slice ids and their points are unchanged, so the sprint total does not move for splits that add no
 scope.

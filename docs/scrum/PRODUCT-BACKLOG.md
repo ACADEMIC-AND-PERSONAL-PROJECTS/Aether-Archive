@@ -514,7 +514,20 @@ opens on tap, feels tactile, and gets out of the way.
 - [ ] Selection survives reordering and page refresh within the workshop session.
 - [ ] Tests for validation, suggestion mapping and preview tokens.
 
-### E4-S5 — Publish dump with optimistic UI · 5 pts · p0
+### E4-S5 — Publish dump with optimistic UI · 5 pts · p0 · **pre-cut into S5A (1) + S5B (1) + S5C (1) + S5D (2)**
+
+> Split before implementation: **S5A** keeps the draft — a successful upload keeps its tile, marked
+> `added`, carrying the archive's `Photo`, so six stored photos and their display order survive to the
+> publish; **S5B** is the pure publish plan (exactly six distinct stored photos and a chosen aura, an
+> optional title ≤ 80 — the server's checks mirrored before any request, refusing with a sentence) and
+> gives `orderedIds` its production caller; **S5C** is the wire — `POST /dumps`, the optimistic insert
+> into `queryKeys.dumps`, the rollback and the error→sentence map; **S5D** is the panel's publish group
+> ("Save archive", the title field, the pending state, the return to the previous view) with the
+> mocked-API end-to-end tests of success and rollback. Each slice is independently reviewable and under
+> the PR budget. **ADR-024** records the decisions the spec leaves open: the draft survives its upload,
+> the publish is an explicit second action over the six stored photos, the client mirrors the server's
+> checks before sending, the optimistic insert is scoped and reversible, and a success returns to the
+> previous view.
 
 *As the curator, I want to publish my dump, so that it joins the river.*
 
