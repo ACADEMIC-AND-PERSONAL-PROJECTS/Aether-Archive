@@ -947,13 +947,12 @@ refuse light backgrounds, per-surface text tokens, or flip the glass tint with t
    rendering pure black or white (`#010101`/`#fefefe` accepted, with a non-pure surface). **Both
    directions are tried** before a page is refused, and the search never returns pure black or white
    text. Pure **pages** are refused by policy (the brief's bases stop at `#0B0B0D`/`#121215`):
-   measured on a 16³ sRGB cube, **4,094 of 4,096 backgrounds are accepted; only `#000000` and
-   `#ffffff` are refused**. (The first cut's single-direction 90-colour refusal band was an artifact;
-   #133's review carried every one of those colours with the other direction.)
+   measured on a 16³ sRGB cube, **4,094/4,096 accepted, only `#000000` and `#ffffff` refused**. (The
+   single-direction 90-colour band was an artifact; the other direction carries all of them.)
 2. **The glass tint flips with the text.** Black tint and white hairline under light text; white tint
    and black hairline under dark text. With black glass on every page and both directions tried,
-   **1,799 of 4,096 backgrounds (43.9%)** could not carry one text colour on the page and the glass;
-   the token layer already owns the tint tokens per theme, so the flip is data, not a component.
+   **1,803 of 4,096 backgrounds (44.0%)** could not carry one text colour across the page, surface and
+   glass; the token layer already owns the tint tokens per theme, so the flip is data, not a component.
 3. **Suggestions merge across the selected photos.** Each palette is extracted (E2-S4, 64 px edge);
    colours are pooled, deduped by normalised hex and ranked by summed weight — confidence is the
    colour's share of the selected pixels. The top eight are offered; a failed extraction is skipped,
