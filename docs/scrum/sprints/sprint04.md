@@ -20,7 +20,7 @@
 | 2d | E4-S3D | Keyboard path and cancel, with dnd-kit's default announcements (criterion 3) | 1 | p0 | Done | #131 |
 | 2e | E4-S3D1 | Position-based announcement copy and instructions (criterion 3) | 1 | p0 | Done | #132 |
 | 3a | E4-S4A | The chosen-background theme engine — hex validation, contrast by construction | 1 | p0 | Done | #133 |
-| 3b | E4-S4B | Palette suggestions from the selected photos, merged and ranked | 2 | p0 | In progress | — |
+| 3b | E4-S4B | Palette suggestions from the selected photos, merged and ranked | 2 | p0 | Done | #135 |
 | 3c | E4-S4C | The Aura picker UI, live preview, reset and session persistence | 2 | p0 | Todo | — |
 | 4 | E4-S5 | Publish dump — `POST /dumps`, optimistic insert, rollback | 5 | p0 | Todo | — |
 | 5 | E6-S2 | Required status checks on `main` and `develop` | 2 | p0 | Todo | — |
@@ -144,3 +144,15 @@ The order is deliberate:
   miscount, noted on the PR). The review's two consistency nits (`.claude/rules/frontend.md`'s glass
   clause and `DESIGN-SYSTEM.md`'s fallback qualifier) and the optional
   `glassSolid`-in-`ContrastReport` hardening are deferred to S4C, recorded here per the review.
+- 2026-10-18 — **E4-S4B merged (`b9cccee`, PR #135)** at APPROVE after one fix round (round 1:
+  APPROVE WITH NITS, no blocking; all five findings closed at `9c55919`), size **385 hand-written**
+  at the tip (production 101 / tests 271 / docs 13, `git diff develop --numstat`), both CI jobs green
+  on the tip run
+  [39163288149](https://github.com/ACADEMIC-AND-PERSONAL-PROJECTS/Aether-Archive/actions/runs/39163288149).
+  The pipeline pools the picked photos' palettes — deduped by normalised hex, confidence the mean
+  photo share, top eight — and a refused extraction is a skip (a synchronously thrown one included:
+  the review's control falsified the skip claim for that shape and the wrapper followed). The record
+  gained two precision fixes: ADR-023's decision 3 now says "mean share across the photos" (`Palette`
+  carries no pixel counts; the review measured 0.5/0.5 emitted where pixel areas give 0.64/0.36) and
+  the module states its trusted-input contract. The probe (real PNGs, Chrome 153 headless)
+  reproduces at the tip and its bundle is byte-identically rebuildable.
