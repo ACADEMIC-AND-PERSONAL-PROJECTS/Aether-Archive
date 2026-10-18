@@ -1584,6 +1584,7 @@ describe("the aura picker", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Reset to extracted" }));
     expect(main.style.getPropertyValue("--aura-bg")).toBe("#1f7a7a");
+    expect(window.sessionStorage.getItem(AURA_STORAGE_KEY)).toBe("#1f7a7a");
 
     // Removing a photo re-extracts; the empty second answer leaves no swatches, and the reset still
     // has a job: clearing the aura back to the neutral set.
@@ -1591,10 +1592,13 @@ describe("the aura picker", () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: /mean share/ })).toBeNull());
     fireEvent.click(screen.getByRole("button", { name: "Reset" }));
     expect(main.style.getPropertyValue("--aura-bg")).toBe("");
+    // The neutral reset clears the key too: a refresh after it comes back neutral.
+    expect(window.sessionStorage.getItem(AURA_STORAGE_KEY)).toBeNull();
   });
 
   it("should restore a stored aura on mount, clear it on unmount, and survive blocked storage", async () => {
-    window.sessionStorage.setItem(AURA_STORAGE_KEY, "#c2542a");
+    // Stored uppercase, as a hand-edit might be: the read normalises before holding it.
+    window.sessionStorage.setItem(AURA_STORAGE_KEY, "#C2542A");
     const view = renderWorkshop();
     const main = screen.getByRole("main");
     expect(main.style.getPropertyValue("--aura-bg")).toBe("#c2542a");
@@ -1605,6 +1609,8 @@ describe("the aura picker", () => {
 
     view.unmount();
     expect(main.style.getPropertyValue("--aura-bg")).toBe("");
+    // Unmount clears the preview, not the session: the stored value is untouched and still holds it.
+    expect(window.sessionStorage.getItem(AURA_STORAGE_KEY)).toBe("#C2542A");
 
     // A hand-edited value the engine refuses is ignored: the neutral set stays, and the field — the
     // one place the stored choice is shown — starts empty once the panel is on screen.
@@ -1622,12 +1628,20 @@ describe("the aura picker", () => {
     const blockedSet = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new Error("blocked");
     });
+    const blockedRemove = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
     renderWorkshop();
     pickFiles(screen.getByLabelText("Choose photos"), [fileOf(16, "image/png", "a.png")]);
     fireEvent.change(screen.getByLabelText("Aura"), { target: { value: "#1f7a7a" } });
     expect(screen.getByRole("main").style.getPropertyValue("--aura-bg")).toBe("#1f7a7a");
+
+    // The neutral reset writes `null` — the removeItem path, blocked here — and still clears the aura.
+    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
+    expect(screen.getByRole("main").style.getPropertyValue("--aura-bg")).toBe("");
     blockedGet.mockRestore();
     blockedSet.mockRestore();
+    blockedRemove.mockRestore();
   });
 
   it("should keep the aura and skip re-extraction when the grid is reordered", async () => {
