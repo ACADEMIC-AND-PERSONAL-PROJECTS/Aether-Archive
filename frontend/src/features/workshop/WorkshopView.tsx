@@ -22,7 +22,8 @@ import { ACCEPT_ATTRIBUTE } from "../../lib/upload/validation";
 import type { UploadProgress } from "../../api/uploadPhoto";
 
 /**
- * `GET /curate` — the Curator's Workshop, multi-select and queue slice (E4-S2A2).
+ * `GET /curate` — the Curator's Workshop, multi-select and queue slice (E4-S2A2; the draft survives
+ * its upload since E4-S5A).
  *
  * ## The screen
  *
@@ -72,13 +73,14 @@ import type { UploadProgress } from "../../api/uploadPhoto";
  * ## Settling, and cancelling the batch
  *
  * When the queue settles, the panel says what this batch did — "Added 3 photos.", "2 photos couldn't be
- * added.", or both halves when both happened. If every file succeeded the tiles are gone and the view
- * returns to `idle`; otherwise it stays `error` while any failed tile remains.
+ * added.", or both halves when both happened. A success keeps its tile (E4-S5A): it is marked `added`
+ * and carries the archive's photo, and the view stays `selected` — the grid is the draft the publish
+ * will read. It stays `error` while any failed tile remains.
  *
  * Cancel is the **batch's** cancel: it aborts the request in flight and stops the queue. The files
- * already uploaded are gone, the files not yet sent stay in the grid as waiting, and the current file
- * returns to waiting (it was not stored as far as this client knows). The panel says "Upload cancelled."
- * visibly.
+ * already uploaded keep their tiles as `added` — their photos are in the archive — the files not yet
+ * sent stay in the grid as waiting, and the current file returns to waiting (it was not stored as far
+ * as this client knows). The panel says "Upload cancelled." visibly.
  *
  * **Cancellation is not a rollback**, and the E4-S1B caveat stands: an abort can race a response that
  * already reached `StorageService.store`. The screen says only that the upload was cancelled, never that
@@ -89,20 +91,21 @@ import type { UploadProgress } from "../../api/uploadPhoto";
  *
  * `items` is the display order (E4-S3B): dragging a tile calls `moveItem` from `lib/ordering/move.ts`,
  * which returns a new array — or the same one for a no-op — and nothing else. The slot is the index,
- * so the publish payload this screen will one day build is `items.map(item => item.id)`, with
- * `displayOrder` 0–5 being that index. Reordering is refused while a batch is uploading: the queue
- * captured the array when it started, and moving a tile mid-batch would leave the grid disagreeing
- * with the requests already on the wire. The grid's own header carries the sensors, the scroll rule
- * and the keyboard path (E4-S3D): the tile is a real focus stop once the sensor that listens for its
- * keys exists.
+ * and since E4-S5A each tile carries the archive's photo, so the publish payload this screen will one
+ * day build is those six stored photos, in this order — `displayOrder` 0–5 is the index, and the order
+ * is read at the publish, not at the upload, so a settled draft can still be rearranged. Reordering is
+ * refused while a batch is uploading: the queue captured the array when it started, and moving a tile
+ * mid-batch would leave the grid disagreeing with the requests already on the wire. The grid's own
+ * header carries the sensors, the scroll rule and the keyboard path (E4-S3D): the tile is a real focus
+ * stop once the sensor that listens for its keys exists.
  *
  * ## The files never outlive the screen
  *
- * Each preview is an object URL created from the picked `File`; it is revoked when its tile is removed,
- * when its upload succeeds, and for everything still held when the view unmounts. The `File`s are React
- * state; **only the aura persists** — one `sessionStorage` value the curator chose (E4-S4C, ADR-023
- * decision 4), never a `File`. An in-flight request is aborted on unmount, and no file name or content
- * is logged.
+ * Each preview is an object URL created from the picked `File`; it is revoked when its tile is removed
+ * and for everything still held when the view unmounts. A success no longer revokes it (E4-S5A: the
+ * tile stays, showing the user's own photo). The `File`s are React state; **only the aura persists** —
+ * one `sessionStorage` value the curator chose (E4-S4C, ADR-023 decision 4), never a `File`. An
+ * in-flight request is aborted on unmount, and no file name or content is logged.
  */
 
 type Phase = "idle" | "selected" | "uploading" | "error";
@@ -143,6 +146,8 @@ export function WorkshopView() {
   const previewUrlsRef = useRef(new Set<string>());
   const idleInputRef = useRef<HTMLInputElement>(null);
   const primaryRef = useRef<HTMLButtonElement>(null);
+  /** The panel's "Add photos" input: the focus fallback of a settled draft (E4-S5A). */
+  const panelInputRef = useRef<HTMLInputElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
   const previousPhase = useRef<Phase>("idle");
   /** The workshop's root: where a chosen aura's preview lands, and only there (ADR-023 decision 4). */
@@ -152,8 +157,9 @@ export function WorkshopView() {
 
   /*
    * One phase, derived rather than stored: `uploading` wins, then a failed tile, then a non-empty grid,
-   * then idle. Deriving it means an empty grid can never be called `selected`, and "everything succeeded
-   * → idle" needs no extra branch.
+   * then idle. Deriving it means an empty grid can never be called `selected`, and a settled batch
+   * needs no branch of its own: its tiles stay (E4-S5A), so the draft reads `selected` — or `error`
+   * while any failed tile remains.
    */
   const phase: Phase = uploading
     ? "uploading"
@@ -165,8 +171,9 @@ export function WorkshopView() {
 
   /*
    * The aura (E4-S4C): suggestions off the selection and the preview on this view's root. Extraction
-   * rests while the queue runs (`enabled`) — a success that shrinks the grid mid-upload must not
-   * re-decode the photos behind the progress line — and only the aura persists (ADR-023 decision 4).
+   * rests while the queue runs (`enabled`) — the decode must not compete with the uploads behind the
+   * progress line, and the membership it keys to is stable through a batch (E4-S5A: no success removes
+   * a tile) — and only the aura persists (ADR-023 decision 4).
    */
   const aura = useAura(items, mainRef, { enabled: !uploading });
 
@@ -196,6 +203,10 @@ export function WorkshopView() {
    * focus on a removed element: Cancel while uploading, the primary action after a selection or a
    * failure, the picker again after everything succeeded. The first render is deliberately exempt —
    * autofocusing a file input on arrival would move a screen reader's place before it has read the view.
+   *
+   * Since E4-S5A the primary action is conditional: the queue button is only rendered while something is
+   * still to send (it would be a no-op over a settled draft), so a settled selection falls through to
+   * the panel's picker — the draft's next move is adding to it.
    */
   useEffect(() => {
     const previous = previousPhase.current;
@@ -208,7 +219,7 @@ export function WorkshopView() {
     } else if (phase === "idle") {
       idleInputRef.current?.focus();
     } else {
-      primaryRef.current?.focus();
+      (primaryRef.current ?? panelInputRef.current)?.focus();
     }
   }, [phase]);
 
@@ -225,6 +236,7 @@ export function WorkshopView() {
       const item: SelectionItem = {
         id: `selection-${nextIdRef.current}`,
         file,
+        photo: null,
         uploadFile: null,
         previewUrl,
         state: "waiting",
@@ -334,7 +346,7 @@ export function WorkshopView() {
       );
 
       try {
-        await upload.mutateAsync({
+        const photo = await upload.mutateAsync({
           file: prepared,
           signal: controller.signal,
           onProgress: (next) => {
@@ -347,6 +359,20 @@ export function WorkshopView() {
             }
           },
         });
+
+        if (!aliveRef.current) {
+          return;
+        }
+        controllerRef.current = null;
+        added += 1;
+        // The draft survives its upload (E4-S5A): the tile stays, marked `added` and carrying the
+        // archive's photo — the six of them, in this order, are what the publish will read. Its
+        // preview is not revoked here; removal and unmount are the only exits now.
+        setItems((previous) =>
+          previous.map((item) =>
+            item.id === entry.id ? { ...item, state: "added", photo, message: null } : item,
+          ),
+        );
       } catch (error) {
         if (!aliveRef.current) {
           return;
@@ -375,15 +401,6 @@ export function WorkshopView() {
         );
         continue;
       }
-
-      if (!aliveRef.current) {
-        return;
-      }
-      controllerRef.current = null;
-      added += 1;
-      revokePreview(entry.previewUrl);
-      // The success is the tile leaving the grid; the batch summary below reports the count.
-      setItems((previous) => previous.filter((item) => item.id !== entry.id));
     }
 
     if (!aliveRef.current) {
@@ -443,6 +460,10 @@ export function WorkshopView() {
 
   const percent =
     progress.total > 0 ? Math.min(100, Math.round((progress.loaded / progress.total) * 100)) : null;
+
+  // Something left to send: the queue button's reason to exist. Over a settled draft it would be a
+  // no-op, so it is not rendered (E4-S5A) — and focus falls through to the panel's picker.
+  const queueable = items.some((item) => item.state === "waiting" || item.state === "error");
 
   const panelSentence = notice !== "" ? notice : selectionSentence(items.length);
   // The constant "Uploading." is the batch's announcement: the persistent region is the only thing
@@ -537,16 +558,19 @@ export function WorkshopView() {
                       {panelSentence}
                     </p>
                     <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        ref={primaryRef}
-                        type="button"
-                        onClick={startUpload}
-                        className={QUIET_ACTION}
-                      >
-                        {phase === "error" ? "Try again" : "Upload"}
-                      </button>
+                      {queueable ? (
+                        <button
+                          ref={primaryRef}
+                          type="button"
+                          onClick={startUpload}
+                          className={QUIET_ACTION}
+                        >
+                          {phase === "error" ? "Try again" : "Upload"}
+                        </button>
+                      ) : null}
                       <label className={QUIET_ACTION}>
                         <input
+                          ref={panelInputRef}
                           type="file"
                           multiple
                           accept={ACCEPT_ATTRIBUTE}

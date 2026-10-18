@@ -39,6 +39,8 @@ import {
   TOUCH_LONG_PRESS_TOLERANCE_PX,
 } from "../../lib/ordering/interaction";
 
+import type { Photo } from "../../types/api";
+
 /**
  * The selection grid — one tile per picked photo, with its own state and its own way out (E4-S2A1),
  * and since E4-S3 the place where the dump's order is arranged by pointer, finger or keyboard.
@@ -129,17 +131,27 @@ import {
  * A screen reader hears the file's name first (the `sr-only` span), so six "Waiting" lines do not become
  * six anonymous ones. The line is ordinary text, not a live region: the workshop mounts one persistent
  * status region for announcements, and inserting a second one per tile would multiply every event by six.
- * `data-state` on the list item carries the same information for tests and for anyone inspecting the DOM.
+ * `data-state` on the list item carries the same information for tests and for anyone inspecting the DOM;
+ * `data-photo-id`, present only once the tile is `added`, carries the archive photo's id — the value the
+ * publish will read.
  */
 
-/** Where one selected file is in the queue. A success removes the tile, so there is no `done` state. */
-export type ItemState = "waiting" | "uploading" | "error";
+/**
+ * Where one selected file is in the queue. A success keeps its tile as `added` (E4-S5A) — the draft
+ * the publish will read — so the only way a tile leaves is the curator's own remove.
+ */
+export type ItemState = "waiting" | "uploading" | "error" | "added";
 
 /** One tile: the File, its preview URL, and what the screen knows about it. */
 export interface SelectionItem {
   readonly id: string;
   /** The picked file. The tile preview always comes from this object, never from the re-encode. */
   readonly file: File;
+  /**
+   * The archive's photo once this tile's upload succeeded (E4-S5A); `null` until then. It is what the
+   * publish reads — six of these, in display order — and why the tile stays after a success.
+   */
+  readonly photo: Photo | null;
   /**
    * What the queue will send: the downscaled `File` once E4-S2B has prepared it, the original before
    * that and whenever preparation failed. `null` until the first attempt; keeping it here is what lets
@@ -193,6 +205,8 @@ function statusSentence(item: SelectionItem): string {
       return "Waiting";
     case "uploading":
       return "Uploading";
+    case "added":
+      return "Added";
     case "error":
       return item.message ?? "That photo couldn't be added.";
   }
@@ -283,6 +297,7 @@ function SortableTile({
       ref={setNodeRef}
       style={style}
       data-state={item.state}
+      data-photo-id={item.photo?.id}
       data-dragging={isDragging ? "true" : undefined}
       // The slot stays measured while its photo is in the overlay; only the paint is hidden.
       className={`min-w-0 ${isDragging ? "opacity-0" : ""}`}
