@@ -100,8 +100,9 @@ import type { UploadProgress } from "../../api/uploadPhoto";
  *
  * Each preview is an object URL created from the picked `File`; it is revoked when its tile is removed,
  * when its upload succeeds, and for everything still held when the view unmounts. The `File`s are React
- * state and **nothing is persisted** — no localStorage, no IndexedDB, no disk. An in-flight request is
- * aborted on unmount, and no file name or content is logged.
+ * state; **only the aura persists** — one `sessionStorage` value the curator chose (E4-S4C, ADR-023
+ * decision 4), never a `File`. An in-flight request is aborted on unmount, and no file name or content
+ * is logged.
  */
 
 type Phase = "idle" | "selected" | "uploading" | "error";
@@ -165,7 +166,7 @@ export function WorkshopView() {
   /*
    * The aura (E4-S4C): suggestions off the selection and the preview on this view's root. Extraction
    * rests while the queue runs (`enabled`) — a success that shrinks the grid mid-upload must not
-   * re-decode the photos behind the progress line — and nothing is persisted (E4-S4C2).
+   * re-decode the photos behind the progress line — and only the aura persists (ADR-023 decision 4).
    */
   const aura = useAura(items, mainRef, { enabled: !uploading });
 
