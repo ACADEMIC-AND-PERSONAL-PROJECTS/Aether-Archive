@@ -51,7 +51,8 @@ vi.mock("../../lib/color/suggest", async (importOriginal) => {
 const mockedSuggest = vi.mocked(suggestPalette);
 
 /**
- * The workshop's multi-select and sequential-queue behaviour (E4-S2A2), as the user observes it.
+ * The workshop's multi-select and sequential-queue behaviour (E4-S2A2; the draft survives its upload,
+ * E4-S5A), as the user observes it.
  *
  * The transport's browser edge is the fake from `api/__fixtures__/fakeXhr.ts`; everything above it is the
  * shipped component, the real mutation hook and a real `QueryClient`. The tests pin this slice's criteria
@@ -896,7 +897,7 @@ describe("reordering", () => {
 });
 
 describe("the queue", () => {
-  it("should upload one file at a time in selection order and remove each success", async () => {
+  it("should upload one file at a time in selection order and keep each success", async () => {
     renderWorkshop();
     const firstFile = fileOf(16, "image/png", "a.png");
     const secondFile = fileOf(16, "image/png", "b.png");
@@ -917,7 +918,10 @@ describe("the queue", () => {
     const second = await requestAt(1);
     expect(FakeXhr.instances).toHaveLength(2);
     expect(multipartBody(second).get("file")).toBe(secondFile);
-    expect(screen.queryByRole("button", { name: "Remove a.png" })).toBeNull();
+    // The draft survives its upload (E4-S5A): a.png is stored, not gone — its tile keeps the archive's
+    // own id, the value the publish will read.
+    expect(tileFor("a.png")).toHaveAttribute("data-state", "added");
+    expect(tileFor("a.png")).toHaveAttribute("data-photo-id", UPLOADED.id);
     await waitFor(() => expect(tileFor("b.png")).toHaveAttribute("data-state", "uploading"));
 
     await respond(second, 201, UPLOADED);
@@ -925,12 +929,14 @@ describe("the queue", () => {
     expect(multipartBody(third).get("file")).toBe(thirdFile);
 
     await respond(third, 201, UPLOADED);
-    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle"));
+    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "selected"));
     expect(screen.getByTestId("workshop-notice")).toHaveTextContent("Added 3 photos.");
     expect(screen.getByTestId("workshop-status")).toHaveTextContent("Added 3 photos.");
-    expect(screen.queryByRole("list", { name: "Selected photos" })).toBeNull();
-    // Focus returns to the picker after a full success, so the next batch is one keystroke away.
-    await waitFor(() => expect(screen.getByLabelText("Choose photos")).toHaveFocus());
+    expect(screen.getByRole("list", { name: "Selected photos" })).toBeVisible();
+    expect(tileLines()).toEqual(["a.png: Added", "b.png: Added", "c.png: Added"]);
+    // Nothing is left to send, so the queue button is gone and focus falls through to the picker.
+    expect(screen.queryByRole("button", { name: "Upload" })).toBeNull();
+    await waitFor(() => expect(screen.getByLabelText("Add photos")).toHaveFocus());
   });
 
   it("should send the files in the displayed order after a reorder", async () => {
@@ -969,7 +975,7 @@ describe("the queue", () => {
     expect(multipartBody(thirdRequest).get("file")).toBe(thirdFile);
     await respond(thirdRequest, 201, UPLOADED);
 
-    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle"));
+    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "selected"));
     expect(screen.getByTestId("workshop-notice")).toHaveTextContent("Added 3 photos.");
   });
 
@@ -1022,8 +1028,9 @@ describe("the queue", () => {
       "Added 2 photos. 1 photo couldn't be added.",
     );
     expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
-    expect(screen.queryByRole("button", { name: "Remove a.png" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Remove c.png" })).toBeNull();
+    // The two successes kept their tiles (E4-S5A); only the failed file is left to send.
+    expect(tileFor("a.png")).toHaveAttribute("data-state", "added");
+    expect(tileFor("c.png")).toHaveAttribute("data-state", "added");
     // The recovery action is where the keyboard already is after the queue settles.
     await waitFor(() => expect(screen.getByRole("button", { name: "Try again" })).toHaveFocus());
   });
@@ -1084,7 +1091,7 @@ describe("the queue", () => {
     expect(multipartBody(retry).get("file")).toBe(secondFile);
 
     await respond(retry, 201, UPLOADED);
-    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle"));
+    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "selected"));
     expect(screen.getByTestId("workshop-notice")).toHaveTextContent("Added 1 photo.");
   });
 
@@ -1171,7 +1178,7 @@ describe("the queue", () => {
       expect(screen.getByTestId("workshop-notice")).toHaveTextContent("Added 1 photo."),
     );
     expect(screen.getByTestId("workshop-notice")).not.toHaveTextContent("Upload cancelled.");
-    expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle");
+    expect(screen.getByRole("main")).toHaveAttribute("data-state", "selected");
   });
 
   it("should open no request when the batch is cancelled during preparation", async () => {
@@ -1251,11 +1258,11 @@ describe("the queue", () => {
     expect(multipartBody(third).get("file")).toBe(secondFile);
     await respond(third, 201, UPLOADED);
 
-    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle"));
+    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "selected"));
     expect(screen.getByTestId("workshop-notice")).toHaveTextContent("Added 2 photos.");
   });
 
-  it("should revoke a successful file's preview when its tile leaves the grid", async () => {
+  it("should keep a successful file's preview and revoke it when its tile is removed", async () => {
     const revoke = vi.spyOn(URL, "revokeObjectURL");
     renderWorkshop();
     pickFiles(screen.getByLabelText("Choose photos"), [
@@ -1266,11 +1273,18 @@ describe("the queue", () => {
 
     const first = await requestAt(0);
     await respond(first, 201, UPLOADED);
-    await waitFor(() => expect(revoke).toHaveBeenCalledWith("blob:preview-1"));
-
     const second = await requestAt(1);
     await respond(second, 201, UPLOADED);
-    await waitFor(() => expect(revoke).toHaveBeenCalledWith("blob:preview-2"));
+    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "selected"));
+
+    // The draft survives its upload (E4-S5A): a success no longer revokes — the tile keeps showing
+    // the user's own photo — so removal is the only exit this spy can see.
+    expect(revoke).not.toHaveBeenCalledWith("blob:preview-1");
+    expect(revoke).not.toHaveBeenCalledWith("blob:preview-2");
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove a.png" }));
+    await waitFor(() => expect(revoke).toHaveBeenCalledWith("blob:preview-1"));
+    expect(revoke).not.toHaveBeenCalledWith("blob:preview-2");
   });
 
   it("should abort an in-flight upload and revoke every preview when the view unmounts", async () => {
@@ -1353,7 +1367,7 @@ describe("the queue", () => {
     const request = await startUpload();
     await respond(request, 201, UPLOADED);
 
-    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle"));
+    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "selected"));
     expect(screen.getByTestId("workshop-notice")).toHaveTextContent("Added 1 photo.");
     expect(invalidate).toHaveBeenCalledTimes(1);
   });
@@ -1381,7 +1395,7 @@ describe("downscaling before upload", () => {
     expect(document.querySelector("main img")).toHaveAttribute("src", "blob:preview-1");
 
     await respond(request, 201, UPLOADED);
-    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle"));
+    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "selected"));
   });
 
   it("should resend the same prepared File on retry instead of downscaling twice", async () => {
@@ -1421,7 +1435,7 @@ describe("downscaling before upload", () => {
     expect(screen.getByRole("progressbar")).toHaveAttribute("data-total", "4096");
 
     await respond(request, 201, UPLOADED);
-    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle"));
+    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "selected"));
     expect(screen.getByTestId("workshop-notice")).toHaveTextContent("Added 1 photo.");
   });
 });
@@ -1446,7 +1460,7 @@ describe("StrictMode", () => {
     expect(multipartBody(request).get("file")).toBeInstanceOf(File);
 
     await respond(request, 201, UPLOADED);
-    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle"));
+    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "selected"));
     expect(screen.getByTestId("workshop-notice")).toHaveTextContent("Added 1 photo.");
   });
 
