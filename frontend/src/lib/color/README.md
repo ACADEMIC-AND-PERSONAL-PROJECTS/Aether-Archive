@@ -4,3 +4,6 @@ Dominant-colour extraction over downscaled bitmaps — pure, deterministic and u
 `extractPalette` runs the `DESIGN-SYSTEM.md` §2.1 pipeline (downscale → cluster → score/filter → 5–8
 weighted colours); `decode.ts` is the bytes→pixels edge. Default algorithm, filters and readings:
 ADR-018.
+
+`suggest.ts` pools many photos' palettes into one ranked suggestion list — deduped by normalised
+hex, weighted by summed pixel share, top eight (E4-S4B; ADR-023's decision 3).

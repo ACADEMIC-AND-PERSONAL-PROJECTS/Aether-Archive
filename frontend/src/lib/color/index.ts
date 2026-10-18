@@ -1,6 +1,7 @@
 /**
- * The public surface of the colour library: extraction, decoding, the palette's types, and the
- * theme layer (E2-S6) that turns a palette into the DESIGN-SYSTEM §2.2 tokens.
+ * The public surface of the colour library: extraction, decoding, the palette's types, the
+ * suggestion pipeline that pools the picked photos' palettes, and the theme layer (E2-S6) that turns
+ * a palette into the DESIGN-SYSTEM §2.2 tokens.
  */
 export {
   compositeOver,
@@ -17,6 +18,8 @@ export type { Canvas2DLike, DecodeDependencies, DecodeOptions, PaletteErrorCode 
 export { downscale } from "./downscale";
 export { DEFAULT_ALGORITHM, MAX_COLORS, MAX_EDGE, MIN_COLORS, extractPalette } from "./palette";
 export type { ExtractOptions, QuantizeAlgorithm } from "./palette";
+export { browserSuggestEnvironment, mergePalettes, suggestPalette } from "./suggest";
+export type { SuggestEnvironment } from "./suggest";
 export {
   applyFallbackTheme,
   applyTheme,
