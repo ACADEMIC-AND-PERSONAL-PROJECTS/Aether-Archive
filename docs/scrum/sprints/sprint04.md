@@ -22,7 +22,7 @@
 | 3a | E4-S4A | The chosen-background theme engine — hex validation, contrast by construction | 1 | p0 | Done | #133 |
 | 3b | E4-S4B | Palette suggestions from the selected photos, merged and ranked | 2 | p0 | Done | #135 |
 | 3c | E4-S4C | The Aura picker UI, live preview, reset and session persistence | 2 | p0 | Done | #137 + #139 + #141 |
-| 4a | E4-S5A | The draft survives its upload — the tile keeps its stored photo | 1 | p0 | Todo | — |
+| 4a | E4-S5A | The draft survives its upload — the tile keeps its stored photo | 1 | p0 | Done | #143 |
 | 4b | E4-S5B | The publish plan — six stored distinct photos, aura, optional title, pure | 1 | p0 | Todo | — |
 | 4c | E4-S5C | The dump wire — `createDump`, optimistic insert, rollback | 1 | p0 | Todo | — |
 | 4d | E4-S5D | "Save archive" — the publish group, pending state, return, e2e | 2 | p0 | Todo | — |
@@ -201,3 +201,14 @@ The order is deliberate:
   write, the read's `normalizeHex`, and an unmount that clears the session — all closed in place
   (each mutation now fails exactly one test), plus the blocked `removeItem` path spied and exercised
   through the neutral reset. Row 3c flips to **Done** (`#137 + #139 + #141`).
+- 2026-10-18 — **E4-S5A merged (`14e814f`, PR #143)** at APPROVE WITH NITS, no blocking findings:
+  the draft survives its upload — a successful tile stays, marked `added`, carrying the archive's
+  `Photo` (its id on `data-photo-id`), and its preview is revoked only by removal or unmount; the
+  queue button renders only while something is still to send, and a settled batch falls through to
+  the panel's picker. Final size **329 hand-written = 250 + 79** (production 125 / tests 98 / docs
+  106) — under the ~400 budget, no claim. Round 1 closed all seven nits in place: the settled-draft
+  capture (`reports/e4s5a-settled-390.png`, Chromium 153, 390 × 844 @ DPR 3), the template-complete
+  body, the `data-photo-id` fallback killed (its own mutant now fails one test), the mixed-cancel
+  branch pinned, the retired success-path-revoke mutant row, the `orderedIds` → `photo.id` step
+  named in the README and ADR-024, and the settled-draft axe sweep. Row 4a flips to **Done**
+  (`#143`).
