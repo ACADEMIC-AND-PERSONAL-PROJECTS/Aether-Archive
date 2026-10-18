@@ -920,9 +920,9 @@ under the tile prefixed `sr-only` by the file's own name. Remove buttons are dis
 running, not removed: the queue holds a snapshot of the files, and a tile vanishing mid-batch would
 leave the summary counting something invisible. The scroll container keeps A1's measured centring
 (`justify-center` on the scroller; the tile's top lands on the computed centre). Preview URLs are
-revoked on removal, **on success** and on unmount; the `File`s are state and **only the aura
-persists** — one `sessionStorage` value the curator chose (E4-S4C, ADR-023 decision 4), never a
-`File`.
+revoked on removal and on unmount — no longer on success (E4-S5A: the tile stays, showing the user's
+own photo); the `File`s are state and **only the aura persists** — one `sessionStorage` value the
+curator chose (E4-S4C, ADR-023 decision 4), never a `File`.
 
 ### The queue — one request at a time, failures isolated
 
@@ -930,9 +930,9 @@ persists** — one `sessionStorage` value the curator chose (E4-S4C, ADR-023 dec
 decision: the single progress line describes the request actually in flight, the server sees a phone's
 uplink as it would see a single upload, and a failure has one unambiguous owner. A failure marks its
 tile `error`, says one quiet sentence, and the loop continues — it never aborts the files behind it.
-Successful files leave the grid. When the queue settles the panel reports this batch: "Added 2 photos.
-1 photo couldn't be added.", or the matching singular. If everything succeeded the view returns to
-`idle`.
+Successful files keep their tiles, marked `added` (E4-S5A) — the draft the publish reads. When the
+queue settles the panel reports this batch: "Added 2 photos. 1 photo couldn't be added.", or the
+matching singular, and the view stays `selected` (or `error` while any failed tile remains).
 
 "Try again" resends the **same `File` objects** — identity is asserted in the test through the multipart
 body — so a failure cannot lose the selection. Invalidation stays where E4-S1B put it, on `onSuccess`:
@@ -1111,11 +1111,11 @@ the slot a photo occupies is its index, so the future publish payload is `ordere
 - `moveItem(items, from, to)` clamps both indices, refuses non-integer input (a caller bug cannot
   truncate a slot), returns the **same reference** when a move changes nothing, and follows
   `arrayMove`'s contract: the destination is the index in the resulting array.
-- `orderedIds(items)` is the payload projection — ids in display order. It has no production caller
-  until E4-S5 publishes; the tests pin the contract the endpoint will consume. **The ids must be the
-  server's photo UUIDs**: today `SelectionItem.id` is client-local (`selection-N`) and a successful
-  upload removes the tile, so E4-S5 must keep the returned `Photo.id` on the item (or map selection
-  id → photo UUID) before `orderedIds` can produce a valid `DumpCreate.photoIds`.
+- `orderedIds(items)` is the payload projection — ids in display order. Its production caller arrives
+  with the publish (E4-S5B); the tests pin the contract the endpoint will consume. **The ids must be
+  the server's photo UUIDs**: `SelectionItem.id` is client-local (`selection-N`), which is why since
+  E4-S5A a successful upload keeps the returned `Photo` on the item — the six stored photos, in
+  display order, are what `orderedIds` will project into a valid `DumpCreate.photoIds`.
 
 11 unit tests state every move direction, both clamps, the no-op identity and the ordered-ids
 projection. The drag and touch surfaces that write through this reducer arrived in E4-S3B — the next
