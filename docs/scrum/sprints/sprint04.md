@@ -21,7 +21,7 @@
 | 2e | E4-S3D1 | Position-based announcement copy and instructions (criterion 3) | 1 | p0 | Done | #132 |
 | 3a | E4-S4A | The chosen-background theme engine — hex validation, contrast by construction | 1 | p0 | Done | #133 |
 | 3b | E4-S4B | Palette suggestions from the selected photos, merged and ranked | 2 | p0 | Done | #135 |
-| 3c | E4-S4C | The Aura picker UI, live preview, reset and session persistence | 2 | p0 | In progress | — |
+| 3c | E4-S4C | The Aura picker UI, live preview, reset and session persistence | 2 | p0 | Done | #137 + #139 + #141 |
 | 4 | E4-S5 | Publish dump — `POST /dumps`, optimistic insert, rollback | 5 | p0 | Todo | — |
 | 5 | E6-S2 | Required status checks on `main` and `develop` | 2 | p0 | Todo | — |
 
@@ -186,5 +186,13 @@ The order is deliberate:
   the new race test; round 2 measured the whole suite green under it). Size **91 hand-written =
   87 + 4** (production 22 / tests 69 / docs 0). The optional membership-trigger variant is recorded
   as not owed (both entrances invalidate a pending answer; an equivalent mutant).
-- 2026-10-18 — Row 3c stays **In progress**: the last slice, **S4C2** (session persistence), follows
-  in its own PR; the flip then records `#137 + #139 + S4C2` and closes issue #34.
+- 2026-10-18 — **E4-S4C · 2/2 merged (`13208ab`, PR #141)** — the story completes and **issue #34
+  closes** (manually: closing keywords fire only on the default branch `main`, and this repository
+  merges into `develop`). The aura survives a refresh through one `sessionStorage` value,
+  re-validated on read (`normalizeHex` + the engine's refusal) and guarded end to end — a blocked
+  Storage loses the session, not the workshop. Final size at the tip `f99fc56`: **113 hand-written =
+  106 + 7** (production 51 / tests 58 / docs 4). The review (APPROVE WITH NITS, no blocking)
+  confirmed all five criteria against the merged slices and found three unpinned mutants — the reset
+  write, the read's `normalizeHex`, and an unmount that clears the session — all closed in place
+  (each mutation now fails exactly one test), plus the blocked `removeItem` path spied and exercised
+  through the neutral reset. Row 3c flips to **Done** (`#137 + #139 + #141`).
