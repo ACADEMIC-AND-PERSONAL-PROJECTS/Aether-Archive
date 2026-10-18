@@ -243,7 +243,8 @@ describe("themeFromBackground", () => {
         expect(token).not.toBe("#000000");
         expect(token).not.toBe("#ffffff");
       }
-      expect(theme.surface).not.toBe(theme.bg);
+      const surfaceDirection = lightness(theme.surface) - lightness(theme.bg);
+      expect(Math.sign(surfaceDirection)).toBe(theme.glass.startsWith("rgba(255") ? 1 : -1);
       for (const ratio of Object.values(contrastReport(theme))) {
         expect(ratio).toBeGreaterThanOrEqual(CONTRAST_MINIMUM);
       }
