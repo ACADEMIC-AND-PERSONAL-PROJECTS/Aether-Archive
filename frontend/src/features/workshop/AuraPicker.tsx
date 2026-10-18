@@ -140,11 +140,10 @@ export function AuraPicker({ chosen, suggestions, onChoose, onReset }: AuraPicke
         ) : null}
       </div>
 
-      {message !== null ? (
-        <p id={messageId} role="status" className="text-sm text-aura-text">
-          {message}
-        </p>
-      ) : null}
+      {/* Kept mounted: a region inserted with its text is not reliably announced (E3-S5B). */}
+      <p id={messageId} role="status" className="text-sm text-aura-text">
+        {message}
+      </p>
     </section>
   );
 }

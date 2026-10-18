@@ -163,11 +163,10 @@ export function WorkshopView() {
         : "idle";
 
   /*
-   * The aura (E4-S4C): suggestions off the selection, the preview on this view's root, and the one
-   * thing the workshop stores. Extraction rests while the queue runs (`enabled`), so a success that
-   * shrinks the grid mid-upload never re-decodes the photos behind the progress line.
+   * The aura (E4-S4C): suggestions off the selection, the preview on this view's root. Nothing is
+   * persisted (E4-S4C2), and the extraction gate is its own slice.
    */
-  const aura = useAura(items, mainRef, { enabled: !uploading });
+  const aura = useAura(items, mainRef);
 
   // Leaving the view cancels the request nobody is watching and releases every preview URL. The File
   // objects need no cleanup: they are references, and React drops them with the component.

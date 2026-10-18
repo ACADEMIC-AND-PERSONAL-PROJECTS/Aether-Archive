@@ -16,7 +16,6 @@ import type { PaletteColor } from "../lib/color/types";
  * identity would re-decode the photos many times per queue. The effect below depends on the sorted
  * ids instead: reordering never re-extracts (the ranking is order-independent, E4-S4B), adding or
  * removing does, once. The files themselves are read through a ref the commit effect keeps current.
- * While `enabled` is false — the queue is running — extraction rests; the panel shows progress.
  *
  * ## The preview is contrast by construction
  *
@@ -43,15 +42,10 @@ export interface Aura {
   readonly chosen: string | null;
   /** Ranked suggestions, refused colours dropped; empty until the first extraction lands. */
   readonly suggestions: readonly PaletteColor[];
-  /** Validates `value` and, on success, becomes the aura: state, storage and preview together. */
+  /** Validates `value` and, on success, becomes the aura: state and preview together. */
   readonly choose: (value: string) => AuraChoiceResult;
   /** Restores the top suggestion; with no suggestions, clears back to the neutral set. */
   readonly reset: () => void;
-}
-
-export interface AuraOptions {
-  /** False while the queue runs: the panel shows progress, so extraction rests and returns after. */
-  readonly enabled?: boolean;
 }
 
 /** True when the engine will carry this page — the one predicate the picker's offers obey. */
@@ -75,9 +69,7 @@ function sameSuggestions(a: readonly PaletteColor[], b: readonly PaletteColor[])
 export function useAura(
   sources: readonly AuraSource[],
   targetRef: RefObject<HTMLElement | null>,
-  options: AuraOptions = {},
 ): Aura {
-  const { enabled = true } = options;
   const [chosen, setChosen] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<readonly PaletteColor[]>([]);
 
@@ -93,9 +85,6 @@ export function useAura(
 
   const runRef = useRef(0);
   useEffect(() => {
-    if (!enabled) {
-      return;
-    }
     const run = ++runRef.current;
     const files = sourcesRef.current.map((source) => source.file);
     if (files.length === 0) {
@@ -112,7 +101,7 @@ export function useAura(
     return () => {
       runRef.current += 1;
     };
-  }, [membership, enabled]);
+  }, [membership]);
 
   useEffect(() => {
     const target = targetRef.current;
@@ -123,7 +112,7 @@ export function useAura(
       try {
         applyTheme(themeFromBackground(chosen), target);
       } catch {
-        // Unreachable through `choose`; a hand-edited stored value lands here. The neutral set stays.
+        // Unreachable through `choose` (it validates first); it guards the E4-S4C2 stored value.
       }
     }
     return () => clearTheme(target);
