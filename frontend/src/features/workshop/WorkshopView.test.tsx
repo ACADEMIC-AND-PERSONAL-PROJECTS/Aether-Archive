@@ -1482,7 +1482,7 @@ describe("StrictMode", () => {
   });
 
   it("should count one extraction after a pick under the double mount", async () => {
-    // StrictMode's setup → cleanup → setup leaves no stale answer: the run counter absorbs it.
+    // The empty double mount extracts nothing; the pick's single real answer stands and applies.
     mockedSuggest.mockResolvedValue([suggestion("#1f7a7a", 1)]);
     render(
       <StrictMode>
