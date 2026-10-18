@@ -6,4 +6,4 @@ weighted colours); `decode.ts` is the bytes→pixels edge. Default algorithm, fi
 ADR-018.
 
 `suggest.ts` pools many photos' palettes into one ranked suggestion list — deduped by normalised
-hex, weighted by summed pixel share, top eight (E4-S4B; ADR-023's decision 3).
+hex, weighted by the mean photo share, top eight (E4-S4B; ADR-023's decision 3).
