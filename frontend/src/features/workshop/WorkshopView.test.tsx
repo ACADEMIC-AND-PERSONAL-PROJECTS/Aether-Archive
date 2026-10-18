@@ -904,6 +904,9 @@ describe("the queue", () => {
     const thirdFile = fileOf(16, "image/png", "c.png");
     pickFiles(screen.getByLabelText("Choose photos"), [firstFile, secondFile, thirdFile]);
 
+    // A waiting tile has no archive id yet: `data-photo-id` arrives with the success (E4-S5A).
+    expect(tileFor("a.png")).not.toHaveAttribute("data-photo-id");
+
     fireEvent.click(screen.getByRole("button", { name: "Upload" }));
     const first = await requestAt(0);
     // Concurrency one: the click opened exactly one request, in pick order.
@@ -1157,6 +1160,35 @@ describe("the queue", () => {
       expect(tileFor(name)).toHaveAttribute("data-state", "waiting");
     }
     expect(screen.getByTestId("workshop-status")).toHaveTextContent("Upload cancelled.");
+    expect(screen.getByRole("button", { name: "Upload" })).toBeVisible();
+  });
+
+  it("should keep the successes and their previews when a cancel stops a mixed batch", async () => {
+    const revoke = vi.spyOn(URL, "revokeObjectURL");
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [
+      fileOf(16, "image/png", "a.png"),
+      fileOf(16, "image/png", "b.png"),
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+    const first = await requestAt(0);
+    await respond(first, 201, UPLOADED);
+    const second = await requestAt(1);
+    await waitFor(() => expect(tileFor("b.png")).toHaveAttribute("data-state", "uploading"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("workshop-notice")).toHaveTextContent("Upload cancelled."),
+    );
+    expect(second.aborted).toBe(true);
+    // The draft survives the cancel too: a.png is stored and keeps its tile, its photo id and its
+    // preview; b.png goes back to waiting and the queue button returns for it.
+    expect(tileFor("a.png")).toHaveAttribute("data-state", "added");
+    expect(tileFor("a.png")).toHaveAttribute("data-photo-id", UPLOADED.id);
+    expect(tileFor("b.png")).toHaveAttribute("data-state", "waiting");
+    expect(revoke).not.toHaveBeenCalledWith("blob:preview-1");
+    expect(revoke).not.toHaveBeenCalledWith("blob:preview-2");
     expect(screen.getByRole("button", { name: "Upload" })).toBeVisible();
   });
 
@@ -1792,6 +1824,16 @@ describe("accessibility", () => {
 
     await waitFor(() => expect(screen.getByRole("button", { name: "Try again" })).toBeVisible());
     expect(screen.getByRole("main")).toHaveAttribute("data-state", "error");
+    expect(violationSummary(await runAxe(document.body))).toEqual([]);
+  });
+
+  it("should have no structural violations with a settled draft", async () => {
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [fileOf(4096, "image/png", "c.png")]);
+    const request = await startUpload();
+    await respond(request, 201, UPLOADED);
+    await waitFor(() => expect(tileFor("c.png")).toHaveAttribute("data-state", "added"));
+
     expect(violationSummary(await runAxe(document.body))).toEqual([]);
   });
 });
