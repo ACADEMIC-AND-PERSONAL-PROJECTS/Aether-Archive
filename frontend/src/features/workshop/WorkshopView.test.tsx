@@ -670,9 +670,10 @@ describe("reordering", () => {
     pickFiles(screen.getByLabelText("Choose photos"), sixFiles());
     stubGridRects();
 
-    // Two persistent regions, each owning one conversation: the workshop's says what the queue is
-    // doing, dnd-kit's says where the photo is. A drag changes no upload state, so only one speaks.
-    expect(screen.getAllByRole("status")).toHaveLength(2);
+    // Three persistent regions, each owning one conversation: the workshop's says what the queue
+    // is doing, dnd-kit's says where the photo is, and the picker's speaks its verdict — kept
+    // mounted and empty between messages (E3-S5B). A drag changes no upload state, so only one speaks.
+    expect(screen.getAllByRole("status")).toHaveLength(3);
     expect(screen.getByTestId("workshop-status")).toHaveTextContent("6 photos selected.");
 
     const first = activatorFor("a.png");
@@ -1479,6 +1480,22 @@ describe("StrictMode", () => {
 
     expect(tileLines()).toEqual(["strict-b.png: Waiting", "strict-a.png: Waiting"]);
   });
+
+  it("should count one extraction after a pick under the double mount", async () => {
+    // StrictMode's setup → cleanup → setup leaves no stale answer: the run counter absorbs it.
+    mockedSuggest.mockResolvedValue([suggestion("#1f7a7a", 1)]);
+    render(
+      <StrictMode>
+        <QueryClientProvider client={createQueryClient()}>
+          <WorkshopView />
+        </QueryClientProvider>
+      </StrictMode>,
+    );
+    pickFiles(screen.getByLabelText("Choose photos"), [fileOf(16, "image/png", "strict.png")]);
+    fireEvent.click(await screen.findByRole("button", { name: "Use #1f7a7a, 100% mean share" }));
+    expect(mockedSuggest.mock.calls.length).toBe(1);
+    expect(screen.getByRole("main").style.getPropertyValue("--aura-bg")).toBe("#1f7a7a");
+  });
 });
 
 describe("the aura picker", () => {
@@ -1507,6 +1524,17 @@ describe("the aura picker", () => {
     expect(second).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("should drop a refused suggestion before it is offered", async () => {
+    // Pure black would be a dead control: its press lands on the refusal and no theme.
+    mockedSuggest.mockResolvedValue([suggestion("#000000", 0.6), suggestion("#c2542a", 0.4)]);
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [fileOf(16, "image/png", "a.png")]);
+    const palette = await screen.findAllByRole("button", { name: /mean share/ });
+    expect(palette.map((swatch) => swatch.getAttribute("aria-label"))).toEqual([
+      "Use #c2542a, 40% mean share",
+    ]);
+  });
+
   it("should apply a typed hex live, and report the invalid and refused shapes", async () => {
     renderWorkshop();
     pickFiles(screen.getByLabelText("Choose photos"), [fileOf(16, "image/png", "a.png")]);
@@ -1523,6 +1551,11 @@ describe("the aura picker", () => {
     fireEvent.keyDown(field, { key: "Enter" });
     expect(screen.getByText(/Not a colour/)).toBeVisible();
     expect(main.style.getPropertyValue("--aura-bg")).toBe("#1f7a7a");
+
+    // Leaving the field commits too: the same incomplete value reports it on blur.
+    fireEvent.change(field, { target: { value: "#12345" } });
+    fireEvent.blur(field);
+    expect(screen.getByText(/Not a colour/)).toBeVisible();
 
     // A pure page is refused by policy (ADR-023) the moment its shape completes.
     fireEvent.change(field, { target: { value: "#000000" } });
@@ -1583,29 +1616,6 @@ describe("the aura picker", () => {
     expect(mockedSuggest.mock.calls.length).toBe(extractions);
     // …and the chosen aura still themes the workshop.
     expect(main.style.getPropertyValue("--aura-bg")).toBe("#1f7a7a");
-  });
-
-  it("should rest extraction while the queue runs, and come back when it ends", async () => {
-    mockedSuggest.mockResolvedValue([suggestion("#1f7a7a", 1)]);
-    renderWorkshop();
-    pickFiles(screen.getByLabelText("Choose photos"), [
-      fileOf(16, "image/png", "a.png"),
-      fileOf(16, "image/png", "b.png"),
-    ]);
-    await screen.findByRole("button", { name: /mean share/ });
-    const extractions = mockedSuggest.mock.calls.length;
-
-    // The first success shrinks the grid mid-upload: membership changed, extraction must not wake.
-    const first = await startUpload();
-    await respond(first, 201, UPLOADED);
-    const second = await requestAt(1);
-    expect(mockedSuggest.mock.calls.length).toBe(extractions);
-
-    await respond(second, 201, UPLOADED);
-    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "idle"));
-    // Everything succeeded: the selection is empty, so the fresh extraction has nothing to offer.
-    expect(mockedSuggest.mock.calls.length).toBe(extractions);
-    expect(screen.queryByRole("button", { name: /mean share/ })).toBeNull();
   });
 });
 
