@@ -49,6 +49,14 @@ describe("mergePalettes — ADR-023's pooling", () => {
     expect(reversed[0]?.oklch).toBe(right.colors[0]?.oklch);
   });
 
+  it("a key that fails normalisation still dedupes trim- and case-insensitively", () => {
+    const merged = mergePalettes([palette(["RED", 0.5], ["red ", 0.5])]);
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0]?.hex).toBe("red");
+    expect(merged[0]?.weight).toBe(1);
+  });
+
   it("caps at MAX_COLORS, keeping the heaviest colours and dropping the tail's weight", () => {
     const nine = palette(
       ["#010101", 0.26],
@@ -78,6 +86,34 @@ describe("mergePalettes — ADR-023's pooling", () => {
     // The dropped tail is why the shares no longer sum to 1 — they are not re-normalised.
     const sum = merged.reduce((total, color) => total + color.weight, 0);
     expect(sum).toBeCloseTo(0.99, 10);
+  });
+
+  it("nine tied colours drop by hex — the cap's tie-break, not the palette's order", () => {
+    const tied: Array<[string, number]> = [
+      ["#000009", 1 / 9],
+      ["#000001", 1 / 9],
+      ["#000008", 1 / 9],
+      ["#000002", 1 / 9],
+      ["#000007", 1 / 9],
+      ["#000003", 1 / 9],
+      ["#000006", 1 / 9],
+      ["#000004", 1 / 9],
+      ["#000005", 1 / 9],
+    ];
+
+    const merged = mergePalettes([palette(...tied)]);
+
+    expect(merged.map((color) => color.hex)).toEqual([
+      "#000001",
+      "#000002",
+      "#000003",
+      "#000004",
+      "#000005",
+      "#000006",
+      "#000007",
+      "#000008",
+    ]);
+    expect(merged.every((color) => color.weight === 1 / 9)).toBe(true);
   });
 
   it("an empty palette adds nothing and is not counted as a photo", () => {
@@ -165,6 +201,34 @@ describe("suggestPalette — the extraction beside the merge", () => {
     expect(merged.map((color) => color.weight)).toEqual([0.375, 0.375, 0.25]);
   });
 
+  it("a synchronously-throwing extract is a skip like any refusal", async () => {
+    const sources = [new Blob(["ok"]), new Blob(["throws"]), new Blob(["ok too"])];
+
+    const merged = await suggestPalette(sources, {
+      extract(source) {
+        if (source === sources[1]) {
+          throw new Error("sync boom");
+        }
+        return Promise.resolve(
+          source === sources[0]
+            ? palette(["#aa3344", 0.5], ["#22aa66", 0.5])
+            : palette(["#aa3344", 0.25], ["#8899aa", 0.75]),
+        );
+      },
+    });
+
+    expect(merged.map((color) => color.hex)).toEqual(["#8899aa", "#aa3344", "#22aa66"]);
+    expect(merged.map((color) => color.weight)).toEqual([0.375, 0.375, 0.25]);
+
+    await expect(
+      suggestPalette([new Blob(["throws"])], {
+        extract() {
+          throw new Error("sync boom");
+        },
+      }),
+    ).resolves.toEqual([]);
+  });
+
   it("every extraction failing yields an empty list, not a rejection", async () => {
     const failure = new PaletteExtractionError("unsupported", "no decoder here");
 
@@ -173,6 +237,10 @@ describe("suggestPalette — the extraction beside the merge", () => {
         extract: () => Promise.reject(failure),
       }),
     ).resolves.toEqual([]);
+  });
+
+  it("no sources at all is an empty list, not an error", async () => {
+    await expect(suggestPalette([])).resolves.toEqual([]);
   });
 
   it("starts every extraction before any one resolves — the photos read beside each other", async () => {
@@ -192,6 +260,9 @@ describe("suggestPalette — the extraction beside the merge", () => {
       },
     });
 
+    // The `Promise.resolve().then(…)` wrapper defers each `extract` by one microtask; none has
+    // resolved yet (the gate is still closed), so both must have started.
+    await Promise.resolve();
     expect(started).toEqual(sources);
     release();
     const merged = await pending;

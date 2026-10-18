@@ -6,11 +6,13 @@
  *
  * - **Dedupe by normalised hex.** The same wall of rust in six frames is one suggestion, not six; the
  *   first occurrence carries its OKLCh through, and equal hexes decode equal.
- * - **Rank by summed weight.** A colour's confidence is its share of the pixels that could be read:
- *   the summed weight divided by the number of photos that produced a palette. The list is capped at
- *   `MAX_COLORS` — the same top-eight bound §2.1 gives one photo — so a capped list's shares sum to
- *   less than 1; they are never re-normalised, because "share of the selected pixels" is the claim
- *   the picker repeats.
+ * - **Rank by summed weight.** A colour's confidence is its mean share across the photos that
+ *   produced colours: the summed weight divided by their count. A `Palette` carries no pixel count,
+ *   so the average is photo-per-photo, not pixel-per-pixel — the closest computable reading of
+ *   "share of the selected pixels" — and the two differ only when the photos' areas do. The list is
+ *   capped at `MAX_COLORS`, the same top-eight bound §2.1 gives one photo, so a capped list's shares
+ *   sum to less than 1; they are never re-normalised, because the share is the number the picker
+ *   will repeat.
  *
  * A failed extraction is skipped, and if every one fails the list is empty: the hex input remains
  * the picker's floor (ADR-023). The order is total — weight descending, then hex ascending — so a tie
@@ -40,7 +42,9 @@ function compareHex(left: string, right: string): number {
 /**
  * Pools palettes into one list: deduped by normalised hex, weights summed and divided by the number
  * of palettes that produced colours (an empty palette read no pixels and does not deflate the
- * shares), capped at `MAX_COLORS`.
+ * shares), capped at `MAX_COLORS`. Inputs are trusted to be extraction's — canonical `#rrggbb`,
+ * finite positive weights summing to 1 per palette; the share arithmetic and the total order assume
+ * it.
  */
 export function mergePalettes(palettes: readonly Palette[]): PaletteColor[] {
   const pooled = new Map<string, { oklch: Oklch; weight: number }>();
@@ -51,7 +55,7 @@ export function mergePalettes(palettes: readonly Palette[]): PaletteColor[] {
     }
     contributors += 1;
     for (const color of palette.colors) {
-      const hex = normalizeHex(color.hex) ?? color.hex.toLowerCase();
+      const hex = normalizeHex(color.hex) ?? color.hex.trim().toLowerCase();
       const seen = pooled.get(hex);
       if (seen) {
         seen.weight += color.weight;
@@ -71,13 +75,18 @@ export function mergePalettes(palettes: readonly Palette[]): PaletteColor[] {
 
 /**
  * Extracts every source beside the others — `Promise.allSettled`, so one refusal is a skip, never a
- * failure — and merges the survivors.
+ * failure — and merges the survivors. A synchronous throw from an injected `extract` is a refusal
+ * too: the call settles it before it can escape.
  */
 export async function suggestPalette(
   sources: readonly Blob[],
   environment: SuggestEnvironment = browserSuggestEnvironment,
 ): Promise<PaletteColor[]> {
-  const settled = await Promise.allSettled(sources.map((source) => environment.extract(source)));
+  // `Promise.resolve().then(…)` makes every injected shape settle: a synchronous throw becomes a
+  // rejection `allSettled` skips instead of escaping it.
+  const settled = await Promise.allSettled(
+    sources.map((source) => Promise.resolve().then(() => environment.extract(source))),
+  );
   const palettes = settled
     .filter((result): result is PromiseFulfilledResult<Palette> => result.status === "fulfilled")
     .map((result) => result.value);
