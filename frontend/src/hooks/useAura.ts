@@ -162,7 +162,8 @@ export function useAura(
       try {
         applyTheme(themeFromBackground(chosen), target);
       } catch {
-        // Unreachable through `choose` (it validates first); it guards the E4-S4C2 stored value.
+        // Both entrances validate through the same engine check; this is the belt for a future
+        // divergence, not a known shape.
       }
     }
     return () => clearTheme(target);
