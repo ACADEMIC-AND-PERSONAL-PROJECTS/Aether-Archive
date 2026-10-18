@@ -19,7 +19,7 @@
 | 2c | E4-S3C | Motion: drop ≤ 300 ms, auto-scroll, reduced motion (criterion 4) — two PRs | 1 | p0 | Done | #127 + #128 |
 | 2d | E4-S3D | Keyboard path and cancel, with dnd-kit's default announcements (criterion 3) | 1 | p0 | Done | #131 |
 | 2e | E4-S3D1 | Position-based announcement copy and instructions (criterion 3) | 1 | p0 | Done | #132 |
-| 3a | E4-S4A | The chosen-background theme engine — hex validation, contrast by construction | 1 | p0 | In progress | — |
+| 3a | E4-S4A | The chosen-background theme engine — hex validation, contrast by construction | 1 | p0 | Done | #133 |
 | 3b | E4-S4B | Palette suggestions from the selected photos, merged and ranked | 2 | p0 | Todo | — |
 | 3c | E4-S4C | The Aura picker UI, live preview, reset and session persistence | 2 | p0 | Todo | — |
 | 4 | E4-S5 | Publish dump — `POST /dumps`, optimistic insert, rollback | 5 | p0 | Todo | — |
@@ -132,3 +132,15 @@ The order is deliberate:
   hand-written for #128 and **498** for #127 (production 156 / tests 222 / docs 120 / records 0) —
   both under the ~500 trigger, no exception claimed. The review's recorded nits (scrim contrast
   8.57/7.45, E6-S23, listener lifecycle, mid-session preference change) are all closed.
+- 2026-10-18 — **E4-S4A merged (`b30a532`, PR #133)** at APPROVE, size **399 hand-written** at the
+  tip (production 187 / tests 126 / docs 86, `git diff develop --numstat`), both CI jobs green on the
+  tip run
+  [39159095128](https://github.com/ACADEMIC-AND-PERSONAL-PROJECTS/Aether-Archive/actions/runs/39159095128).
+  The engine changed only where the review proved it wrong — the single-direction refusal band and
+  pure-text returns (`d05eccd`: both directions tried, never pure text) and the near-endpoint pure
+  surfaces (`5c5054c`: the step flips at the cube's edge) — and the record's black-glass
+  counterfactual was re-measured with the tint forced in the shipped search: **1,803 of 4,096
+  refused (44.0%)**, not the 1,799 first recorded (ADR-023 updated; the pushed messages keep the
+  miscount, noted on the PR). The review's two consistency nits (`.claude/rules/frontend.md`'s glass
+  clause and `DESIGN-SYSTEM.md`'s fallback qualifier) and the optional
+  `glassSolid`-in-`ContrastReport` hardening are deferred to S4C, recorded here per the review.
