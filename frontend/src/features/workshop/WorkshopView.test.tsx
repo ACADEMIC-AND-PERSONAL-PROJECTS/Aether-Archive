@@ -1617,6 +1617,75 @@ describe("the aura picker", () => {
     // …and the chosen aura still themes the workshop.
     expect(main.style.getPropertyValue("--aura-bg")).toBe("#1f7a7a");
   });
+
+  it("should rest extraction while the queue runs, and come back when it ends", async () => {
+    mockedSuggest
+      .mockResolvedValueOnce([suggestion("#1f7a7a", 1)])
+      .mockResolvedValue([suggestion("#c2542a", 1)]);
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [
+      fileOf(16, "image/png", "a.png"),
+      fileOf(16, "image/png", "b.png"),
+    ]);
+    await screen.findByRole("button", { name: "Use #1f7a7a, 100% mean share" });
+    const extractions = mockedSuggest.mock.calls.length;
+
+    // The first success shrinks the grid mid-upload: membership changed, extraction must not wake.
+    const first = await startUpload();
+    await respond(first, 201, UPLOADED);
+    const second = await requestAt(1);
+    expect(mockedSuggest.mock.calls.length).toBe(extractions);
+
+    // The queue ends with a tile left (b failed): the gate reopens for a non-empty selection, the
+    // extraction wakes once more, and its answer replaces the one held before the queue.
+    await respond(second, 413, PROBLEM_413_TOO_LARGE, "application/problem+json");
+    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "error"));
+    expect(mockedSuggest.mock.calls.length).toBe(extractions + 1);
+    expect(
+      await screen.findByRole("button", { name: "Use #c2542a, 100% mean share" }),
+    ).toBeVisible();
+  });
+
+  it("should drop an answer that lands while the gate is closed", async () => {
+    let resolveDoomed: (value: PaletteColor[]) => void = () => {};
+    let resolveReopen: (value: PaletteColor[]) => void = () => {};
+    mockedSuggest
+      .mockImplementationOnce(
+        () =>
+          new Promise<PaletteColor[]>((resolve) => {
+            resolveDoomed = resolve;
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise<PaletteColor[]>((resolve) => {
+            resolveReopen = resolve;
+          }),
+      )
+      .mockResolvedValue([]);
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [
+      fileOf(16, "image/png", "a.png"),
+      fileOf(16, "image/png", "b.png"),
+    ]);
+    const first = await startUpload();
+    await respond(first, 201, UPLOADED);
+    const second = await requestAt(1);
+
+    // The first extraction was in flight when the queue started; the gate's cleanup is what makes
+    // its late answer stale. Resolved while the gate is closed, it must not surface when the failed
+    // queue brings the picker back — with the increment gone, it would show here.
+    resolveDoomed([suggestion("#1f7a7a", 1)]);
+    await respond(second, 413, PROBLEM_413_TOO_LARGE, "application/problem+json");
+    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "error"));
+    expect(screen.queryByRole("button", { name: /mean share/ })).toBeNull();
+
+    // The reopen's own extraction lands and stands.
+    resolveReopen([suggestion("#c2542a", 1)]);
+    expect(
+      await screen.findByRole("button", { name: "Use #c2542a, 100% mean share" }),
+    ).toBeVisible();
+  });
 });
 
 describe("accessibility", () => {

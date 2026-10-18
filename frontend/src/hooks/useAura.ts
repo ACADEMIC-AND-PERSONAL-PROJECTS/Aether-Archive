@@ -16,6 +16,9 @@ import type { PaletteColor } from "../lib/color/types";
  * identity would re-decode the photos many times per queue. The effect below depends on the sorted
  * ids instead: reordering never re-extracts (the ranking is order-independent, E4-S4B), adding or
  * removing does, once. The files themselves are read through a ref the commit effect keeps current.
+ * While `enabled` is false — the queue is running — extraction rests; the panel shows progress. A
+ * gate that reopens on an unchanged membership re-extracts once; accepted — O(n), and invisible
+ * beside the queue that just ended.
  *
  * ## The preview is contrast by construction
  *
@@ -48,6 +51,11 @@ export interface Aura {
   readonly reset: () => void;
 }
 
+export interface AuraOptions {
+  /** False while the queue runs: the panel shows progress, so extraction rests and returns after. */
+  readonly enabled?: boolean;
+}
+
 /** True when the engine will carry this page — the one predicate the picker's offers obey. */
 function isCarriable(hex: string): boolean {
   try {
@@ -69,7 +77,9 @@ function sameSuggestions(a: readonly PaletteColor[], b: readonly PaletteColor[])
 export function useAura(
   sources: readonly AuraSource[],
   targetRef: RefObject<HTMLElement | null>,
+  options: AuraOptions = {},
 ): Aura {
+  const { enabled = true } = options;
   const [chosen, setChosen] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<readonly PaletteColor[]>([]);
 
@@ -85,6 +95,9 @@ export function useAura(
 
   const runRef = useRef(0);
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
     const run = ++runRef.current;
     const files = sourcesRef.current.map((source) => source.file);
     if (files.length === 0) {
@@ -101,7 +114,7 @@ export function useAura(
     return () => {
       runRef.current += 1;
     };
-  }, [membership]);
+  }, [membership, enabled]);
 
   useEffect(() => {
     const target = targetRef.current;
