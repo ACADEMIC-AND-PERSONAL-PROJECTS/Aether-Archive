@@ -156,3 +156,35 @@ The order is deliberate:
   carries no pixel counts; the review measured 0.5/0.5 emitted where pixel areas give 0.64/0.36) and
   the module states its trusted-input contract. The probe (real PNGs, Chrome 153 headless)
   reproduces at the tip and its bundle is byte-identically rebuildable.
+- 2026-10-18 — **E4-S4C · 1/2 merged (`1ca606f`, PR #137)** at APPROVE WITH NITS after two review
+  rounds. The picker offers the ranked suggestions, live-applies complete hexes, commits on Enter or
+  blur with a quiet refusal, and holds a persistent status paragraph; nothing is persisted yet. The
+  story had been **pre-cut before implementation** into S4C1 (this PR) and S4C2 (session), and the
+  branch was cut further **at this PR's round-1 review**: the blocking finding was the size
+  accounting, and the branch gave up real scope rather than re-labelling it — the **extraction gate**
+  left whole to **S4C1b** and the two E4-S4A glass nits to **PR #138** (the E4-S3C/auto-scroll
+  precedent, #128). Final size, re-measured at the tip `be4270e`: **499 hand-written = 489 + 10**
+  (production 322 / tests 173 / docs 4) — **under the ~500 trigger, no exception claimed**; over the
+  ~400 PR ideal with the claim surviving review as exactly that arithmetic (**504 → 499: −13 the
+  gate, −8 the nits, +16 the review's own tests = −5**). Round 2 closed all seven nits: the
+  refused-filter test (fails under the reviewer's round-1 mutation), blur witnessed, the StrictMode
+  extraction-count test with its comment reworded to what it measures, and the run-counter race
+  deferred to S4C1b. Captures (390 × 844 @ DPR 3, Chrome 153, committed at `10762b2`) are
+  **pixel-identical at the tip** — capture PNG bytes are encoder-nondeterministic; pixels are the
+  provenance — and the probe transcript reproduces word for word.
+- 2026-10-18 — **PR #138 merged (`a078332`)**: the two glass nits carried from E4-S4A's review — the
+  `.claude/rules/frontend.md` glass clause and `DESIGN-SYSTEM.md`'s fallback qualifier — **8
+  hand-written** lines (5 + 3). Their content was verified twice inside #137's rounds (checked
+  against `theme.ts:356-358` and `glass.css`'s `@supports` branch, then re-read as "exactly the two
+  statements round 1 verified"); no separate scope remained for a third pass.
+- 2026-10-18 — **E4-S4C · 1b merged (`6e79ed0`, PR #139)** at APPROVE WITH NITS: the extraction gate
+  re-lands on top of the merged picker **exactly as it stood at `10762b2`**, with the transfer
+  commitments closed — **N2** (the reopen pinned on a non-empty selection: b fails 413, the second
+  answer replaces the held one; the reviewer's vacuity counterexample fails the test) and **N3**
+  (the reopen's re-decode recorded as accepted: O(n), invisible beside the queue that just ended) —
+  plus **M4** from #137's round 2 (removing the cleanup's `runRef.current += 1` now fails exactly
+  the new race test; round 2 measured the whole suite green under it). Size **91 hand-written =
+  87 + 4** (production 22 / tests 69 / docs 0). The optional membership-trigger variant is recorded
+  as not owed (both entrances invalidate a pending answer; an equivalent mutant).
+- 2026-10-18 — Row 3c stays **In progress**: the last slice, **S4C2** (session persistence), follows
+  in its own PR; the flip then records `#137 + #139 + S4C2` and closes issue #34.
