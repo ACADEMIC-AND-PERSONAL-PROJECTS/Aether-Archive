@@ -1581,6 +1581,7 @@ describe("the publish group", () => {
     const { client } = renderWorkshop();
     await uploadSixStored();
     fireEvent.change(screen.getByLabelText("Aura"), { target: { value: "#1f7a7a" } });
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Summer night" } });
 
     const dumps = stubPublishFetch();
     fireEvent.click(screen.getByRole("button", { name: "Save archive" }));
@@ -1595,8 +1596,9 @@ describe("the publish group", () => {
     await waitFor(() => expect(screen.getByTestId("workshop-notice")).toHaveTextContent(sentence));
     expect(screen.getByTestId("workshop-status")).toHaveTextContent(sentence);
 
-    // The draft survives the refusal: six stored tiles, still editable, the action ready again.
+    // The draft survives the refusal: six stored tiles, the typed title, the action ready again.
     expect(selectedTiles()).toHaveLength(6);
+    expect(screen.getByLabelText("Title")).toHaveValue("Summer night");
     expect(tileFor("a.png")).toHaveAttribute("data-state", "added");
     expect(screen.getByRole("button", { name: "Remove a.png" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Save archive" })).toBeEnabled();
