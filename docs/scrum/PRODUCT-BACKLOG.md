@@ -632,6 +632,8 @@ delivery, documentation, and a clean v1.0.
 | E6-S21 | Splash hero URL origin validation | p2 | 1 | — | Todo |
 | E6-S22 | GitHub Actions majors and Dependabot | p2 | 1 | — | Todo |
 | E6-S23 | Drag overlay stacking at short viewports | p2 | 1 | — | Todo |
+| E6-S24 | River viewport, scroll memory & aura (#176) | p1 | — | — | Todo |
+| E6-S25 | Preserve existing dumps after first publish (#177) | p1 | — | — | Todo |
 
 ### E6-S1 — CI on every PR · 5 pts · p0
 
@@ -659,6 +661,17 @@ delivery, documentation, and a clean v1.0.
 - [ ] iOS Safari + Android Chrome quirks captured (dvh, backdrop-filter, scroll, gesture conflicts).
 - [ ] Results written in `reports/` and converted into backlog items with priorities.
 - [ ] LAN setup documented in the README (host exposure, firewall note).
+
+### E6-S24 — River viewport, scroll memory & aura · estimate pending · p1 · #176
+
+- [ ] Constrain the River to the available viewport so its `main` is the actual scroll container.
+- [ ] Verify `main.scrollTop` changes and restores across route navigation.
+- [ ] Verify differently coloured dumps update the River aura while scrolling.
+
+### E6-S25 — Preserve existing dumps after first publish · estimate pending · p1 · #177
+
+- [ ] When the dumps query has not been loaded, publishing a dump must not hide earlier dumps.
+- [ ] Add regression coverage for a fresh client that publishes before opening the River.
 
 ### E6-S5 — Security & robustness pass · 5 pts · p0
 
