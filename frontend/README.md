@@ -1402,13 +1402,42 @@ is ADR-024 decision 4:
    prepends the server's dump, drops the optimistic entry and any copy a read raced in — exactly once —
    and **nothing is invalidated**: the response is canonical.
 2. The publish takes no `AbortSignal` — leaving the view must not throw away an answer that changes what
-   the archive holds. The error→sentence vocabulary lands with the "Save archive" panel (E4-S5D), the
-   story that first shows a sentence; the hook exposes the `ApiError` and carries no wording itself.
+   the archive holds. The error→sentence vocabulary now lives in `lib/publish/sentence.ts` (E4-S5D),
+   the story that first shows a sentence; the hook exposes the `ApiError` and carries no wording itself.
 
 The dump feed (the River, E5-S1) does not exist yet; this slice prepares the cache entry it will read.
 The tests read the cache through their own `QueryClient`, or through a mounted `useQuery` standing in
 for E5-S1's feed: 8 tests at `api/dumps.test.tsx`, from the request's shape to the removal of a failed
 draft when there was nothing before it.
+
+## The "Save archive" panel (E4-S5D)
+
+The draft's second, explicit action (ADR-024 decision 2). The group appears once the draft holds six
+tiles — the dump's shape — with the optional title field and the button; a draft that cannot leave is
+answered by `planPublish`'s one sentence in the panel (a photo still un-stored, no aura, a title past 80) and the click sends nothing. Five tiles is not the shape: the group leaves with the sixth tile.
+
+A ready plan runs the real `usePublishDump` mutation. While the request is in flight the grid, the
+title field, the picker and the button are disabled ("Saving…", `aria-busy`), the live region says
+"Saving the dump." so the state is announced, and the aura picker stays live — its change cannot
+affect a body already on the wire. Success returns where the workshop was entered from (`navigate(-1)`)
+with the river's cache already holding the server's dump; a failure stays, the draft intact and its
+six tiles still stored, and shows one sentence from `lib/publish/sentence.ts`:
+
+| Failure                           | Sentence                                                                                   |
+| --------------------------------- | ------------------------------------------------------------------------------------------ |
+| network or timeout                | "The archive didn't answer. Try again."                                                    |
+| 400, `errors[0].field = photoIds` | "The archive refused the photos — one may already be in a dump. Remove it and save again." |
+| 400, `backgroundColor`            | "The archive refused the colour. Choose an aura and save again."                           |
+| 400, `title`                      | "The archive refused the title. Shorten it and try again."                                 |
+| anything else                     | "The dump couldn't be saved. Try again."                                                   |
+
+The `photoIds` sentence is the one ADR-024 decision 5 pins: a refusal never costs a re-upload, and
+telling the curator to reload or discard the draft would contradict the decision — review round 1 on
+E4-S5C refused exactly that wording. The 4 unit tests in `lib/publish/sentence.test.ts` pin every
+sentence and the fallback's refusal to repeat the server's `detail`; 4 view tests cover the group's
+visibility, the blocked click that opens no request, the optimistic entry between click and response
+with the return on success, and the rollback with the draft intact. One publish at a time: the action
+is disabled in flight, which is also why the optimistic id can stay deterministic.
 
 ## Zero external requests — measured on the built bundle
 
