@@ -22,7 +22,7 @@
 | 3 | E5-S3 | Image loading performance — LQIP, no CLS, the first-viewport budget | 5 | p0 | Done | #170 |
 | 4 | E6-S4 | Real-device verification pass (LAN) | 3 | p0 | Todo | — |
 | 5 | E5-S4 | Virtualisation decision & implementation — measure first, then decide | 3 | p1 | Done | #172 |
-| 6 | E6-S3 | Accessibility audit (WCAG 2.2 AA) | 3 | p1 | Todo | — |
+| 6 | E6-S3 | Accessibility audit (WCAG 2.2 AA) | 3 | p1 | Done | #174 |
 
 **Total: 27 points.** The order is deliberate:
 
@@ -157,3 +157,14 @@
   to E6-S4), synthetic hex colours overflow at large i (no functional impact). Final size at tip
   `c51a5a2`: **211 hand-written** (probe 162 / docs 49; reports copy excluded as duplicate) — under
   the ~400 budget. Frontend suite 508 → **510 tests** (+2). Row 5 flips to **Done** (`#172`).
+- 2026-10-19 — **E6-S3 merged (`222c4d8`, PR #174)** at APPROVE WITH NITS (one round): accessibility
+  audit (WCAG 2.2 AA) — one finding fixed: focus ring opacity raised from 50% to 70% across all
+  interactive elements (7 files, 10 occurrences) to meet the 3:1 non-text contrast minimum (WCAG
+  1.4.11). Full audit report in `reports/accessibility-audit-sprint05.md` covering axe (12 tests,
+  zero violations), keyboard walkthrough, contrast, motion preferences, touch targets (≥44px),
+  semantic structure, and accessibility tree inspection. One environment limitation named: no real
+  screen reader device — deferred to E6-S4. Three nits accepted: occurrence miscount (10 not 11),
+  no test for CSS class swap (not observable in jsdom), SR deferral naming. Final size at tip
+  `f9d5f6e`: **87 hand-written** (production 10 / report 77) — well under the ~400 budget.
+  Frontend suite 510 → **510 tests** (no new tests — fix is a CSS class swap). Row 6 flips to
+  **Done** (`#174`).
