@@ -26,7 +26,7 @@
 | 4b | E4-S5B | The publish plan — six stored distinct photos, aura, optional title, pure | 1 | p0 | Done | #145 |
 | 4c | E4-S5C | The dump wire — `createDump`, optimistic insert, rollback | 1 | p0 | Done | #147 |
 | 4d | E4-S5D | "Save archive" — the publish group, pending state, return, e2e | 2 | p0 | Done | #148 |
-| 5 | E6-S2 | Required status checks on `main` and `develop` | 2 | p0 | Todo | — |
+| 5 | E6-S2 | Required status checks on `main` and `develop` | 2 | p0 | Done | #41 |
 
 **Total: 25 points across 14 slices** (E4-S3 was re-cut at #124's review into 2a/2b/2c, and 2c was
 pre-cut after measuring 928 hand-written lines into motion (2c, 1 pt) and keyboard (2d, 2 pts) — points
@@ -263,3 +263,19 @@ The order is deliberate:
   recreates #147's round-1 finding; doc/comment tightening took the branch from 535 to 495). Evidence
   ships in-repo: `reports/verify-e4-s5d-20261019.md` and three captures. Row 4d flips to **Done**
   (`#148`); **E4-S5 (#35) closes** — E6-S2 (required status checks) is what remains on the sprint.
+- 2026-10-19 — **E6-S2 merged (`cd50eac`, PR #153)** at APPROVE (round 1 APPROVE WITH NITS). `develop`
+  and `main` now **require the two CI job contexts before any merge** — `Backend — ./mvnw verify` and
+  `Frontend — lint, format, typecheck, test, build` — applied through the branch-protection API with
+  the previous settings preserved (PRs required, `enforce_admins: true`, no force-push, no deletions;
+  before/after states read back and diffed on both branches). The proof is a drill, not a claim:
+  scratch PR #152 (one deliberately failing frontend test) read `mergeStateStatus: BLOCKED` and
+  `gh pr merge` exited 1 ("the base branch policy prohibits the merge"), then was closed unmerged and
+  its branch deleted — and PR #153 was the gate's first green traversal. The invariant also sits at
+  the edit site (a comment above each required job's `name:` in `ci.yml`), the playbook carries the
+  rule and forbids bypasses (`--admin`, disabling a check, weakening the protection), and round 2
+  proved the comment delta gate-inert (parsed-tree equality across both revisions; the required
+  strings byte-identical across the protection, the workflow and the registered check runs). Size 14
+  hand-written. One accident on the way, recorded rather than hidden: the `ci.yml` comment first
+  landed on the E4-S5 flip branch (#154), moved by cherry-pick — no rebase — and #154 was closed
+  unmerged and re-cut clean as #155 (`22af0ae`). Row 5 flips to **Done** (`#41`): all 25 committed
+  points are delivered.
