@@ -171,6 +171,20 @@ describe("refusals", () => {
       status: "blocked",
       sentence: "A dump needs exactly 6 photos — this draft holds 5.",
     });
+    // Five tiles, one of them un-stored: the count still comes before the un-stored photo.
+    expect(
+      planPublish(draft("photo-a", "photo-b", "photo-c", "photo-d", null), "#1f7a7a", ""),
+    ).toEqual({
+      status: "blocked",
+      sentence: "A dump needs exactly 6 photos — this draft holds 5.",
+    });
+    // Five stored tiles, one of them repeated: the count still comes before distinctness.
+    expect(
+      planPublish(draft("photo-a", "photo-a", "photo-c", "photo-d", "photo-e"), "#1f7a7a", ""),
+    ).toEqual({
+      status: "blocked",
+      sentence: "A dump needs exactly 6 photos — this draft holds 5.",
+    });
     // Six tiles, one un-stored, no aura: the un-stored photo comes before the colour.
     expect(planPublish(draft(...SIX.slice(0, 5), null), null, "")).toEqual({
       status: "blocked",
