@@ -16,7 +16,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | 1a | E5-S1A | The feed's data layer — `GET /photos` + `GET /dumps` as queries, ADR-025 | 2 | p0 | Done | #160 |
 | 1b | E5-S1B | The feed model — `buildFeed`: months, dumps as sections, singles between | 2 | p0 | Done | #162 |
-| 1c | E5-S1C | The river view — markers in display serif, dump sections, quiet states | 2 | p0 | Todo | — |
+| 1c | E5-S1C | The river view — markers in display serif, dump sections, quiet states | 2 | p0 | Done | #164 |
 | 1d | E5-S1D | Scroll memory — back restores, a fresh visit starts at the top | 2 | p0 | Todo | — |
 | 2 | E5-S2 | Ambient background per dump — `--aura-bg` follows the section in view | 5 | p0 | Todo | — |
 | 3 | E5-S3 | Image loading performance — LQIP, no CLS, the first-viewport budget | 5 | p0 | Todo | — |
@@ -112,3 +112,12 @@
   (`Date.parse` for fractional seconds, pinned by adversarial mutation). Final size at the tip
   `2e4ad55`: **302 hand-written** (production 139 / tests 163) — under the ~400 budget, no claim.
   Frontend suite 460 → **470 tests** (+10). Row 1b flips to **Done** (`#162`).
+- 2026-10-19 — **E5-S1C merged (`4a40200`, PR #164)** at APPROVE WITH NITS (one round): the river
+  view — `RiverView` consumes `usePhotos`/`useDumps`, builds the feed with `buildFeed`, renders month
+  markers in display serif (`font-display text-2xl tracking-display`), dump sections as titled articles
+  with a 2-col grid, single photos full-width, and the three quiet states from `QuietState.tsx`. One nit
+  fixed in-branch: `useCallback` deps stabilised to the destructured `refetch` functions instead of
+  the full query objects. `SinglePhoto` layout-shift prevention deferred to E5-S3 (named in the PR).
+  Final size at tip `2255108`: **439 hand-written** (production 110 / tests 329) — over the ~400 ideal,
+  under the ~500 split trigger. Adversarial mutation confirmed: removing `dumps.refetch()` fails the
+  retry test. Frontend suite 470 → **482 tests** (+12). Row 1c flips to **Done** (`#164`).
