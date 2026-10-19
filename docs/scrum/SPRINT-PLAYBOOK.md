@@ -79,7 +79,7 @@ A story is `Done` only when `DEFINITION-OF-DONE.md` is fully checked with eviden
 | 1 | The archive can store and serve images and dumps on PostgreSQL through a tested local API | 2026-10-15 → 2026-10-16 | Sprint 01 — Foundation & Backend | **Released** (`sprint-01`) |
 | 2 | The React shell runs and the design system (colour extraction, typography, glass) is defined | 2026-10-16 → 2026-10-30 | Sprint 02 — Design System | **Released** (`sprint-02`) |
 | 3 | The signature entry experience exists: immersive splash, glass menu, first uploads | 2026-10-16 → 2026-10-17 | Sprint 03 — Splash & Workshop | **Released** (`sprint-03`) |
-| 4 | Dumps can be curated end to end (upload, order, colour, publish) with CI guarding merges | 2026-10-17 → 2026-10-31 | Sprint 04 — Workshop & CI | In progress |
+| 4 | Dumps can be curated end to end (upload, order, colour, publish) with CI guarding merges | 2026-10-17 → 2026-10-31 | Sprint 04 — Workshop & CI | **Released** (`sprint-04`) |
 | 5 | The Time River scrolls and the background follows each dump's aura | 2026-12-14 → 2026-12-25 | Sprint 05 — Time River | Planned |
 | 6 | The app is polished, containerized, documented and released as v1.0 | 2026-12-28 → 2027-01-08 | Sprint 06 — Hardening & v1.0 | Planned |
 
@@ -91,6 +91,7 @@ A story is `Done` only when `DEFINITION-OF-DONE.md` is fully checked with eviden
 | 1 | 34 | 34 | 34 | 9/9 stories; 280 backend tests, suite 45 s; security audit found no Critical/High. **+1 unplanned** delivered point: the audit's reachable SEC-03 (`jackson-core` DoS, PR #70, backlog E6-S15). Deliberately kept out of the velocity figure — a series that mixes planned and unplanned work cannot be compared across sprints — and recorded here so the throughput is still visible. |
 | 2 | 33 | 33 | 33 | 8/8 stories, 0 carry-over; 302 backend + 136 frontend tests at the close; security audit found no Critical/High/Medium (1 Low, pre-tracked as E6-S17). Hand-written size average 1,067/story — below Sprint 1's 1,245 baseline, still above the ~400 guidance. No unplanned points landed. |
 | 3 | 28 | 28 | 28 | 7/7 stories, 0 carry-over, delivered in two days against a two-week window; 307 backend + 344 frontend tests at the close; security audit **CLEAR**, 0 blocking. Average story-PR size 949 changed lines (range 248–1,787) — still well above the ~400 guidance. Five stories were split (12 slices), four PRs were closed unmerged and re-cut; six "cannot be split" claims were withdrawn against measured cuts. |
+| 4 | 25 | 25 | 25 | 5/5 stories, 14 slices (E4-S3 re-cut at review into 2a–2e), 0 carry-over, delivered in three days against a two-week window; 302 backend + 450 frontend tests at the close; security audit **CLEAR**, 0 blocking. Average story-PR size 323 changed lines (range 8–839) — the first sprint near the ~400 guidance after three above 900. The planned E4-S5 four-slice pre-cut survived review whole (a first); two re-cuts (#124 → 2a–2e, #154 → #155) and one deliberate drill PR (#152). |
 
 ## Escalation
 
