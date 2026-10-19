@@ -25,7 +25,7 @@
 | 4a | E4-S5A | The draft survives its upload — the tile keeps its stored photo | 1 | p0 | Done | #143 |
 | 4b | E4-S5B | The publish plan — six stored distinct photos, aura, optional title, pure | 1 | p0 | Done | #145 |
 | 4c | E4-S5C | The dump wire — `createDump`, optimistic insert, rollback | 1 | p0 | Done | #147 |
-| 4d | E4-S5D | "Save archive" — the publish group, pending state, return, e2e | 2 | p0 | Todo | — |
+| 4d | E4-S5D | "Save archive" — the publish group, pending state, return, e2e | 2 | p0 | Done | #148 |
 | 5 | E6-S2 | Required status checks on `main` and `develop` | 2 | p0 | Todo | — |
 
 **Total: 25 points across 14 slices** (E4-S3 was re-cut at #124's review into 2a/2b/2c, and 2c was
@@ -241,3 +241,25 @@ The order is deliberate:
   `c18b608`: **495 hand-written = 495 + 0** (production 109 / tests 364 / docs 22) — 95 over the
   ~400 target, under the ~500 trigger, the atomic story claimed and judged as surviving in substance
   (`createDump` alone would leave ~405). Row 4c flips to **Done** (`#147`); S5D (#148) follows.
+- 2026-10-19 — **E4-S5D merged (`de3ca13`, PR #150)** at APPROVE WITH NITS, no blocking findings, and
+  **E4-S5 completes: issue #35 closes** with this slice. The panel: with the sixth stored tile the
+  workshop grows the optional title and "Save archive" (ADR-024 decision 2) — a draft that cannot
+  leave is answered with `planPublish`'s one sentence and sends nothing (no disabled action); a ready
+  plan runs `usePublishDump` under the flight lock (grid, title, picker and button disabled — "Saving…",
+  `aria-busy`; the live region says "Saving the dump."; the aura stays live, its change unable to
+  reach a body already on the wire), returns where the workshop was entered from (`navigate(-1)`), and
+  on failure stays with the draft intact and one sentence from `lib/publish/sentence.ts` — the map
+  #147's round 1 moved here, its `photoIds` wording deliberately draft-preserving. Round 1: APPROVE
+  WITH NITS, no blocking — ten mutants each killed their test (group visibility 1 / blocked notice 1 /
+  no disabled 1 / `navigate(0)` 1 / no sentence 1 / swapped sentences 3 / "Reload and try again." 2 /
+  leaked `detail` 1 / dropped title 1 / grid unlocked 1), the Chromium probe reproduced every logged
+  value and the three captures byte-identically; the nits: a labelled probe hero for the return
+  capture and the typed title pinned across the refusal (both landed), the `errors[0]` switch and the
+  handler-level `busy` guard closed by decision (mixed-field refusals unreachable from this surface;
+  the guard is "one publish at a time"'s handler half, kept as defence-in-depth). Round 2: APPROVE
+  WITH NITS, nothing blocking at the tip. Final size, re-measured at `923ac70`: **495 hand-written =
+  470 + 25** (production 165 / tests 297 / docs 33) — 95 over the ~400 target, under the ~500 trigger,
+  the atomic story claimed and judged as surviving (`sentence.ts` + its tests is the only cut, and it
+  recreates #147's round-1 finding; doc/comment tightening took the branch from 535 to 495). Evidence
+  ships in-repo: `reports/verify-e4-s5d-20261019.md` and three captures. Row 4d flips to **Done**
+  (`#148`); **E4-S5 (#35) closes** — E6-S2 (required status checks) is what remains on the sprint.
