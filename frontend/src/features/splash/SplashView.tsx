@@ -204,7 +204,7 @@ export function SplashView() {
           aria-haspopup="dialog"
           aria-expanded={menuOpen}
           onClick={tap}
-          className="absolute inset-0 z-10 cursor-pointer select-none focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/50"
+          className="absolute inset-0 z-10 cursor-pointer select-none focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/70"
         />
       </main>
 

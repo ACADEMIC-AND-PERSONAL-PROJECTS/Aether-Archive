@@ -140,7 +140,7 @@ function failureSentence(error: unknown): string {
 
 /** The hidden-input label's focus ring, shared by the idle picker and the panel's "Add photos". */
 const PICKER_LABEL_FOCUS =
-  "peer-focus-visible:outline peer-focus-visible:outline-1 peer-focus-visible:-outline-offset-4 peer-focus-visible:outline-aura-text/50";
+  "peer-focus-visible:outline peer-focus-visible:outline-1 peer-focus-visible:-outline-offset-4 peer-focus-visible:outline-aura-text/70";
 
 export function WorkshopView() {
   const [items, setItems] = useState<SelectionItem[]>([]);
@@ -668,7 +668,7 @@ export function WorkshopView() {
                             placeholder="Optional"
                             autoComplete="off"
                             disabled={publishing}
-                            className="min-h-11 min-w-40 flex-1 rounded-[10px] bg-transparent px-3 text-sm text-aura-text [border:var(--aura-hairline)] placeholder:text-aura-muted focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-aura-text/50 disabled:opacity-60"
+                            className="min-h-11 min-w-40 flex-1 rounded-[10px] bg-transparent px-3 text-sm text-aura-text [border:var(--aura-hairline)] placeholder:text-aura-muted focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-aura-text/70 disabled:opacity-60"
                           />
                         </div>
                         <div className="flex flex-wrap items-center gap-2">

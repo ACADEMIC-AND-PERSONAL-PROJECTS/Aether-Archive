@@ -125,7 +125,7 @@ export function QuietError({ onRetry }: QuietErrorProps) {
           type="button"
           aria-describedby={messageId}
           onClick={onRetry}
-          className="ml-auto min-h-11 shrink-0 rounded-[10px] px-3 text-sm text-aura-text underline decoration-aura-text/40 underline-offset-4 transition-colors duration-[var(--motion-duration-quick)] active:bg-aura-text/6 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/50"
+          className="ml-auto min-h-11 shrink-0 rounded-[10px] px-3 text-sm text-aura-text underline decoration-aura-text/40 underline-offset-4 transition-colors duration-[var(--motion-duration-quick)] active:bg-aura-text/6 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/70"
         >
           Try again
         </button>
