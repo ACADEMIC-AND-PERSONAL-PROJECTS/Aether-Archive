@@ -23,7 +23,7 @@
 | 3b | E4-S4B | Palette suggestions from the selected photos, merged and ranked | 2 | p0 | Done | #135 |
 | 3c | E4-S4C | The Aura picker UI, live preview, reset and session persistence | 2 | p0 | Done | #137 + #139 + #141 |
 | 4a | E4-S5A | The draft survives its upload — the tile keeps its stored photo | 1 | p0 | Done | #143 |
-| 4b | E4-S5B | The publish plan — six stored distinct photos, aura, optional title, pure | 1 | p0 | Todo | — |
+| 4b | E4-S5B | The publish plan — six stored distinct photos, aura, optional title, pure | 1 | p0 | Done | #145 |
 | 4c | E4-S5C | The dump wire — `createDump`, optimistic insert, rollback | 1 | p0 | Todo | — |
 | 4d | E4-S5D | "Save archive" — the publish group, pending state, return, e2e | 2 | p0 | Todo | — |
 | 5 | E6-S2 | Required status checks on `main` and `develop` | 2 | p0 | Todo | — |
@@ -212,3 +212,15 @@ The order is deliberate:
   branch pinned, the retired success-path-revoke mutant row, the `orderedIds` → `photo.id` step
   named in the README and ADR-024, and the settled-draft axe sweep. Row 4a flips to **Done**
   (`#143`).
+- 2026-10-18 — **E4-S5B merged (`ee094d6`, PR #145)** at APPROVE WITH NITS after two review rounds:
+  `planPublish` turns the draft into the `DumpCreate` body or refuses it in one sentence — exactly six
+  tiles, every one stored, the six distinct, a `#RRGGBB` aura, and a title trimmed then ≤ 80 (blank
+  reads as `null`, counted in UTF-16 units like the server's `@Size`). The ids are the stored photos'
+  ids in display order — `orderedIds`' production caller — and the ready plan returns the six photos
+  for S5C's optimistic insert. Final size, re-measured at the tip `6a8859d`: **411 hand-written =
+  397 + 14** (production 134 / tests 221 / docs 56) — 11 over the ~400 target, claimed under the
+  **atomic-story exception** and judged in review; under the ~500 trigger. Round 1 closed the
+  order/UTF-16/NBSP/newline-hex pins and the constant coupling; **round 2 refused the branch** because
+  the count's position relative to stored/distinct was still unpinned (two reorder mutants green),
+  closed by two count-failure cases. Seven mutants, each failing one test; positive control
+  `>` → `>=` fails two. Row 4b flips to **Done** (`#145`).
