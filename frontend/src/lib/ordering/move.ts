@@ -3,10 +3,10 @@
  *
  * The workshop's `items` array **is** the order. There is no second `order` field to keep in sync, no
  * index stored on a tile and no sorting step at render time: dropping a tile produces one new array,
- * and the slot a photo occupies is its index. A future publish payload therefore reads
- * `items.map(item => item.id)` — `displayOrder` is the index, 0–5 for a six-photo dump. Keeping the
- * array as the single source is what lets the reducer be tested without React and what makes a move
- * impossible to half-apply.
+ * and the slot a photo occupies is its index. The publish payload therefore projects the tiles onto
+ * their stored photos (`planPublish`, E4-S5B) — `displayOrder` is the index, 0–5 for a six-photo
+ * dump. Keeping the array as the single source is what lets the reducer be tested without React and
+ * what makes a move impossible to half-apply.
  *
  * ## The rules
  *
@@ -22,8 +22,8 @@
  *   `[b, c, a]`, exactly `arrayMove`'s contract and the one the drag overlay's drop measures.
  *
  * `orderedIds` is the payload projection, not a second source of truth. The test for it states the
- * contract the future publish endpoint will consume: ids in display order, and the index is the
- * `displayOrder` value.
+ * contract the publish endpoint consumes: ids in display order, and the index is the `displayOrder`
+ * value.
  */
 
 /** Clamps an integer index into `[0, length - 1]`. `length` is assumed non-zero by the caller. */
@@ -58,7 +58,7 @@ export function moveItem<T>(items: readonly T[], from: number, to: number): read
 }
 
 /**
- * The order a publish payload will carry: ids in display order. `displayOrder` is the index in this
+ * The order a publish payload carries: ids in display order. `displayOrder` is the index in this
  * list (0–5 for a dump), so nothing else needs to compute it.
  */
 export function orderedIds<T extends { readonly id: string }>(items: readonly T[]): string[] {

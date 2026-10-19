@@ -1373,13 +1373,19 @@ order a draft can fail them:
 4. **An aura chosen** — a `#RRGGBB` triple, `null` and a malformed hex refused with the same sentence
    (`ValidationConstraints.BACKGROUND_COLOR_PATTERN`).
 5. **The title at most 80 characters** — counted **after trimming**, and the trimmed value is what the
-   body carries; blank reads as `null` (ADR-011 §2).
+   body carries; blank reads as `null` (ADR-011 §2). The count is UTF-16 units, exactly as Java's
+   `String.length()` in the server's `@Size` — a code-point count would let an emoji title through
+   the client and have the server refuse it.
+
+The checks that compare the request with the archive itself — a photo that does not exist, one
+already curated — stay server-side: the client cannot know them without a round trip, and S5C maps
+that `validation-failure`.
 
 A blocked plan has no `body`: the panel shows `sentence` and no request is made (ADR-024 decisions
 2–3). A ready plan carries the body **and** the six `Photo`s in display order, so the optimistic
 insert (E4-S5C) can build the entry it shows before the server answers. The plan is pure — `items` is
 structural (`{ photo: Photo | null }[]`), so `lib/` never imports a feature, and nothing here touches
-React or the network. 12 unit tests pin every sentence, the refusal order and both boundaries (six,
+React or the network. 13 unit tests pin every sentence, the refusal order and both boundaries (six,
 80).
 
 ## Zero external requests — measured on the built bundle
