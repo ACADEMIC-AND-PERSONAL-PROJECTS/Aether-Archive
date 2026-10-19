@@ -17,7 +17,7 @@
 | 1a | E5-S1A | The feed's data layer — `GET /photos` + `GET /dumps` as queries, ADR-025 | 2 | p0 | Done | #160 |
 | 1b | E5-S1B | The feed model — `buildFeed`: months, dumps as sections, singles between | 2 | p0 | Done | #162 |
 | 1c | E5-S1C | The river view — markers in display serif, dump sections, quiet states | 2 | p0 | Done | #164 |
-| 1d | E5-S1D | Scroll memory — back restores, a fresh visit starts at the top | 2 | p0 | Todo | — |
+| 1d | E5-S1D | Scroll memory — back restores, a fresh visit starts at the top | 2 | p0 | Done | #166 |
 | 2 | E5-S2 | Ambient background per dump — `--aura-bg` follows the section in view | 5 | p0 | Todo | — |
 | 3 | E5-S3 | Image loading performance — LQIP, no CLS, the first-viewport budget | 5 | p0 | Todo | — |
 | 4 | E6-S4 | Real-device verification pass (LAN) | 3 | p0 | Todo | — |
@@ -121,3 +121,12 @@
   Final size at tip `2255108`: **439 hand-written** (production 110 / tests 329) — over the ~400 ideal,
   under the ~500 split trigger. Adversarial mutation confirmed: removing `dumps.refetch()` fails the
   retry test. Frontend suite 470 → **482 tests** (+12). Row 1c flips to **Done** (`#164`).
+- 2026-10-19 — **E5-S1D merged (`2f25bc8`, PR #166)** at APPROVE WITH NITS (one round): scroll memory —
+  `useScrollMemory` hook stores scroll position in a module-level Map (survives remounts, lost on refresh),
+  restores on `ready=true`, debounces save via rAF, and guards saves with a `readyRef` so loading state
+  doesn't overwrite a saved non-zero position. Two nits fixed in-branch: the `readyRef` guard on scroll
+  saves (review finding), and moving `readyRef.current = ready` into a `useEffect` to satisfy the
+  `react-hooks/refs` lint rule (CI finding). Final size at tip `9693308`: **237 hand-written**
+  (production 73 / tests 164) — under the ~400 budget. Frontend suite 482 → **493 tests** (+11).
+  Row 1d flips to **Done** (`#166`). **E5-S1 (8 pts) is now complete** — all four slices merged; issue
+  #36 closed.
