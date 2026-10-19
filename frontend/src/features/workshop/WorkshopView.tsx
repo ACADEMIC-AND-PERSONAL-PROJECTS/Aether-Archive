@@ -1,10 +1,18 @@
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useId, useRef, useState, type ChangeEvent } from "react";
+import { useNavigate } from "react-router";
 
+import { QUIET_ACTION } from "./actions";
+import { AuraPicker } from "./AuraPicker";
 import { SelectionGrid, type SelectionItem } from "./SelectionGrid";
 import { ApiError } from "../../api/client";
+import { usePublishDump } from "../../api/dumps";
 import { useUploadPhoto } from "../../api/photos";
 import { GlassPanel } from "../../components/GlassPanel";
+import { useAura } from "../../hooks/useAura";
 import { ENTER_FADE_BASE, LOADING_PULSE } from "../../lib/motion/tokens";
+import { moveItem } from "../../lib/ordering/move";
+import { DUMP_PHOTO_COUNT, planPublish } from "../../lib/publish/plan";
+import { publishErrorSentence } from "../../lib/publish/sentence";
 import { downscaleForUpload } from "../../lib/upload/downscale";
 import { isCurrentProgress } from "../../lib/upload/progress";
 import {
@@ -18,7 +26,8 @@ import { ACCEPT_ATTRIBUTE } from "../../lib/upload/validation";
 import type { UploadProgress } from "../../api/uploadPhoto";
 
 /**
- * `GET /curate` — the Curator's Workshop, multi-select and queue slice (E4-S2A2).
+ * `GET /curate` — the Curator's Workshop: multi-select and the upload queue (E4-S2A2), the draft that
+ * survives its upload (E4-S5A), and the publish that saves it (E4-S5D).
  *
  * ## The screen
  *
@@ -68,25 +77,47 @@ import type { UploadProgress } from "../../api/uploadPhoto";
  * ## Settling, and cancelling the batch
  *
  * When the queue settles, the panel says what this batch did — "Added 3 photos.", "2 photos couldn't be
- * added.", or both halves when both happened. If every file succeeded the tiles are gone and the view
- * returns to `idle`; otherwise it stays `error` while any failed tile remains.
+ * added.", or both halves when both happened. A success keeps its tile (E4-S5A): it is marked `added`
+ * and carries the archive's photo, and the view stays `selected` — the grid is the draft the publish
+ * will read. It stays `error` while any failed tile remains.
  *
  * Cancel is the **batch's** cancel: it aborts the request in flight and stops the queue. The files
- * already uploaded are gone, the files not yet sent stay in the grid as waiting, and the current file
- * returns to waiting (it was not stored as far as this client knows). The panel says "Upload cancelled."
- * visibly.
+ * already uploaded keep their tiles as `added` — their photos are in the archive — the files not yet
+ * sent stay in the grid as waiting, and the current file returns to waiting (it was not stored as far
+ * as this client knows). The panel says "Upload cancelled." visibly.
  *
  * **Cancellation is not a rollback**, and the E4-S1B caveat stands: an abort can race a response that
  * already reached `StorageService.store`. The screen says only that the upload was cancelled, never that
  * the archive stored nothing. Retrying a file that landed before the abort may add a second copy; a
  * server-side idempotency key is a later story, not a client fix.
  *
+ * ## The order
+ *
+ * `items` is the display order (E4-S3B): dragging a tile calls `moveItem` from `lib/ordering/move.ts`,
+ * which returns a new array — or the same one for a no-op — and nothing else. The slot is the index,
+ * and since E4-S5A each tile carries the archive's photo, so the publish payload this screen builds is
+ * those six stored photos, in this order — the order is read at the publish, not at the upload, so a
+ * settled draft can still be rearranged. Reordering is refused while a batch is uploading or a publish
+ * is in flight: the queue captured the array and the publish has read it, so a move mid-flight would
+ * leave the wire disagreeing with the grid. The grid's own header carries the sensors, the scroll rule
+ * and the keyboard path (E4-S3D): the tile is a real focus stop once the sensor for its keys exists.
+ *
+ * ## The publish
+ *
+ * With the sixth tile the panel grows the story's second action — an optional title and "Save archive"
+ * (ADR-024 decision 2); `planPublish` decides whether the draft can leave, and a refusal is one
+ * sentence in the panel, never a disabled button. A ready plan runs `usePublishDump` (E4-S5C): the
+ * flight locks the draft ("Saving…" on the disabled button, the grid locked with it), success returns
+ * where the workshop was entered from (`navigate(-1)`), and a failure stays — the draft intact and one
+ * sentence about it (ADR-024 decision 5; the wording is `lib/publish/sentence.ts`).
+ *
  * ## The files never outlive the screen
  *
- * Each preview is an object URL created from the picked `File`; it is revoked when its tile is removed,
- * when its upload succeeds, and for everything still held when the view unmounts. The `File`s are React
- * state and **nothing is persisted** — no localStorage, no IndexedDB, no disk. An in-flight request is
- * aborted on unmount, and no file name or content is logged.
+ * Each preview is an object URL created from the picked `File`; it is revoked when its tile is removed
+ * and for everything still held when the view unmounts. A success no longer revokes it (E4-S5A: the
+ * tile stays, showing the user's own photo). The `File`s are React state; **only the aura persists** —
+ * one `sessionStorage` value the curator chose (E4-S4C, ADR-023 decision 4), never a `File`. An
+ * in-flight request is aborted on unmount, and no file name or content is logged.
  */
 
 type Phase = "idle" | "selected" | "uploading" | "error";
@@ -107,10 +138,6 @@ function failureSentence(error: unknown): string {
   return "That photo couldn't be added.";
 }
 
-/** The quiet action grammar: text, a 44 px target, a 180 ms press, an inset focus ring. */
-const QUIET_ACTION =
-  "flex min-h-11 shrink-0 cursor-pointer items-center rounded-[10px] px-3 text-sm text-aura-text underline decoration-aura-text/40 underline-offset-4 transition-colors duration-[var(--motion-duration-quick)] active:bg-aura-text/6 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/50";
-
 /** The hidden-input label's focus ring, shared by the idle picker and the panel's "Add photos". */
 const PICKER_LABEL_FOCUS =
   "peer-focus-visible:outline peer-focus-visible:outline-1 peer-focus-visible:-outline-offset-4 peer-focus-visible:outline-aura-text/50";
@@ -120,6 +147,9 @@ export function WorkshopView() {
   const [uploading, setUploading] = useState(false);
   const [notice, setNotice] = useState("");
   const [progress, setProgress] = useState<UploadProgress>({ loaded: 0, total: 0 });
+  /** The publish's optional title, raw: the plan trims it and the server counts the trimmed value. */
+  const [title, setTitle] = useState("");
+  const titleId = useId();
 
   const controllerRef = useRef<AbortController | null>(null);
   /** Set by Cancel; the loop checks it before starting each file, and after a response wins the race. */
@@ -131,15 +161,25 @@ export function WorkshopView() {
   const previewUrlsRef = useRef(new Set<string>());
   const idleInputRef = useRef<HTMLInputElement>(null);
   const primaryRef = useRef<HTMLButtonElement>(null);
+  /** The panel's "Add photos" input: the focus fallback of a settled draft (E4-S5A). */
+  const panelInputRef = useRef<HTMLInputElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
   const previousPhase = useRef<Phase>("idle");
+  /** The workshop's root: where a chosen aura's preview lands, and only there (ADR-023 decision 4). */
+  const mainRef = useRef<HTMLElement>(null);
 
   const upload = useUploadPhoto();
+  const publish = usePublishDump();
+  const navigate = useNavigate();
+  /** `publishing` is the mutation's own state; `busy` is one lock for both flights (decision 5). */
+  const publishing = publish.isPending;
+  const busy = uploading || publishing;
 
   /*
    * One phase, derived rather than stored: `uploading` wins, then a failed tile, then a non-empty grid,
-   * then idle. Deriving it means an empty grid can never be called `selected`, and "everything succeeded
-   * → idle" needs no extra branch.
+   * then idle. Deriving it means an empty grid can never be called `selected`, and a settled batch
+   * needs no branch of its own: its tiles stay (E4-S5A), so the draft reads `selected` — or `error`
+   * while any failed tile remains.
    */
   const phase: Phase = uploading
     ? "uploading"
@@ -148,6 +188,14 @@ export function WorkshopView() {
       : items.length > 0
         ? "selected"
         : "idle";
+
+  /*
+   * The aura (E4-S4C): suggestions off the selection and the preview on this view's root. Extraction
+   * rests while the queue runs (`enabled`) — the decode must not compete with the uploads behind the
+   * progress line, and the membership it keys to is stable through a batch (E4-S5A: no success removes
+   * a tile) — and only the aura persists (ADR-023 decision 4).
+   */
+  const aura = useAura(items, mainRef, { enabled: !uploading });
 
   // Leaving the view cancels the request nobody is watching and releases every preview URL. The File
   // objects need no cleanup: they are references, and React drops them with the component.
@@ -175,6 +223,10 @@ export function WorkshopView() {
    * focus on a removed element: Cancel while uploading, the primary action after a selection or a
    * failure, the picker again after everything succeeded. The first render is deliberately exempt —
    * autofocusing a file input on arrival would move a screen reader's place before it has read the view.
+   *
+   * Since E4-S5A the primary action is conditional: the queue button is only rendered while something is
+   * still to send (it would be a no-op over a settled draft), so a settled selection falls through to
+   * the panel's picker — the draft's next move is adding to it.
    */
   useEffect(() => {
     const previous = previousPhase.current;
@@ -187,7 +239,7 @@ export function WorkshopView() {
     } else if (phase === "idle") {
       idleInputRef.current?.focus();
     } else {
-      primaryRef.current?.focus();
+      (primaryRef.current ?? panelInputRef.current)?.focus();
     }
   }, [phase]);
 
@@ -204,6 +256,7 @@ export function WorkshopView() {
       const item: SelectionItem = {
         id: `selection-${nextIdRef.current}`,
         file,
+        photo: null,
         uploadFile: null,
         previewUrl,
         state: "waiting",
@@ -232,8 +285,27 @@ export function WorkshopView() {
     setNotice(selectionNotices(plan).join(" "));
   };
 
+  /**
+   * A drag's outcome, as one array move. The reducer returns the input array for a no-op, so a drag
+   * that ends where it began does not re-render the grid. The guard repeats the grid's `busy`
+   * decision: the queue holds a snapshot of the order and a publish has already read the array, so a
+   * move mid-flight must not change it.
+   */
+  const moveSelection = (from: number, to: number): void => {
+    if (busy) {
+      return;
+    }
+    setItems((previous) => {
+      // `moveItem` returns a readonly array by design (it never mutates); the state is mutable, so
+      // the spread is a type requirement, not a second copy of intent. A no-op returns the same
+      // reference and React skips the render.
+      const moved = moveItem(previous, from, to);
+      return moved === previous ? previous : [...moved];
+    });
+  };
+
   const removeItem = (id: string): void => {
-    if (uploading) {
+    if (busy) {
       return;
     }
     const item = items.find((candidate) => candidate.id === id);
@@ -295,7 +367,7 @@ export function WorkshopView() {
       );
 
       try {
-        await upload.mutateAsync({
+        const photo = await upload.mutateAsync({
           file: prepared,
           signal: controller.signal,
           onProgress: (next) => {
@@ -308,6 +380,20 @@ export function WorkshopView() {
             }
           },
         });
+
+        if (!aliveRef.current) {
+          return;
+        }
+        controllerRef.current = null;
+        added += 1;
+        // The draft survives its upload (E4-S5A): the tile stays, marked `added` and carrying the
+        // archive's photo — the six of them, in this order, are what the publish will read. Its
+        // preview is not revoked here; removal and unmount are the only exits now.
+        setItems((previous) =>
+          previous.map((item) =>
+            item.id === entry.id ? { ...item, state: "added", photo, message: null } : item,
+          ),
+        );
       } catch (error) {
         if (!aliveRef.current) {
           return;
@@ -336,15 +422,6 @@ export function WorkshopView() {
         );
         continue;
       }
-
-      if (!aliveRef.current) {
-        return;
-      }
-      controllerRef.current = null;
-      added += 1;
-      revokePreview(entry.previewUrl);
-      // The success is the tile leaving the grid; the batch summary below reports the count.
-      setItems((previous) => previous.filter((item) => item.id !== entry.id));
     }
 
     if (!aliveRef.current) {
@@ -402,18 +479,64 @@ export function WorkshopView() {
     controllerRef.current?.abort();
   };
 
+  /**
+   * The publish: the plan is pure (E4-S5B) and a refusal is one sentence in the panel; a ready plan
+   * goes through `usePublishDump` (E4-S5C), whose optimistic insert precedes the answer. Success
+   * returns where the workshop was entered from; a failure restores the cache (the hook) and shows one
+   * sentence, the draft exactly as it was (ADR-024 decision 5).
+   */
+  const saveArchive = (): void => {
+    if (busy) {
+      return;
+    }
+    const plan = planPublish(items, aura.chosen, title);
+    if (plan.status === "blocked") {
+      setNotice(plan.sentence);
+      return;
+    }
+    setNotice("");
+    void publish
+      .mutateAsync({ body: plan.body, photos: plan.photos })
+      .then(() => {
+        // A publish that landed while the curator was elsewhere must not pull them back.
+        if (aliveRef.current) {
+          navigate(-1);
+        }
+      })
+      .catch((error: unknown) => {
+        if (aliveRef.current) {
+          setNotice(publishErrorSentence(error));
+        }
+      });
+  };
+
   const percent =
     progress.total > 0 ? Math.min(100, Math.round((progress.loaded / progress.total) * 100)) : null;
 
+  // Something left to send: the queue button's reason to exist. Over a settled draft it would be a
+  // no-op, so it is not rendered (E4-S5A) — and focus falls through to the panel's picker.
+  const queueable = items.some((item) => item.state === "waiting" || item.state === "error");
+
   const panelSentence = notice !== "" ? notice : selectionSentence(items.length);
   // The constant "Uploading." is the batch's announcement: the persistent region is the only thing
-  // announced while the queue runs, and a mid-batch failure is carried by the settled summary.
+  // announced while the queue runs, and a mid-batch failure is carried by the settled summary. The
+  // publish gets a constant for the same reason — "Saving…" is on a disabled button.
   const announcement =
-    phase === "uploading" ? "Uploading." : phase === "idle" ? notice : panelSentence;
+    phase === "uploading"
+      ? "Uploading."
+      : publishing
+        ? "Saving the dump."
+        : phase === "idle"
+          ? notice
+          : panelSentence;
 
   return (
     <>
-      <main data-state={phase} className="relative flex flex-1 flex-col overflow-hidden bg-aura-bg">
+      <main
+        ref={mainRef}
+        data-state={phase}
+        className="relative flex flex-1 flex-col overflow-hidden bg-aura-bg"
+      >
         <h1 className="sr-only">Curator&rsquo;s Workshop</h1>
 
         {phase === "idle" ? (
@@ -447,7 +570,8 @@ export function WorkshopView() {
             <div className="relative z-10 flex flex-1 flex-col justify-center overflow-y-auto px-4 py-6">
               <SelectionGrid
                 items={items}
-                busy={uploading}
+                busy={busy}
+                onMove={moveSelection}
                 onRemove={removeItem}
                 onPreviewError={markPreviewBroken}
               />
@@ -493,25 +617,73 @@ export function WorkshopView() {
                       {panelSentence}
                     </p>
                     <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        ref={primaryRef}
-                        type="button"
-                        onClick={startUpload}
-                        className={QUIET_ACTION}
-                      >
-                        {phase === "error" ? "Try again" : "Upload"}
-                      </button>
+                      {queueable ? (
+                        <button
+                          ref={primaryRef}
+                          type="button"
+                          onClick={startUpload}
+                          className={QUIET_ACTION}
+                        >
+                          {phase === "error" ? "Try again" : "Upload"}
+                        </button>
+                      ) : null}
                       <label className={QUIET_ACTION}>
                         <input
+                          ref={panelInputRef}
                           type="file"
                           multiple
                           accept={ACCEPT_ATTRIBUTE}
                           onChange={handlePick}
+                          disabled={publishing}
                           className="peer sr-only"
                         />
                         <span className={PICKER_LABEL_FOCUS}>Add photos</span>
                       </label>
                     </div>
+                    <AuraPicker
+                      chosen={aura.chosen}
+                      suggestions={aura.suggestions}
+                      onChoose={aura.choose}
+                      onReset={aura.reset}
+                    />
+                    {items.length === DUMP_PHOTO_COUNT ? (
+                      // The publish group (ADR-024 decision 2): with the sixth tile the panel offers
+                      // the save; a click it cannot send is answered with one sentence.
+                      <section
+                        aria-label="Publish"
+                        className="flex flex-col gap-2 border-t border-aura-text/15 pt-3"
+                      >
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                          <label
+                            htmlFor={titleId}
+                            className="text-xs tracking-wide text-aura-muted uppercase"
+                          >
+                            Title
+                          </label>
+                          <input
+                            id={titleId}
+                            type="text"
+                            value={title}
+                            onChange={(event) => setTitle(event.target.value)}
+                            placeholder="Optional"
+                            autoComplete="off"
+                            disabled={publishing}
+                            className="min-h-11 min-w-40 flex-1 rounded-[10px] bg-transparent px-3 text-sm text-aura-text [border:var(--aura-hairline)] placeholder:text-aura-muted focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-aura-text/50 disabled:opacity-60"
+                          />
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={saveArchive}
+                            disabled={publishing}
+                            aria-busy={publishing}
+                            className={`${QUIET_ACTION} disabled:opacity-60`}
+                          >
+                            {publishing ? "Saving…" : "Save archive"}
+                          </button>
+                        </div>
+                      </section>
+                    ) : null}
                   </>
                 )}
               </GlassPanel>
@@ -522,8 +694,10 @@ export function WorkshopView() {
 
       {/* The persistent live region, a sibling of `<main>` for the reason E3-S5B measured: a region
           inserted together with its text is not reliably announced. The visible sentences are ordinary
-          paragraphs and a test pins the words equal. */}
-      <p role="status" className="sr-only">
+          paragraphs and a test pins the words equal. Since E4-S3B the sortable grid mounts dnd-kit's
+          own `role="status"` live region beside this one, so the workshop's region carries a test id:
+          the two speak for different things and must not be confused. */}
+      <p role="status" data-testid="workshop-status" className="sr-only">
         {announcement}
       </p>
     </>

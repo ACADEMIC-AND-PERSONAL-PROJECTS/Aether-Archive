@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { hexToRgb } from "./contrast";
+import { hexToRgb, normalizeHex } from "./contrast";
 import { oklchToHex, rgbToOklch } from "./oklch";
 import {
   applyFallbackTheme,
@@ -10,6 +10,7 @@ import {
   contrastReport,
   FALLBACK_THEME,
   paletteToTheme,
+  themeFromBackground,
   THEME_PROPERTIES,
 } from "./theme";
 import globalCss from "../../styles/global.css?raw";
@@ -164,5 +165,128 @@ describe("applyTheme", () => {
 
     clearTheme();
     expect(document.documentElement.style.getPropertyValue("--aura-text")).toBe("");
+  });
+});
+
+/** OKLCh lightness of a hex, the scale both the surface and the text step along. */
+const lightness = (hex: string): number => {
+  const { r, g, b } = hexToRgb(hex);
+  return rgbToOklch(r, g, b).l;
+};
+
+describe("normalizeHex", () => {
+  it("should accept case and surrounding spaces, and return lowercase", () => {
+    expect(normalizeHex("  #1E3A5F ")).toBe("#1e3a5f");
+    expect(normalizeHex("#abcdef")).toBe("#abcdef");
+  });
+
+  it("should reject everything that is not #rrggbb", () => {
+    expect(normalizeHex("#abc")).toBeNull();
+    expect(normalizeHex("1e3a5f")).toBeNull();
+    expect(normalizeHex("#gggggg")).toBeNull();
+    expect(normalizeHex("rgba(0, 0, 0, 0.4)")).toBeNull();
+    expect(normalizeHex("")).toBeNull();
+  });
+});
+
+describe("themeFromBackground", () => {
+  it("should keep the chosen background exactly and normalise its case", () => {
+    expect(themeFromBackground("  #1E3A5F ").bg).toBe("#1e3a5f");
+  });
+
+  it("should throw on anything that is not #rrggbb", () => {
+    expect(() => themeFromBackground("#abc")).toThrow("Not a #rrggbb colour");
+  });
+
+  it("should refuse pure black and pure white pages by policy", () => {
+    expect(() => themeFromBackground("#000000")).toThrow("Pure black and pure white");
+    expect(() => themeFromBackground("#ffffff")).toThrow("Pure black and pure white");
+  });
+
+  it("should accept the near endpoints with non-pure text and surface", () => {
+    // The away-step flips at the cube's edge (ADR-023): #010101's surface would be pure black and
+    // #fefefe's pure white, so each steps toward the page instead. Every pair still clears 4.5:1.
+    for (const hex of ["#010101", "#fefefe"]) {
+      const theme = themeFromBackground(hex);
+      expect(theme.bg).toBe(hex);
+      expect(theme.text).not.toBe("#000000");
+      expect(theme.text).not.toBe("#ffffff");
+      expect(theme.surface).not.toBe(theme.bg);
+      expect(theme.surface).not.toBe("#000000");
+      expect(theme.surface).not.toBe("#ffffff");
+      for (const ratio of Object.values(contrastReport(theme))) {
+        expect(ratio).toBeGreaterThanOrEqual(CONTRAST_MINIMUM);
+      }
+    }
+  });
+
+  it("should accept every other sampled colour with every §2.2 pair and non-pure text", () => {
+    const steps = Array.from({ length: 16 }, (_, index) => index * 17);
+    const channel = (value: number): string => value.toString(16).padStart(2, "0");
+    const cube = steps.flatMap((r) =>
+      steps.flatMap((g) => steps.map((b) => `#${channel(r)}${channel(g)}${channel(b)}`)),
+    );
+    let accepted = 0;
+    const refused: string[] = [];
+    for (const background of cube) {
+      let theme;
+      try {
+        theme = themeFromBackground(background);
+      } catch {
+        refused.push(background);
+        continue;
+      }
+      accepted += 1;
+      expect(theme.bg).toBe(background);
+      // Non-pure text and surface; the surface never collapses (at the cube's edge its step flips).
+      for (const token of [theme.text, theme.surface]) {
+        expect(token).not.toBe("#000000");
+        expect(token).not.toBe("#ffffff");
+      }
+      const surfaceDirection = lightness(theme.surface) - lightness(theme.bg);
+      expect(Math.sign(surfaceDirection)).toBe(theme.glass.startsWith("rgba(255") ? 1 : -1);
+      for (const ratio of Object.values(contrastReport(theme))) {
+        expect(ratio).toBeGreaterThanOrEqual(CONTRAST_MINIMUM);
+      }
+    }
+    // Only the two pure endpoints are refused; the two-direction search accepts the rest.
+    expect(refused.sort()).toEqual(["#000000", "#ffffff"]);
+    expect(accepted).toBe(4096 - 2);
+  });
+
+  it("should try the other text direction before refusing a saturated colour", () => {
+    // #cc3399: the dark direction only passes at pure black; the light direction passes near-white.
+    const theme = themeFromBackground("#cc3399");
+    expect(theme.text).not.toBe("#000000");
+    expect(theme.text).not.toBe("#ffffff");
+    expect(theme.glass).toMatch(/^rgba\(0, 0, 0, 0\.4\)$/);
+    expect(contrastReport(theme).textOnBg).toBeGreaterThanOrEqual(CONTRAST_MINIMUM);
+    // #0066ff was refused by the first cut's single-direction search; it is accepted now.
+    expect(() => themeFromBackground("#0066ff")).not.toThrow();
+  });
+
+  it("should flip the glass tint with the text so the glass pair stays legible", () => {
+    const dark = themeFromBackground("#101418");
+    const light = themeFromBackground("#f2ead8");
+    expect(dark.glass).toMatch(/^rgba\(0, 0, 0, 0\.4\)$/);
+    expect(dark.hairline).toContain("255, 255, 255");
+    expect(light.glass).toMatch(/^rgba\(255, 255, 255, 0\.4\)$/);
+    expect(light.hairline).toContain("0, 0, 0");
+  });
+
+  it("should step the surface away from the text's end of the scale", () => {
+    const dark = themeFromBackground("#101418");
+    const light = themeFromBackground("#f2ead8");
+    // Light text on a dark page: the surface goes darker. Dark text on a light page: lighter.
+    expect(lightness(dark.surface)).toBeLessThan(lightness(dark.bg));
+    expect(lightness(light.surface)).toBeGreaterThan(lightness(light.bg));
+  });
+
+  it("should use the fallback accent when the background has no hue", () => {
+    expect(themeFromBackground("#141414").accent).toBe(FALLBACK_THEME.accent);
+  });
+
+  it("should be deterministic", () => {
+    expect(themeFromBackground("#2a1b3d")).toEqual(themeFromBackground("#2a1b3d"));
   });
 });

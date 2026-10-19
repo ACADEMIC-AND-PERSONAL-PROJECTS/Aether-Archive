@@ -71,7 +71,9 @@ All UI colour is read from CSS custom properties applied to `:root` at runtime:
 Rules: contrast of `--aura-text` on `--aura-bg` and on glass ≥ **4.5:1** (≥ 3:1 only for text ≥ 24 px);
 monotonic lightness for surfaces; **neutral fallback palette** for extraction failures. A hex literal
 outside the theme layer — `lib/color/theme.ts` plus this stylesheet's `:root` block (ADR-020) — is a
-review blocker.
+review blocker. **For a page whose aura the curator chose, the glass tint follows the text**
+(`themeFromBackground`, ADR-023): black under light text, the inverse white tint with a dark hairline
+under dark text; the defaults above remain the neutral set.
 
 **A glass notice switches its token, because the generated theme is not the fallback theme.** Measured
 (E3-S2): a notice over the menu's veil renders at **4.14:1** in `--aura-muted` — under §8's floor — and
@@ -111,8 +113,12 @@ accent **8.46:1** — every pair ≥ 4.5:1 (§8).
 ```
 
 - Exactly **one** glass primitive component (`components/GlassPanel.tsx`); everything else composes it.
+- **The tint is per theme.** The literals above are the neutral set; a curator-chosen page uses the
+  tokens from `themeFromBackground` (ADR-023), which flips to the inverse white tint and dark hairline
+  under dark text so the glass keeps carrying 4.5:1 text.
 - Fallback when `backdrop-filter` is unsupported: the `@supports` branch in `glass.css` swaps
-  `--aura-glass` for `--aura-glass-solid` (`rgba(0, 0, 0, 0.72)`) so text stays readable.
+  `--aura-glass` for `--aura-glass-solid` (`rgba(0, 0, 0, 0.72)` in the neutral set; white under a light
+  theme's dark text) so text stays readable.
 - No drop shadows beyond a soft `0 8px 24px rgba(0,0,0,0.24)` when elevation must be communicated.
 - Scrim rule: text over an image always sits on a gradient scrim or glass — never directly on pixels.
 

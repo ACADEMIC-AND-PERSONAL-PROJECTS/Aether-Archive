@@ -35,6 +35,9 @@ Hard rules:
   The only text on screen is intentional: month/year markers and Dump titles.
 - **Dark Glassmorphism** only: dark tinted glass (`rgba(0,0,0,0.4)`), `backdrop-filter: blur(15px)`,
   hairline highlights (`1px solid rgba(255,255,255,0.08)`), generous negative space.
+  **Exception, by ADR-023:** a page whose aura the curator chose may use the inverse tint — white
+  glass with a dark hairline — because the dark tint cannot carry one text colour legibly on a light
+  page. The tint always follows the text; `themeFromBackground` owns the arithmetic.
   No heavy drop shadows, no neon, no decorative gradients, no emoji in the UI.
 - **Motion is soft and tactile**: fade + small upward drift (12–16 px; transitions 300–600 ms,
   micro-feedback 180 ms), `cubic-bezier(0.22, 1, 0.36, 1)`. No bounce, no attention-seeking loops,

@@ -407,9 +407,15 @@ opens on tap, feels tactile, and gets out of the way.
 | E4-S2A1 | The selection grid surface (criterion 3) | p0 | 1 | 3 | Done |
 | E4-S2A2 | Multi-select (≤ 6) and the sequential queue (criteria 1, 4) | p0 | 2 | 3 | Done |
 | E4-S2B | Client-side downscale before upload (criterion 2) | p0 | 2 | 3 | Done |
-| E4-S3 | Drag-and-drop ordering | p0 | 8 | 4 | Todo |
-| E4-S4 | Aura colour picker with palette suggestions | p0 | 5 | 4 | Todo |
-| E4-S5 | Publish dump with optimistic UI | p0 | 5 | 4 | Todo |
+| E4-S3A | The order reducer (criterion 2, reducer half) | p0 | 1 | 4 | Done |
+| E4-S3B | The gesture core: mouse/touch sensors, sortable grid, overlay (criterion 1) | p0 | 4 | 4 | Done |
+| E4-S3C | Motion: drop ≤ 300 ms, auto-scroll and reduced motion (criterion 4) — two PRs | p0 | 1 | 4 | Done |
+| E4-S3D | Keyboard path and cancel, with dnd-kit's default announcements (criterion 3) | p0 | 1 | 4 | Done |
+| E4-S3D1 | Position-based announcement copy and instructions (criterion 3) | p0 | 1 | 4 | Done |
+| E4-S4A | The chosen-background theme engine — hex validation, contrast by construction (criterion 2) | p0 | 1 | 4 | Done |
+| E4-S4B | Palette suggestions from the selected photos, merged and ranked (criterion 1) | p0 | 2 | 4 | Done |
+| E4-S4C | The Aura picker UI, live preview, reset and session persistence (criteria 1–4) | p0 | 2 | 4 | Done |
+| E4-S5 | Publish dump with optimistic UI | p0 | 5 | 4 | Done |
 
 ### E4-S1 — Single photo upload · 5 pts · p0 · **split at review into E4-S1A (2) + E4-S1B (3)**
 
@@ -451,17 +457,54 @@ opens on tap, feels tactile, and gets out of the way.
 - [ ] **(A2)** Uploads run sequentially or bounded-concurrent; one failure never aborts the others silently.
 - [ ] **(A2/B)** Tests for the cap and for the downscale decision function (pure).
 
-### E4-S3 — Drag-and-drop ordering · 8 pts · p0
+### E4-S3 — Drag-and-drop ordering · 8 pts · p0 · **re-cut at review into S3A (1) + S3B (4) + S3C (1, two PRs) + S3D (1) + S3D1 (1)**
 
 *As the curator, I want to reorder my 6 images by touch, so that the dump tells the story I want.*
 
-- [ ] `@dnd-kit` grid: long-press (touch) / drag (mouse) reorder with visual lift, no scroll conflict.
-- [ ] Order is a pure reducer in `lib/` (unit-tested) driving `displayOrder` 0–5 in the payload.
-- [ ] Keyboard path: focus an item, move it with keys, announced to assistive tech.
-- [ ] Auto-scroll while dragging near edges; drop animation feels tactile (≤ 300 ms).
-- [ ] Tests: reducer, keyboard move, reorder persistence in the payload.
+> Re-cut at PR #124's review: the whole story measured 1,343 hand-written and claimed the exception on
+> block-attributed halves; the review constructed a **reducer-only slice at 238 lines, green and under
+> budget**, so the claim was withdrawn. The same review found the shuffled suite flaky (a leaked dnd-kit
+> document listener between tests), fixed in the re-cut. **S3A** ships the reducer, **S3B** the gesture
+> core (its own measured exception), **S3C** keyboard/announcements/auto-scroll/motion. Points unchanged.
+>
+> Re-cut again at PR #127's review: the motion slice had grown to **521 hand-written including records,
+> 21 past the ~500 branch trigger**, after the pre-cut had measured it at 496. Rather than claim an
+> exception the reviewer could falsify, auto-scroll is delivered on its own branch (constant, one
+> `DndContext` prop, an exact-value test, its own probe) and #127 keeps the drop animation, the overlay
+> scrim and reduced motion. Same slice id and point, so the sprint total does not move; keyboard is
+> **S3D**.
+>
+> **Carried into S3C from S3B's review:** the sort settle (and any drop transition) must respect
+> `prefers-reduced-motion` — `global.css` freezes `animation-duration` only, not `transition-duration`;
+> the overlay's status line needs a scrim or to move inside the lifted surface; `onDragCancel` needs a
+> unit test; dnd-kit's default live region speaks internal ids and must be replaced by the custom
+> announcements/instructions; and a test should pin that a reorder before a batch sends the files in
+> the displayed order (S3C or E4-S5).
+>
+> Split at PR #131's review: the keyboard slice measured 496 hand-written, 96 over the ~400 PR ideal,
+> and the review **built and measured the cut**: keyboard operability with dnd-kit's default
+> announcements is 260 lines, green (32 files / 375 tests), with the custom copy as the remainder.
+> **S3D** ships the keyboard path and cancel; **S3D1** ships the position-based announcements and
+> instructions. Same total points (2). The review also falsified the first-over guard in the custom
+> copy (a back-step to the origin position was never announced); the guard is fixed in S3D1 with a
+> last-announced-destination ref and an ArrowLeft-back test, so the defect never reaches `develop`.
 
-### E4-S4 — Aura colour picker with palette suggestions · 5 pts · p0
+- [ ] **(B)** `@dnd-kit` grid: long-press (touch) / drag (mouse) reorder with visual lift, no scroll conflict.
+- [ ] **(A)** Order is a pure reducer in `lib/` (unit-tested) driving `displayOrder` 0–5 in the payload.
+- [ ] **(C)** Keyboard path: focus an item, move it with keys, announced to assistive tech.
+- [ ] **(C)** Auto-scroll while dragging near edges; drop animation feels tactile (≤ 300 ms).
+- [ ] **(A/B/C)** Tests: reducer, keyboard move, reorder persistence in the payload.
+
+### E4-S4 — Aura colour picker with palette suggestions · 5 pts · p0 · **pre-cut into S4A (1) + S4B (2) + S4C (2)**
+
+> Split before implementation: **S4A** is the pure theme engine (a chosen `#RRGGBB` → the §2.2 tokens,
+> contrast by construction, a sampled-cube test) and the hex validation; **S4B** is the extraction and
+> merge pipeline that ranks suggestions by pixel share; **S4C** is the picker UI, the live preview, the
+> reset and session persistence. Each slice is independently reviewable and under the PR budget.
+> **ADR-023** records the decisions the spec leaves open: the chosen colour is kept exactly, both text
+> directions are searched and pure black/white pages are refused by policy (4,094 of 4,096 sampled
+> colours accepted), the glass tint flips with the text, suggestions merge by summed pixel weight, and
+> the aura — only the aura — persists for the browsing session.
 
 *As the curator, I want to choose the dump's background colour, so that the river reflects its mood.*
 
@@ -471,7 +514,20 @@ opens on tap, feels tactile, and gets out of the way.
 - [ ] Selection survives reordering and page refresh within the workshop session.
 - [ ] Tests for validation, suggestion mapping and preview tokens.
 
-### E4-S5 — Publish dump with optimistic UI · 5 pts · p0
+### E4-S5 — Publish dump with optimistic UI · 5 pts · p0 · **pre-cut into S5A (1) + S5B (1) + S5C (1) + S5D (2)**
+
+> Split before implementation: **S5A** keeps the draft — a successful upload keeps its tile, marked
+> `added`, carrying the archive's `Photo`, so six stored photos and their display order survive to the
+> publish; **S5B** is the pure publish plan (exactly six distinct stored photos and a chosen aura, an
+> optional title ≤ 80 — the server's checks mirrored before any request, refusing with a sentence) and
+> gives `orderedIds` its production caller; **S5C** is the wire — `POST /dumps`, the optimistic insert
+> into `queryKeys.dumps`, the rollback and the error→sentence map; **S5D** is the panel's publish group
+> ("Save archive", the title field, the pending state, the return to the previous view) with the
+> mocked-API end-to-end tests of success and rollback. Each slice is independently reviewable and under
+> the PR budget. **ADR-024** records the decisions the spec leaves open: the draft survives its upload,
+> the publish is an explicit second action over the six stored photos, the client mirrors the server's
+> checks before sending, the optimistic insert is scoped and reversible, and a success returns to the
+> previous view.
 
 *As the curator, I want to publish my dump, so that it joins the river.*
 
@@ -545,8 +601,8 @@ delivery, documentation, and a clean v1.0.
 
 | ID | Story | P | Pts | Sprint | Status |
 | --- | --- | --- | --- | --- | --- |
-| E6-S1 | CI — backend + frontend on every PR | p0 | 5 | 4 | Todo |
-| E6-S2 | Required status checks on `main`/`develop` | p0 | 2 | 4 | Todo |
+| E6-S1 | CI — backend + frontend on every PR | p0 | 5 | 4 | Done |
+| E6-S2 | Required status checks on `main`/`develop` | p0 | 2 | 4 | Done |
 | E6-S3 | Accessibility audit (WCAG 2.2 AA) | p1 | 3 | 5 | Todo |
 | E6-S4 | Real-device verification pass (LAN) | p0 | 3 | 5 | Todo |
 | E6-S5 | Security & robustness pass | p0 | 5 | 6 | Todo |
@@ -566,6 +622,8 @@ delivery, documentation, and a clean v1.0.
 | E6-S19 | Upload-validation hardening from E4-S1A's review | p2 | 1 | — | Todo |
 | E6-S20 | Static-WebP downscaling, once animation and alpha are detectable | p2 | 2 | — | Todo |
 | E6-S21 | Splash hero URL origin validation | p2 | 1 | — | Todo |
+| E6-S22 | GitHub Actions majors and Dependabot | p2 | 1 | — | Todo |
+| E6-S23 | Drag overlay stacking at short viewports | p2 | 1 | — | Todo |
 
 ### E6-S1 — CI on every PR · 5 pts · p0
 
@@ -768,6 +826,31 @@ splash issue an off-machine request — the one thing the rule forbids.
       quiet failure, never a request.
 - [ ] A test pins the refusal with an absolute and a protocol-relative URL, and a backend test pins the
       relative guarantee the client relies on.
+
+### E6-S22 — GitHub Actions majors and Dependabot · 1 pt · p2
+
+*As a maintainer, I want the CI's own actions current and watched, so the pipeline does not rot under
+deprecation warnings.*
+
+E6-S1 pins every action to a commit SHA on the then-current `v4` tags. Run logs already warn that
+`setup-java@v4` is deprecated and that the Node 20 runtime under `checkout`/`setup-node` is forced onto
+Node 24; current majors are checkout v7, setup-java v6, setup-node v7 and upload-artifact v7.
+
+- [ ] Migrate the workflow to the current major of each action, pinned by SHA, and re-run the suite.
+- [ ] Add `.github/dependabot.yml` for `github-actions` (and optionally `npm`/`maven`) with a weekly
+      schedule; review the first PR it opens rather than auto-merging.
+
+### E6-S23 — Drag overlay stacking at short viewports · 1 pt · p2
+
+*As the curator on a short screen, I want the lifted tile to stay above the panel, so the photo I am
+holding is never cut by the control surface.*
+
+E4-S3C's probe (390 × 300): the grid's scroll container and the upload panel are both `relative z-10`
+siblings, so the fixed drag clone (z-index 999) lives inside the earlier stacking context and paints
+**under** the panel; at 390 × 844 they do not overlap. Recorded rather than changed inside the story.
+
+- [ ] Raise the scroller's stacking context (or portal the overlay) so the clone always wins; a probe
+      at 390 × 300 pins it, and the existing dnd geometry tests stay green.
 
 ---
 

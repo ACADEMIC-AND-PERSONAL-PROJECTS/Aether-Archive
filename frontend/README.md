@@ -920,7 +920,9 @@ under the tile prefixed `sr-only` by the file's own name. Remove buttons are dis
 running, not removed: the queue holds a snapshot of the files, and a tile vanishing mid-batch would
 leave the summary counting something invisible. The scroll container keeps A1's measured centring
 (`justify-center` on the scroller; the tile's top lands on the computed centre). Preview URLs are
-revoked on removal, **on success** and on unmount; the `File`s are state and nothing is persisted.
+revoked on removal and on unmount — no longer on success (E4-S5A: the tile stays, showing the user's
+own photo); the `File`s are state and **only the aura persists** — one `sessionStorage` value the
+curator chose (E4-S4C, ADR-023 decision 4), never a `File`.
 
 ### The queue — one request at a time, failures isolated
 
@@ -928,9 +930,9 @@ revoked on removal, **on success** and on unmount; the `File`s are state and not
 decision: the single progress line describes the request actually in flight, the server sees a phone's
 uplink as it would see a single upload, and a failure has one unambiguous owner. A failure marks its
 tile `error`, says one quiet sentence, and the loop continues — it never aborts the files behind it.
-Successful files leave the grid. When the queue settles the panel reports this batch: "Added 2 photos.
-1 photo couldn't be added.", or the matching singular. If everything succeeded the view returns to
-`idle`.
+Successful files keep their tiles, marked `added` (E4-S5A) — the draft the publish reads. When the
+queue settles the panel reports this batch: "Added 2 photos. 1 photo couldn't be added.", or the
+matching singular, and the view stays `selected` (or `error` while any failed tile remains).
 
 "Try again" resends the **same `File` objects** — identity is asserted in the test through the multipart
 body — so a failure cannot lose the selection. Invalidation stays where E4-S1B put it, on `onSuccess`:
@@ -996,6 +998,10 @@ mutants were each applied, observed red, and reverted:
 | `cancelledRef.current = false` deleted               | 1 failed — `expected 1 to be greater than 1` (the second batch opened no request)         |
 | `alive` half of the progress gate defeated           | 1 failed — `expected true to be false`                                                    |
 | old post-loop cancel check restored                  | 1 failed — "Upload cancelled." overwrote "Added 1 photo." after a stored 201              |
+
+E4-S5A retires the `success-path revokePreview deleted` mutant above: a success no longer revokes its
+preview, so that mutant no longer exists to run — the preview test now pins the reverse (kept until
+the tile is removed, its only exit).
 
 Browser probe (development-time, headless Chromium 152, 390 × 844 DPR 3, built `dist/` served by a
 local stub; scripts outside the repository; the stub answers every second upload with 415
@@ -1098,6 +1104,340 @@ multipart `file` part; Chromium then decoded both the fixture and the received b
 - There is no visual change in this story (the grid, the panel and the progress line are E4-S2A's), so
   no mobile capture is required. Not measured here: Safari's `OffscreenCanvas`/`toBlob` behaviour and a
   physical phone; the fallback keeps Safari uploadable regardless.
+
+## The display order (E4-S3A)
+
+The workshop's `items` array **is** the dump order: there is no `order` field, no index stored on a
+tile and no sorting at render. Moving a tile produces one new array through `lib/ordering/move.ts`;
+the slot a photo occupies is its index, so the publish payload is `orderedIds` over the tiles' stored
+photos and `displayOrder` is 0–5.
+
+- `moveItem(items, from, to)` clamps both indices, refuses non-integer input (a caller bug cannot
+  truncate a slot), returns the **same reference** when a move changes nothing, and follows
+  `arrayMove`'s contract: the destination is the index in the resulting array.
+- `orderedIds(items)` is the payload projection — ids in display order. Its production caller is
+  `planPublish` (E4-S5B); the tests pin the contract the endpoint consumes. **The ids must be the
+  server's photo UUIDs**: `SelectionItem.id` is client-local (`selection-N`) and `orderedIds` maps
+  that field, so the plan projects each tile's `photo.id` — which is why since E4-S5A a successful
+  upload keeps the returned `Photo` on the item before `DumpCreate.photoIds` is built.
+
+11 unit tests state every move direction, both clamps, the no-op identity and the ordered-ids
+projection. The drag and touch surfaces that write through this reducer arrived in E4-S3B — the next
+section. A keyboard surface is E4-S3D and is not part of this one.
+
+## Gestures on the grid — measured (E4-S3B)
+
+The grid is sortable by pointer and by finger. `DndContext` owns the sensors, `SortableContext` uses
+`rectSortingStrategy` and `closestCenter`, and a drop reports `onMove(from, to)` to the workshop, which
+applies `moveItem` from the previous section. The array is still the only order.
+
+**Sensors and their constraints** (`lib/ordering/interaction.ts`, pinned by `interaction.test.ts`):
+
+- `MouseSensor` with a **distance: 8** constraint — a click, or a 4 px wobble, is not a drag.
+- `TouchSensor` with **delay: 250** and **tolerance: 8** — a finger must stay still for a quarter of a
+  second; moving 8 px before that cancels the pending drag, so the same touch reaches the browser as a
+  scroll. The activator carries `touch-action: manipulation` (Tailwind's `touch-manipulation`), which
+  leaves vertical panning and pinch-zoom native; the sensor only takes the gesture over once the press
+  has actually started a drag.
+- The tiles settle with a **200 ms** inline transition on `cubic-bezier(0.22, 1, 0.36, 1)`
+  (`SORT_SETTLE_MS`, `EASE_SOFT`).
+- Auto-scroll, the tuned drop animation and the reduced-motion reading were **not** in S3B: auto-scroll
+  landed on its own branch (#128), the tuned drop and the reduced-motion reading on #127 — both
+  E4-S3C. The keyboard sensor, announcements and screen-reader instructions are E4-S3D, not here.
+
+**The overlay.** `DragOverlay` renders a presentational clone — scrim, preview, state line — raised with
+the one soft shadow and a hairline edge; the source slot keeps its measured space and paints nothing
+(`opacity-0`) so nothing shifts. The clone is `aria-hidden` paint, not a second tile, and the probe
+finds it once during the lift and zero times after the drop. At the S3B tip dnd-kit's default short
+drop animation ran; this slice replaced it with the tuned 250 ms animation, removed it under
+`prefers-reduced-motion`, and moved the state line inside the lifted square — see below.
+
+**No dead focus stop (S3B's reasoning, now satisfied).** In S3B the activator deliberately did not
+spread dnd-kit's `attributes`: they carry `tabIndex: 0`, `role="button"` and an `aria-describedby` that
+promises the space bar, and without a sensor that would have been a control in the tab order that does
+nothing when activated. **E4-S3D** adds `attributes` and the `KeyboardSensor` together, so the promise
+is now true — measured in the keyboard section below; at the S3B tip this slice was pointer and touch
+only.
+
+**The remove button stays clickable.** It is a **sibling** of the activator, so its pointer events
+never reach a sensor; tests pin both the gesture (a 300 ms press on it lifts nothing) and the click
+path. While a batch uploads, `useSortable` and `SortableContext` are both `disabled`: the queue captured
+the array when it started, and a reorder mid-batch would make the grid disagree with the requests on
+the wire. The tile's removal is disabled here too, as it was in E4-S2A.
+
+**The flakiness fix (PR #124's review, a real defect).** dnd-kit removes its capture-phase document
+listeners on a **50 ms timer** after a drag detaches — they exist to swallow the click that follows a
+drag. A test that activated a drag and returned before that timer fired left the listener on the shared
+jsdom document, where it swallowed the next test's first click. Every activated drag in this suite now
+ends with a drop or a cancel and then awaits `settleDragListeners()` (60 ms) before returning; the
+shuffled suite was run **six times**, green each time (producing command: `npm run test -- --run
+--sequence.shuffle`, repeated).
+
+**Three packages, justified.** `@dnd-kit/core` (sensors, context, overlay), `@dnd-kit/sortable`
+(the sortable context and rect strategy) and `@dnd-kit/utilities` (the transform serialiser
+`useSortable` styles with); `@dnd-kit/accessibility` arrives transitively. A hand-rolled pointer/touch
+stack would have to re-earn the same activation thresholds and overlay behaviour.
+
+Bundle delta, two production builds with and without the imports in `dist/`:
+
+| Chunk                 | Before                    | After                     | Delta                          |
+| --------------------- | ------------------------- | ------------------------- | ------------------------------ |
+| `WorkshopView` (lazy) | 11.48 kB / 4.25 kB gzip   | 59.70 kB / 19.63 kB gzip  | **+48.22 kB / +15.38 kB gzip** |
+| `index`               | 278.56 kB / 87.78 kB gzip | 278.61 kB / 87.83 kB gzip | +0.05 kB / +0.05 kB gzip       |
+| CSS                   | 21.39 kB / 5.17 kB gzip   | 22.15 kB / 5.32 kB gzip   | +0.76 kB / +0.15 kB gzip       |
+
+The cost lands in the lazily loaded workshop chunk, not in the first paint.
+
+Tests added: 6 gesture tests in `WorkshopView.test.tsx` (mouse threshold, reorder through the callback,
+long-press vs short swipe, the remove control's pointer isolation and click path, the focus-stop
+decision, and the disabled state while uploading) and 2 envelope tests in `interaction.test.ts`. At
+the E4-S3B tip the full suite was **31 files / 363 tests**.
+
+Probe: headless Chromium **153.0.8010.12**, built `dist/` on `vite preview`, scripts outside the
+repository, 390 × 844 DPR 3 (390 × 300 where scrolling matters; at 844 six tiles fit and the document
+has no travel).
+
+| Scenario                                          | Evidence                                                                                                                                                                                                                                |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mouse drag tile 1 → tile 3                        | order `[1,2,3,4,5,6]` → `[2,3,1,4,5,6]`; overlay present (1) during the lift and gone (0) after the drop; source slot `data-dragging="true"` during, absent after; neighbour transition `transform 0.2s cubic-bezier(0.22, 1, 0.36, 1)` |
+| Touch long-press (CDP `Input.dispatchTouchEvent`) | lifted tile 1 and overlay present; order `[1,2,3,4,5,6]` → `[2,3,1,4,5,6]`; overlay gone after; page scroll 0 during the hold                                                                                                           |
+| Short swipe, 390 × 300                            | page `scrollTop` 0 → **148** (its maximum), order unchanged, no tile in the dragging state, no overlay                                                                                                                                  |
+
+0 off-origin requests and 0 page/console exceptions in every scenario. Captures:
+`reports/e4s3-drag-390.png` (lift + overlay) and `reports/e4s3-order-390.png` (settled order).
+Not measured here: a physical phone's long-press feel and Safari's `touch-action` handling. The
+reduced-motion drop arrived with E4-S3C's motion slice and is measured in the next section.
+
+## Drop animation and reduced motion — measured (E4-S3C, motion branch)
+
+This branch tunes the drop and stops the motion for readers who ask it to. Auto-scroll landed on its
+own branch (#128) and is measured in the section below; the array is still the only order, and the
+queue sends the displayed order. Keyboard moves and announcements are E4-S3D and are not part of this
+tree.
+
+**The drop animation.** `DROP_ANIMATION_MS` is 250 with `EASE_SOFT`, under the story's 300 ms ceiling.
+Recorded by wrapping `Element.prototype.animate` before the app loads: one call,
+`{duration: 250, easing: "cubic-bezier(0.22, 1, 0.36, 1)"}`. The drop is released 25 px off the
+destination's centre because dnd-kit skips the animation when its first and last keyframes are equal;
+a pixel-exact drop would have measured zero animations and "≤ 300 ms" would have been vacuous. The
+sortable settle stays 200 ms.
+
+**The overlay's state line.** It now sits inside the lifted square on a gradient scrim
+(`from-aura-bg/85 via-aura-bg/75 to-transparent`), not floating below it. The tile is the surface the
+user is holding; text over another photo would need its own scrim, and moving it into the clone reuses
+the one already there. Measured in the review over a pure-white photo at 390 × 844 DPR 3: `#E8E6E3`
+on the composited scrim, **mean 8.57:1, worst pixel 7.45:1** — above the 4.5:1 rule at every pixel.
+
+**Reduced motion, both readings.** `Emulation.setEmulatedMedia` with `prefers-reduced-motion: reduce`:
+
+- The `@media (prefers-reduced-motion: reduce)` block now neutralises **`transition-duration` as well
+  as `animation-duration`** (`0.01ms !important`). Measured on the sortable tile: computed
+  `transition: 1e-05s`, so the inline 200 ms settle cannot move anything. The `!important` is required
+  to beat an inline style; the entry vocabulary is untouched (`--motion-distance-enter` stays 0px and
+  the fade survives).
+- The WAAPI drop is not CSS, so `prefersReducedMotion()` (matchMedia, unit-tested with an injected
+  environment) feeds `useSortable` a `transition: null` and `DragOverlay` a `dropAnimation={null}`.
+  Measured: `data-drop-animation="none"` and **zero** `Element.prototype.animate` calls across a
+  pointer drag.
+- The reorder still works under reduce: the pointer drag moved 1 → 3 and the order became
+  `[2,3,1,4,5,6]`.
+
+Probe: headless Chromium **153.0.8010.12**, built `dist/` on `vite preview`, scripts outside the
+repository, 390 × 844 DPR 3.
+
+| Scenario (built bundle)      | Evidence                                                                                                                                                                                                                 |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Drop animation               | overlay `data-drop-animation="250ms"`; neighbour settle `transform 0.2s cubic-bezier(0.22, 1, 0.36, 1)`; one `Element.prototype.animate` call: duration **250 ms**, same easing; order `[1,2,3,4,5,6]` → `[2,3,1,4,5,6]` |
+| Reduced motion, pointer drag | `matchMedia` true; computed tile `transition` `1e-05s`; `data-drop-animation="none"`; **0** animate calls; reorder `[2,3,1,4,5,6]`                                                                                       |
+
+0 off-origin requests and 0 page/console exceptions in every scenario. The S3B captures stay; the
+auto-scroll capture belongs to #128. The keyboard slice's capture is not part of this tree.
+
+**Layering note, measured at 390 × 300.** The grid's scroll container and the upload panel are both
+`relative z-10` siblings, so the fixed drag clone (z-index 999) lives inside the earlier stacking
+context and paints **under** the panel when the short viewport makes them overlap; at 390 × 844 they
+do not overlap. Not an acceptance criterion of this story — recorded so the observation has a number
+behind it. If the clone should always win, raising the scroller's stacking context is the one-class
+change — recorded as **E6-S23** rather than silently changed here.
+
+Tests added or rewritten: 3 in `WorkshopView.test.tsx` (the reduced-motion reading, the queue's
+displayed order, and a StrictMode pointer reorder), 3 in `reduced.test.ts`, 1 in
+`interaction.test.ts` (the drop ceiling) and 1 in `tokens.test.ts`. One piece is **probe-covered
+rather than suite-covered**, stated because a passing suite is not evidence for it: dnd-kit's WAAPI
+drop gating (jsdom's zero geometry makes dnd-kit skip the drop animation entirely, so a test assertion
+would pass with or without the gate). The `autoScroll` wiring is stated in the auto-scroll section
+below. The full suite is **32 files / 372 tests**; the shuffled suite was run **three times**
+(`npm run test -- --run --sequence.shuffle`), green each time.
+
+Bundle delta for the whole E4-S3C motion work — auto-scroll, drop animation and reduced motion —
+two production builds with and without it in `dist/` (measured before the auto-scroll split; the
+auto-scroll share is one constant and one prop, so it is a negligible part of the delta):
+
+| Chunk                 | Before                    | After                     | Delta                        |
+| --------------------- | ------------------------- | ------------------------- | ---------------------------- |
+| `WorkshopView` (lazy) | 59.70 kB / 19.63 kB gzip  | 60.45 kB / 19.88 kB gzip  | **+0.75 kB / +0.25 kB gzip** |
+| `index`               | 278.61 kB / 87.83 kB gzip | 278.61 kB / 87.83 kB gzip | 0                            |
+| CSS                   | 22.15 kB / 5.32 kB gzip   | 24.68 kB / 5.64 kB gzip   | +2.53 kB / +0.32 kB gzip     |
+
+The cost lands in the lazily loaded workshop chunk and the new gradient utilities; first paint is
+unchanged.
+
+Not measured here: Safari/iOS's `prefers-reduced-motion` reading (the probe emulates it through CDP in
+Chromium) — **SKIPPED**. The keyboard path and announcements are measured in the next section (E4-S3D).
+
+## The keyboard path and its announcements — measured (E4-S3D + E4-S3D1)
+
+The grid is operable without a pointer. The array is still the only order: the keyboard path writes
+through the same `moveItem`, and the queue sends the displayed order.
+
+**The keyboard path.** `KeyboardSensor` uses `sortableKeyboardCoordinates`: Space or Enter lifts,
+arrows move to the nearest tile in that direction, Space or Enter drops, Escape puts the photo back.
+The activator now spreads `useSortable`'s `attributes` — `role="button"`, `tabIndex: 0`,
+`aria-roledescription="sortable"` and our instructions behind `aria-describedby` — with a name
+rebuilt from the live array: `Photo 1 of 6: photo-1.png`. While a batch uploads, the tiles carry
+`aria-disabled="true"` and the sensor has no listeners, so the keys are inert as well as the pointer.
+The left/right/up/down reach comes from the coordinate getter; without it the sensor moves the
+overlay in 25 px steps and never changes the order.
+
+**The announcement copy (E4-S3D1).** dnd-kit's `accessibility` prop replaces its defaults with builders
+in `lib/ordering/announce.ts` (8 exact-string tests): "Photo 1 of 6 picked up. …", "Photo 1 of 6 moved
+to position 4.", "Photo 4 of 6 dropped.", "Move cancelled. Photo 1 of 6 is back in position 1." The
+first `over` in a drag is the tile itself, so the handler tracks the **last announced destination** and
+skips a repeat; a return to the origin position is a real move and is announced — the first cut guarded
+on `destination === position` and swallowed that back-step, which the review measured and this slice
+fixes with an `ArrowRight → ArrowLeft` test. The workshop's own `role="status"` region stays silent
+during a drag.
+
+Probe: headless Chromium **153.0.8010.12**, built `dist/` on `vite preview`, scripts outside the
+repository, 390 × 844 DPR 3.
+
+| Step (probe)           | Evidence                                                                                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Focus                  | name `Photo 1 of 6: photo-1.png`, `role="button"`, `aria-roledescription="sortable"`, `aria-describedby` present                                  |
+| Space (lift)           | `aria-pressed="true"`; overlay 1; live region "Photo 1 of 6 picked up. …"; upload region still "6 photos selected."; neighbour `transform 0.2s …` |
+| ArrowDown              | live region "Photo 1 of 6 moved to position 4."; upload region still "6 photos selected."                                                         |
+| Space (drop)           | live region "Photo 4 of 6 dropped."; order `[1,2,3,4,5,6]` → `[2,3,4,1,5,6]`; overlay 0, `data-dragging` 0                                        |
+| ArrowRight → ArrowLeft | live region "moved to position 2." then "moved to position 1." — the back-step is announced                                                       |
+| Escape mid-move        | live region "Move cancelled. Photo 1 of 6 is back in position 1."; order unchanged; overlay 0, `data-dragging` 0                                  |
+
+0 off-origin requests and 0 page/console exceptions in the probe. The full transcript is in the PR
+body; the raw run also produced `version "153.0.8010.12"` and `PROBE_DONE`.
+
+Capture: `reports/e4s3-keyboard-390.png` (1170 × 2532, 390 × 844 DPR 3), taken after the arrow move:
+the source cell is empty, the clone is over the destination and the state line sits on its scrim.
+
+Tests: the S3B dead-focus-stop test is replaced by the attributes test; keyboard down, keyboard up,
+Escape cancel and the back-step test join it, plus 8 in `announce.test.ts`. The full suite is **33
+files / 384 tests**; the shuffled suite was run **three times** (`npm run test -- --run
+--sequence.shuffle`), green each time. The workshop chunk grows from 60.45 kB / 19.88 kB gzip to
+**63.86 kB / 20.87 kB gzip** — dnd-kit's keyboard sensor and coordinate getter, inside the lazy chunk.
+
+Not measured here: a real screen reader (the copy and the live region are measured, but whether a
+reader speaks it is not), keyboards on iOS/Safari, and a physical device — **SKIPPED**.
+
+## Auto-scroll — measured (E4-S3C, auto-scroll branch)
+
+`AUTO_SCROLL_OPTIONS` — edge bands at 15 % / 18 %, acceleration 8, interval 5 — is passed to
+`DndContext`; the values are pinned **exactly** in `interaction.test.ts`, because a range check would
+pass with dnd-kit's defaults and the tuning the probe measured could disappear silently. At 390 × 300
+the document has 448 px of content in a 300 px viewport, so it can travel 148 px. The probe moved the
+pointer to y = 292 (8 px above the viewport's bottom edge) and sampled `scrollTop` every 100 ms: the
+first sample was already **148 px, the maximum**, and all 14 samples held it for the rest of the
+drag; the grid's own scroller stayed at 0 (its `scrollHeight` equals its `clientHeight` at this
+viewport, so the document is the only scroller with travel). Dropping on the last fully visible tile
+moved photo 1 from position 1 to position 6: `[1,2,3,4,5,6]` → `[2,3,4,5,6,1]`.
+
+The `autoScroll` prop's **wiring** is probe-covered rather than suite-covered: the shipped suite does
+not mock `DndContext`, so nothing pins that the prop is received, and jsdom cannot perform the scroll
+either — measured here instead. Capture: `reports/e4s3-autoscroll-390.png` (1170 × 900, 390 × 300
+DPR 3). The drop animation and the reduced-motion reading are on #127.
+
+Tests added: 1 in `interaction.test.ts` (the exact-value pin); the full suite is **31 files /
+364 tests** at #128's tip. Probe: headless Chromium **153.0.8010.12**, built `dist/` on
+`vite preview`, scripts outside the repository. Not measured here: a physical phone's auto-scroll feel
+while a finger holds a tile at the edge (the probe drives a synthetic mouse pointer) and Safari/iOS's
+scroll behaviour — **SKIPPED**, tracked with E6-S4.
+
+## The publish plan (E4-S5B)
+
+`planPublish(items, aura, title)` in `lib/publish/plan.ts` turns the draft into the `DumpCreate` body
+— or refuses it, in one sentence, before anything is sent. It mirrors the server's checks, in the
+order a draft can fail them:
+
+1. **Exactly six tiles** — the dump's shape; the count is the guard for a caller that skipped the
+   draft's own gate.
+2. **Every tile stored** — `photo !== null`, with the singular/plural sentence naming how many
+   uploads are missing.
+3. **The six photos distinct** — the server refuses duplicates under `photoIds`; the mirror keeps an
+   impossible grid impossible.
+4. **An aura chosen** — a `#RRGGBB` triple, `null` and a malformed hex refused with the same sentence
+   (`ValidationConstraints.BACKGROUND_COLOR_PATTERN`).
+5. **The title at most 80 characters** — counted **after trimming**, and the trimmed value is what the
+   body carries; blank reads as `null` (ADR-011 §2). The count is UTF-16 units, exactly as Java's
+   `String.length()` in the server's `@Size` — a code-point count would let an emoji title through
+   the client and have the server refuse it.
+
+The checks that compare the request with the archive itself — a photo that does not exist, one
+already curated — stay server-side: the client cannot know them without a round trip, and S5C maps
+that `validation-failure`.
+
+A blocked plan has no `body`: the panel shows `sentence` and no request is made (ADR-024 decisions
+2–3). A ready plan carries the body **and** the six `Photo`s in display order, so the optimistic
+insert (E4-S5C) can build the entry it shows before the server answers. The plan is pure — `items` is
+structural (`{ photo: Photo | null }[]`), so `lib/` never imports a feature, and nothing here touches
+React or the network. 13 unit tests pin every sentence, the refusal order and both boundaries (six,
+80).
+
+## The publish wire and its optimistic write (E4-S5C)
+
+`createDump(body)` in `api/dumps.ts` posts the plan's `DumpCreate` as JSON and resolves with the stored
+`Dump`; `usePublishDump` is the mutation the "Save archive" action runs (E4-S5D). Its cache lifecycle
+is ADR-024 decision 4:
+
+1. `onMutate` cancels an in-flight dumps read — a late answer must not overwrite the draft — snapshots
+   `queryKeys.dumps`, and prepends the optimistic dump, whose id is `optimistic-<first photo id>`, not
+   a UUID: `crypto.randomUUID` needs a secure context, a module counter would leak between tests, and
+   the panel serializes publishes (E4-S5D). `onError` restores the snapshot, or **resets the query**
+   when the cache held no list before (the reader E5-S1 mounts is left able to fetch); `onSuccess`
+   prepends the server's dump, drops the optimistic entry and any copy a read raced in — exactly once —
+   and **nothing is invalidated**: the response is canonical.
+2. The publish takes no `AbortSignal` — leaving the view must not throw away an answer that changes what
+   the archive holds. The error→sentence vocabulary now lives in `lib/publish/sentence.ts` (E4-S5D),
+   the story that first shows a sentence; the hook exposes the `ApiError` and carries no wording itself.
+
+The dump feed (the River, E5-S1) does not exist yet; this slice prepares the cache entry it will read.
+The tests read the cache through their own `QueryClient`, or through a mounted `useQuery` standing in
+for E5-S1's feed: 8 tests at `api/dumps.test.tsx`, from the request's shape to the removal of a failed
+draft when there was nothing before it.
+
+## The "Save archive" panel (E4-S5D)
+
+The draft's second, explicit action (ADR-024 decision 2). The group appears once the draft holds six
+tiles — the dump's shape — with the optional title field and the button; a draft that cannot leave is
+answered by `planPublish`'s one sentence in the panel (a photo still un-stored, no aura, a title past 80) and the click sends nothing. Five tiles is not the shape: the group leaves with the sixth tile.
+
+A ready plan runs the real `usePublishDump` mutation. While the request is in flight the grid, the
+title field, the picker and the button are disabled ("Saving…", `aria-busy`), the live region says
+"Saving the dump." so the state is announced, and the aura picker stays live — its change cannot
+affect a body already on the wire. Success returns where the workshop was entered from (`navigate(-1)`)
+with the river's cache already holding the server's dump; a failure stays, the draft intact and its
+six tiles still stored, and shows one sentence from `lib/publish/sentence.ts`:
+
+| Failure                           | Sentence                                                                                   |
+| --------------------------------- | ------------------------------------------------------------------------------------------ |
+| network or timeout                | "The archive didn't answer. Try again."                                                    |
+| 400, `errors[0].field = photoIds` | "The archive refused the photos — one may already be in a dump. Remove it and save again." |
+| 400, `backgroundColor`            | "The archive refused the colour. Choose an aura and save again."                           |
+| 400, `title`                      | "The archive refused the title. Shorten it and try again."                                 |
+| anything else                     | "The dump couldn't be saved. Try again."                                                   |
+
+The `photoIds` sentence is the one ADR-024 decision 5 pins: a refusal never costs a re-upload, and
+telling the curator to reload or discard the draft would contradict the decision — review round 1 on
+E4-S5C refused exactly that wording. The 4 unit tests in `lib/publish/sentence.test.ts` pin every
+sentence and the fallback's refusal to repeat the server's `detail`; 4 view tests cover the group's
+visibility, the blocked click that opens no request, the optimistic entry between click and response
+with the return on success, and the rollback with the draft intact. One publish at a time: the action
+is disabled in flight, which is also why the optimistic id can stay deterministic.
 
 ## Zero external requests — measured on the built bundle
 
