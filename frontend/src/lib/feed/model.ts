@@ -24,9 +24,6 @@ import type { Dump, Photo } from "../../types/api";
  * no pagination (ADR-025). It is built from whole lists and knows nothing of the network.
  */
 
-/** The kinds an entry can wear; the prefix keeps `entryKey` unique even if the sources ever collided. */
-export type FeedEntryKind = "dump" | "photo";
-
 /** One dated entry of the feed: a dump section or a single photo, with its identity and instant. */
 export type FeedEntry =
   | {
