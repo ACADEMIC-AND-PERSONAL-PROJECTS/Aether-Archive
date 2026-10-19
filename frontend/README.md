@@ -124,7 +124,7 @@ frontend/
     ├── features/         splash/ — the immersive hero (E3-S1); river/ workshop/ placeholders (E2-S2); menu/ in E3
     ├── components/       README.md only — GlassPanel and shared primitives (E2-S6)
     ├── lib/              README.md per folder (color/ image/ gesture/ motion/) — pure TS, no React
-    ├── api/              typed client, query keys, retry policy, photo queries + tests (E2-S2, E3-S1)
+    ├── api/              typed client, query keys, retry policy, photo + dump queries (feed, hero, upload) + tests (E2-S2, E3-S1, E5-S1A)
     ├── hooks/            useHeroImage + usePullToRefresh (E3-S1) — reusable hooks
     ├── types/            wire types mirroring _docs/openapi.yml (E2-S2)
     ├── styles/           global.css — the `@theme` token layer lives here
