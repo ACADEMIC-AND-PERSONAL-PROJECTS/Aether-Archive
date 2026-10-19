@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { type SyntheticEvent, useCallback, useMemo } from "react";
 
 import { useDumps } from "../../api/dumps";
 import { usePhotos } from "../../api/photos";
@@ -16,10 +16,18 @@ import type { Dump, Photo } from "../../types/api";
  * markers are in display serif; dumps render as titled 6-photo sections; single photos sit between
  * them. The three quiet states are the same trio the splash uses (`components/QuietState.tsx`).
  *
- * What this view does not own: image placeholders (E5-S3) and virtualisation (E5-S4).
+ * What this view does not own: virtualisation (E5-S4).
  */
 
 type RiverState = "loading" | "empty" | "error" | "ready";
+
+const DUMP_IMG_SIZES = "calc((min(32rem, 100vw) - 2rem) / 2)";
+const SINGLE_IMG_SIZES = "min(32rem, calc(100vw - 2rem))";
+
+function hideOnError(e: SyntheticEvent<HTMLImageElement>): void {
+  const img = e.currentTarget;
+  img.style.display = "none";
+}
 
 function DumpSection({ dump }: { readonly dump: Dump }) {
   return (
@@ -35,7 +43,10 @@ function DumpSection({ dump }: { readonly dump: Dump }) {
             alt=""
             loading="lazy"
             decoding="async"
+            sizes={DUMP_IMG_SIZES}
+            onError={hideOnError}
             className="aspect-square w-full rounded-lg object-cover"
+            style={{ backgroundColor: dump.backgroundColor }}
           />
         ))}
       </div>
@@ -51,7 +62,9 @@ function SinglePhoto({ photo }: { readonly photo: Photo }) {
         alt=""
         loading="lazy"
         decoding="async"
-        className="w-full rounded-lg object-cover"
+        sizes={SINGLE_IMG_SIZES}
+        onError={hideOnError}
+        className="aspect-[3/4] w-full rounded-lg object-cover bg-aura-surface"
       />
     </div>
   );
