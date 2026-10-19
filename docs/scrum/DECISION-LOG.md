@@ -35,6 +35,7 @@ Statuses: `Proposed` · `Accepted` · `Superseded by ADR-NNN` · `Rejected`.
 | [ADR-023](#adr-023--the-aura-picker-the-chosen-page-colour-is-kept-the-glass-flips-suggestions-merge-by-pixel-share) | 2026-10-17 | The aura picker: the chosen page colour is kept, the glass flips, suggestions merge by pixel share | Accepted |
 | [ADR-024](#adr-024--the-draft-survives-its-upload-the-workshop-keeps-the-six-it-stored-and-the-publish-reads-them-in-order) | 2026-10-18 | The draft survives its upload: the workshop keeps the six it stored, and the publish reads them in order | Accepted |
 | [ADR-025](#adr-025--the-feed-reads-the-archive-whole-two-queries-no-pagination-yet-and-the-numbers-that-would-revisit-it) | 2026-10-19 | The feed reads the archive whole: two queries, no pagination yet, and the numbers that would revisit it | Accepted |
+| [ADR-026](#adr-026--no-derivative-images-yet-originals-with-lazy-loading-colour-placeholders-revisit-with-e5-s4) | 2026-10-19 | No derivative images yet: originals with lazy loading, colour placeholders, revisit with E5-S4 | Accepted |
 
 ---
 
@@ -1060,6 +1061,33 @@ cold load spends two requests of a few kB and no more. The client holds the arch
 memory while the tab lives — acceptable for a single-user archive, and the same lifetime the query
 cache already had. The escape hatch is precise: server pagination is a contract change
 (`_docs/openapi.yml` is a frozen spec), and it supersedes this ADR rather than bending it.
+
+---
+
+## ADR-026 — No derivative images yet: originals with lazy loading, colour placeholders, revisit with E5-S4
+
+**Date**: 2026-10-19 · **Status**: Accepted
+
+**Context.** E5-S3 asks whether images in the River need thumbnails or derivative sizes. The
+archive is local-only, served over LAN to one device. E1-S5 maps `/images/**` to the data directory;
+the contract reserves no thumbnail namespace. Generating derivatives would require a backend change
+(a new directory + mapping), an image-processing dependency, and storage duplication — cost that is
+justified only by measured latency.
+
+**Decision.** The River serves originals. CLS prevention uses explicit `aspect-ratio` (`aspect-square`
+for dump photos, `aspect-[3/4]` for singles) and `sizes` so the browser can choose when `srcset` is
+added later. Each image carries a dominant-colour placeholder (`dump.backgroundColor` for dump photos,
+`bg-aura-surface` for singles) visible until decode completes. `loading="lazy"` and
+`decoding="async"` keep the main thread free. Broken images are hidden (`display: none`) so layout
+holds.
+
+The revisit threshold belongs to E5-S4's profile: if the 300-item feed's LCP exceeds the 1.5 s
+budget over LAN, derivative images are the next lever, and they supersede this ADR with their own
+directory, mapping and build step. Until that measurement lands, originals are the correct default.
+
+**Consequences.** No backend change; no new dependency; no storage duplication. `sizes` is set now so
+a future `srcset` addition is additive. The escape hatch: E5-S4's profile numbers, or a
+real-device pass (E6-S4) finding slow images, triggers a new ADR.
 
 ---
 

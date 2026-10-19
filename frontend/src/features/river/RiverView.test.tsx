@@ -297,6 +297,72 @@ describe("RiverView — feed rendering", () => {
   });
 });
 
+describe("RiverView — image loading (E5-S3)", () => {
+  it("should set sizes on all images", async () => {
+    stubApi(
+      () => jsonResponse([PHOTO_A, ...DUMP_PHOTOS]),
+      () => jsonResponse([DUMP_TITLED]),
+    );
+
+    const { container } = renderRiver();
+
+    await waitFor(() => expect(mainEl()).toHaveAttribute("data-state", "ready"));
+
+    const images = container.querySelectorAll("img");
+    for (const img of images) {
+      expect(img).toHaveAttribute("sizes");
+    }
+  });
+
+  it("should paint dump photos with the dump's background colour as placeholder", async () => {
+    stubApi(
+      () => jsonResponse([...DUMP_PHOTOS]),
+      () => jsonResponse([DUMP_TITLED]),
+    );
+
+    const { container } = renderRiver();
+
+    await waitFor(() => expect(mainEl()).toHaveAttribute("data-state", "ready"));
+
+    const article = container.querySelector("[data-dump-id]") as HTMLElement;
+    const images = article.querySelectorAll("img");
+    for (const img of images) {
+      expect(img.style.backgroundColor).not.toBe("");
+    }
+  });
+
+  it("should give single photos an explicit aspect ratio to prevent CLS", async () => {
+    stubApi(
+      () => jsonResponse([PHOTO_A]),
+      () => jsonResponse([]),
+    );
+
+    const { container } = renderRiver();
+
+    await waitFor(() => expect(mainEl()).toHaveAttribute("data-state", "ready"));
+
+    const images = container.querySelectorAll("img");
+    expect(images.length).toBe(1);
+    const img = images[0] as HTMLImageElement;
+    expect(img.className).toContain("aspect-");
+  });
+
+  it("should hide broken images on error", async () => {
+    stubApi(
+      () => jsonResponse([PHOTO_A]),
+      () => jsonResponse([]),
+    );
+
+    const { container } = renderRiver();
+
+    await waitFor(() => expect(mainEl()).toHaveAttribute("data-state", "ready"));
+
+    const img = container.querySelector("img") as HTMLImageElement;
+    fireEvent.error(img);
+    expect(img.style.display).toBe("none");
+  });
+});
+
 describe("RiverView — accessibility", () => {
   it("should have an accessible heading for assistive technology", async () => {
     stubApi(
