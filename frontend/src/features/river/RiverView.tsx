@@ -3,6 +3,7 @@ import { useCallback, useMemo } from "react";
 import { useDumps } from "../../api/dumps";
 import { usePhotos } from "../../api/photos";
 import { QuietEmpty, QuietError, QuietLoading } from "../../components/QuietState";
+import { useScrollMemory } from "../../hooks/useScrollMemory";
 import { buildFeed, entryKey } from "../../lib/feed/model";
 
 import type { Dump, Photo } from "../../types/api";
@@ -82,13 +83,15 @@ export function RiverView() {
 
   const state: RiverState = isPending ? "loading" : isError ? "error" : isEmpty ? "empty" : "ready";
 
+  const scrollRef = useScrollMemory("river", state === "ready");
+
   const retry = useCallback(() => {
     void refetchPhotos();
     void refetchDumps();
   }, [refetchPhotos, refetchDumps]);
 
   return (
-    <main data-state={state} className="relative flex-1 overflow-y-auto bg-aura-bg">
+    <main ref={scrollRef} data-state={state} className="relative flex-1 overflow-y-auto bg-aura-bg">
       <h1 className="sr-only">The River</h1>
 
       {state === "loading" && <QuietLoading />}
