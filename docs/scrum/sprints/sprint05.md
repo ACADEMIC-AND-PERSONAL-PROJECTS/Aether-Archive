@@ -14,7 +14,10 @@
 
 | # | ID | Story | Points | Priority | Status | PR |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | E5-S1 | River feed & timeline markers — the feed, its data layer and the loading ADR | 8 | p0 | Todo | — |
+| 1a | E5-S1A | The feed's data layer — `GET /photos` + `GET /dumps` as queries, ADR-025 | 2 | p0 | Todo | — |
+| 1b | E5-S1B | The feed model — `buildFeed`: months, dumps as sections, singles between | 2 | p0 | Todo | — |
+| 1c | E5-S1C | The river view — markers in display serif, dump sections, quiet states | 2 | p0 | Todo | — |
+| 1d | E5-S1D | Scroll memory — back restores, a fresh visit starts at the top | 2 | p0 | Todo | — |
 | 2 | E5-S2 | Ambient background per dump — `--aura-bg` follows the section in view | 5 | p0 | Todo | — |
 | 3 | E5-S3 | Image loading performance — LQIP, no CLS, the first-viewport budget | 5 | p0 | Todo | — |
 | 4 | E6-S4 | Real-device verification pass (LAN) | 3 | p0 | Todo | — |
@@ -84,3 +87,8 @@
 - 2026-10-19 — Sprint opened the day Sprint 4 was released (`sprint-04`, `125944b7`). Mid-band
   capacity (27) with the feed first; the playbook's indicative window is superseded and the reason is
   recorded above.
+- 2026-10-19 — **E5-S1 was pre-cut before implementation into 1a–1d (2/2/2/2), points unchanged.** The
+  scoped estimate measured ~1,600 hand-written lines against the ~500 branch trigger, so the cut was
+  decided before the first line rather than at review (E4-S4/S5's precedent; the plan bullet's
+  "re-cut at review" reading is superseded by this entry). Slices: the data layer + ADR-025 (1a), the
+  pure feed model (1b), the view (1c), scroll memory (1d — DESIGN-SYSTEM §14 routes it to the River).
