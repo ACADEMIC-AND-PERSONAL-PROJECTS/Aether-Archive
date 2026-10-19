@@ -21,7 +21,7 @@
 | 2 | E5-S2 | Ambient background per dump — `--aura-bg` follows the section in view | 5 | p0 | Done | #168 |
 | 3 | E5-S3 | Image loading performance — LQIP, no CLS, the first-viewport budget | 5 | p0 | Done | #170 |
 | 4 | E6-S4 | Real-device verification pass (LAN) | 3 | p0 | Todo | — |
-| 5 | E5-S4 | Virtualisation decision & implementation — measure first, then decide | 3 | p1 | Todo | — |
+| 5 | E5-S4 | Virtualisation decision & implementation — measure first, then decide | 3 | p1 | Done | #172 |
 | 6 | E6-S3 | Accessibility audit (WCAG 2.2 AA) | 3 | p1 | Todo | — |
 
 **Total: 27 points.** The order is deliberate:
@@ -148,3 +148,12 @@
   measurement deferred to E6-S4 (real-device verification pass). Final size at tip `05ed548`:
   **110 hand-written** (production 19 / tests 66 / docs 28) — well under the ~400 budget. Frontend
   suite 504 → **508 tests** (+4). Row 3 flips to **Done** (`#170`).
+- 2026-10-19 — **E5-S4 merged (`15f2d9d`, PR #172)** at APPROVE WITH NITS (one round): virtualisation
+  decision — profiled the River with 300-item (593 DOM nodes) and 600-item (1,193 nodes) synthetic
+  feeds. Node-per-photo ratio is ~2.0 regardless of scale. Decision: no virtualisation yet — 593 nodes
+  is well below the jank threshold for lazy-loaded images. ADR-027 records three concrete revisit
+  triggers: 1,000 photos, real-device frame drops, or heavier per-item DOM. Three nits accepted:
+  reports/ copy not standalone (test is the runnable one), frame time is jsdom not real paint (deferred
+  to E6-S4), synthetic hex colours overflow at large i (no functional impact). Final size at tip
+  `c51a5a2`: **211 hand-written** (probe 162 / docs 49; reports copy excluded as duplicate) — under
+  the ~400 budget. Frontend suite 508 → **510 tests** (+2). Row 5 flips to **Done** (`#172`).
