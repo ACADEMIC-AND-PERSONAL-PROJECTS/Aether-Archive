@@ -18,7 +18,7 @@
 | 1b | E5-S1B | The feed model — `buildFeed`: months, dumps as sections, singles between | 2 | p0 | Done | #162 |
 | 1c | E5-S1C | The river view — markers in display serif, dump sections, quiet states | 2 | p0 | Done | #164 |
 | 1d | E5-S1D | Scroll memory — back restores, a fresh visit starts at the top | 2 | p0 | Done | #166 |
-| 2 | E5-S2 | Ambient background per dump — `--aura-bg` follows the section in view | 5 | p0 | Todo | — |
+| 2 | E5-S2 | Ambient background per dump — `--aura-bg` follows the section in view | 5 | p0 | Done | #168 |
 | 3 | E5-S3 | Image loading performance — LQIP, no CLS, the first-viewport budget | 5 | p0 | Todo | — |
 | 4 | E6-S4 | Real-device verification pass (LAN) | 3 | p0 | Todo | — |
 | 5 | E5-S4 | Virtualisation decision & implementation — measure first, then decide | 3 | p1 | Todo | — |
@@ -130,3 +130,11 @@
   (production 73 / tests 164) — under the ~400 budget. Frontend suite 482 → **493 tests** (+11).
   Row 1d flips to **Done** (`#166`). **E5-S1 (8 pts) is now complete** — all four slices merged; issue
   #36 closed.
+- 2026-10-19 — **E5-S2 merged (`d482d87`, PR #168)** at APPROVE WITH NITS (one round): ambient
+  background per dump — `useRiverAura` hook observes dump sections via IntersectionObserver with
+  center-biased `rootMargin: -35%` (one active at a time), applies `themeFromBackground` themes on
+  the River's `<main>`. Eight colour tokens registered with `@property` so CSS transitions interpolate
+  them; `[data-aura-transition]` drives a 600 ms soft ease matching the motion vocabulary. Contrast
+  guaranteed by `themeFromBackground`'s §2.2 validation. One nit (stale cache) accepted — unlikely in
+  practice. Final size at tip `b32c20f`: **378 hand-written** (production 193 / tests 185) — under the
+  ~400 budget. Frontend suite 493 → **504 tests** (+11). Row 2 flips to **Done** (`#168`).
