@@ -121,6 +121,52 @@
 
 /* ----------------------------------------------------------- 4. Runtime tokens --- */
 
+/*
+ * Registered custom properties (E5-S2): the browser must know the syntax to interpolate a
+ * transition between two values. Every colour token is registered; `--aura-hairline` is a
+ * border shorthand and cannot be typed as `<color>`, so it snaps on change.
+ */
+@property --aura-bg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #0b0b0d;
+}
+@property --aura-surface {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #121215;
+}
+@property --aura-glass {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(0, 0, 0, 0.4);
+}
+@property --aura-glass-solid {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(0, 0, 0, 0.72);
+}
+@property --aura-text {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #e8e6e3;
+}
+@property --aura-muted {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(232, 230, 227, 0.62);
+}
+@property --aura-accent {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #b5a98f;
+}
+@property --aura-accent-contrast {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #0b0b0d;
+}
+
 :root {
   color-scheme: dark;
 
@@ -269,6 +315,25 @@ body {
   html {
     scroll-behavior: auto !important;
   }
+}
+
+/* --------------------------------------------------- 5b. Aura transition (E5-S2) --- */
+
+/*
+ * The River's ambient background: as the user scrolls past dump sections, the aura tokens
+ * transition from one dump's palette to the next. The registered `@property` declarations
+ * (section 4) make the custom properties interpolable; this rule applies the timing.
+ *
+ * The existing reduced-motion rule (section 5) already sets `transition-duration: 0.01ms
+ * !important` on `*:not(.motion-enter)`, which covers `[data-aura-transition]` — so the
+ * aura snaps instantly under `prefers-reduced-motion: reduce`, no additional override needed.
+ */
+[data-aura-transition] {
+  transition-property:
+    --aura-bg, --aura-surface, --aura-glass, --aura-glass-solid, --aura-text, --aura-muted,
+    --aura-accent, --aura-accent-contrast;
+  transition-duration: var(--motion-duration-slow);
+  transition-timing-function: var(--motion-ease-soft);
 }
 
 /* ------------------------------------------------------------------ 6. Motion --- */

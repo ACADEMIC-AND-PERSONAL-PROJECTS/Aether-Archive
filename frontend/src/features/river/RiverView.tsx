@@ -3,8 +3,9 @@ import { useCallback, useMemo } from "react";
 import { useDumps } from "../../api/dumps";
 import { usePhotos } from "../../api/photos";
 import { QuietEmpty, QuietError, QuietLoading } from "../../components/QuietState";
+import { useRiverAura, type DumpAura } from "../../hooks/useRiverAura";
 import { useScrollMemory } from "../../hooks/useScrollMemory";
-import { buildFeed, entryKey } from "../../lib/feed/model";
+import { buildFeed, entryKey, type FeedEntry } from "../../lib/feed/model";
 
 import type { Dump, Photo } from "../../types/api";
 
@@ -15,15 +16,14 @@ import type { Dump, Photo } from "../../types/api";
  * markers are in display serif; dumps render as titled 6-photo sections; single photos sit between
  * them. The three quiet states are the same trio the splash uses (`components/QuietState.tsx`).
  *
- * What this view does not own: scroll restoration (E5-S1D), the ambient background per dump (E5-S2),
- * image placeholders (E5-S3), and virtualisation (E5-S4).
+ * What this view does not own: image placeholders (E5-S3) and virtualisation (E5-S4).
  */
 
 type RiverState = "loading" | "empty" | "error" | "ready";
 
 function DumpSection({ dump }: { readonly dump: Dump }) {
   return (
-    <article className="mb-12">
+    <article data-dump-id={dump.id} className="mb-12">
       {dump.title !== null && (
         <h3 className="mb-4 font-display text-xl tracking-display text-aura-text">{dump.title}</h3>
       )}
@@ -85,13 +85,30 @@ export function RiverView() {
 
   const scrollRef = useScrollMemory("river", state === "ready");
 
+  const dumpAuras: readonly DumpAura[] = useMemo(
+    () =>
+      feed.flatMap((month) =>
+        month.entries
+          .filter((e): e is Extract<FeedEntry, { kind: "dump" }> => e.kind === "dump")
+          .map((e) => ({ id: e.dump.id, backgroundColor: e.dump.backgroundColor })),
+      ),
+    [feed],
+  );
+
+  useRiverAura(scrollRef, dumpAuras);
+
   const retry = useCallback(() => {
     void refetchPhotos();
     void refetchDumps();
   }, [refetchPhotos, refetchDumps]);
 
   return (
-    <main ref={scrollRef} data-state={state} className="relative flex-1 overflow-y-auto bg-aura-bg">
+    <main
+      ref={scrollRef}
+      data-state={state}
+      data-aura-transition
+      className="relative flex-1 overflow-y-auto bg-aura-bg text-aura-text"
+    >
       <h1 className="sr-only">The River</h1>
 
       {state === "loading" && <QuietLoading />}
