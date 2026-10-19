@@ -57,15 +57,25 @@ function SinglePhoto({ photo }: { readonly photo: Photo }) {
 }
 
 export function RiverView() {
-  const photos = usePhotos();
-  const dumps = useDumps();
+  const {
+    data: photoData,
+    isPending: photosPending,
+    isError: photosError,
+    refetch: refetchPhotos,
+  } = usePhotos();
+  const {
+    data: dumpData,
+    isPending: dumpsPending,
+    isError: dumpsError,
+    refetch: refetchDumps,
+  } = useDumps();
 
-  const isPending = photos.isPending || dumps.isPending;
-  const isError = !isPending && (photos.isError || dumps.isError);
+  const isPending = photosPending || dumpsPending;
+  const isError = !isPending && (photosError || dumpsError);
 
   const feed = useMemo(
-    () => (photos.data && dumps.data ? buildFeed(photos.data, dumps.data) : []),
-    [photos.data, dumps.data],
+    () => (photoData && dumpData ? buildFeed(photoData, dumpData) : []),
+    [photoData, dumpData],
   );
 
   const isEmpty = !isPending && !isError && feed.length === 0;
@@ -73,9 +83,9 @@ export function RiverView() {
   const state: RiverState = isPending ? "loading" : isError ? "error" : isEmpty ? "empty" : "ready";
 
   const retry = useCallback(() => {
-    void photos.refetch();
-    void dumps.refetch();
-  }, [photos, dumps]);
+    void refetchPhotos();
+    void refetchDumps();
+  }, [refetchPhotos, refetchDumps]);
 
   return (
     <main data-state={state} className="relative flex-1 overflow-y-auto bg-aura-bg">
