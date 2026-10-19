@@ -1388,6 +1388,33 @@ structural (`{ photo: Photo | null }[]`), so `lib/` never imports a feature, and
 React or the network. 13 unit tests pin every sentence, the refusal order and both boundaries (six,
 80).
 
+## The publish wire and its optimistic write (E4-S5C)
+
+`createDump(body)` in `api/dumps.ts` posts the plan's `DumpCreate` as JSON and resolves with the stored
+`Dump`; `usePublishDump` is the mutation the "Save archive" action runs (E4-S5D). Its cache lifecycle
+is ADR-024 decision 4:
+
+1. `onMutate` cancels an in-flight dumps read — a response landing between the insert and the request
+   would overwrite the draft — snapshots `queryKeys.dumps`, and prepends the optimistic dump.
+2. The optimistic id is `optimistic-<first photo id>`, not a UUID: `crypto.randomUUID` exists only in a
+   secure context and the app is used over plain HTTP on a LAN, while a module counter would leak
+   between tests. Publishing curates the six photos, so the same first photo cannot head a second dump,
+   and the entry only lives while the mutation is in flight.
+3. `onError` restores the snapshot, or **removes the key entirely** when the cache held no list before
+   the publish. `onSuccess` replaces the optimistic entry with the server's dump — id, title, colour,
+   photos and `createdAt` — and **nothing is invalidated**: the response is canonical.
+4. `publishErrorSentence` maps a failure to one sentence: network and timeout share "The archive didn't
+   answer. Try again."; a 400 `validation-failure` switches on the archive's own fields (`photoIds`,
+   `backgroundColor`, `title`); anything else, including a field this client did not expect, falls
+   through to "The dump couldn't be saved. Try again."
+
+The publish takes no `AbortSignal` — unlike the upload, leaving the view must not throw away an answer
+that changes what the archive holds. The default 10 s deadline still bounds it.
+
+The dump feed (the River) does not exist yet; this slice prepares the cache entry it will read. The
+tests therefore read the cache through their own `QueryClient`: 8 tests at `api/dumps.test.tsx`, from
+the request's shape to the removal of a failed draft when there was nothing before it.
+
 ## Zero external requests — measured on the built bundle
 
 ```bash
