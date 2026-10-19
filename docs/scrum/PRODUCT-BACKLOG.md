@@ -550,9 +550,17 @@ opens on tap, feels tactile, and gets out of the way.
 | E5-S3 | Image loading performance (LQIP, no CLS) | p0 | 5 | 5 | Todo |
 | E5-S4 | Virtualisation decision & implementation | p1 | 3 | 5 | Todo |
 
-### E5-S1 — River feed & timeline markers · 8 pts · p0
+### E5-S1 — River feed & timeline markers · 8 pts · p0 · **pre-cut into S1A (2) + S1B (2) + S1C (2) + S1D (2)**
 
 *As the curator, I want to scroll my whole archive, so that I can relive it in order.*
+
+> Split before implementation: **S1A** is the feed's data layer — `GET /photos` + `GET /dumps` as queries
+> and **ADR-025** (the archive is read whole; the numbers that would revisit pagination belong to E5-S4);
+> **S1B** is the pure feed model — `buildFeed` groups month sections, dumps keep their six photos in
+> display order, singles are the photos no dump holds, the order is total and no key duplicates;
+> **S1C** is the view — month markers in display serif, dump sections, single photos, the quiet states;
+> **S1D** is scroll memory — returning restores the position, a fresh visit starts at the top
+> (DESIGN-SYSTEM §14 routes it to the River). Points unchanged.
 
 - [ ] Infinite vertical feed grouped by month, markers in display serif, generous negative space.
 - [ ] Pagination or cursor-based loading (decide with an ADR); no duplicate keys, stable ordering.

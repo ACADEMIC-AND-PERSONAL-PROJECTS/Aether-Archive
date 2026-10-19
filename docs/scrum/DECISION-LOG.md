@@ -34,6 +34,7 @@ Statuses: `Proposed` · `Accepted` · `Superseded by ADR-NNN` · `Rejected`.
 | [ADR-022](#adr-022--route-transitions-and-the-motion-vocabulary-css-keyframes-no-animation-library) | 2026-10-17 | Route transitions and the motion vocabulary: CSS keyframes, no animation library | Accepted |
 | [ADR-023](#adr-023--the-aura-picker-the-chosen-page-colour-is-kept-the-glass-flips-suggestions-merge-by-pixel-share) | 2026-10-17 | The aura picker: the chosen page colour is kept, the glass flips, suggestions merge by pixel share | Accepted |
 | [ADR-024](#adr-024--the-draft-survives-its-upload-the-workshop-keeps-the-six-it-stored-and-the-publish-reads-them-in-order) | 2026-10-18 | The draft survives its upload: the workshop keeps the six it stored, and the publish reads them in order | Accepted |
+| [ADR-025](#adr-025--the-feed-reads-the-archive-whole-two-queries-no-pagination-yet-and-the-numbers-that-would-revisit-it) | 2026-10-19 | The feed reads the archive whole: two queries, no pagination yet, and the numbers that would revisit it | Accepted |
 
 ---
 
@@ -1022,6 +1023,43 @@ publish ever runs, so no rollback ever needs to un-store a file. The e2e evidenc
 criterion names a mocked API); the narrative spec's one-shot multipart publish stays unimplemented
 (ADR-011 §1). Further divergence — publishing fewer than six photos, editing a published dump's title,
 a server idempotency key for retried uploads — needs a new ADR.
+
+## ADR-025 — The feed reads the archive whole: two queries, no pagination yet, and the numbers that would revisit it
+
+**Date**: 2026-10-19 · **Status**: Accepted
+
+**Context.** E5-S1 builds the River, the archive's chronological feed. `_docs/openapi.yml` publishes
+`GET /photos` (every photo, newest first) and `GET /dumps` (every dump with its six photos, newest
+first) with **no pagination parameters anywhere in the contract**. The story's criterion says
+"Pagination or cursor-based loading (decide with an ADR); no duplicate keys, stable ordering", and the
+wire payload is metadata only — ids, urls, categories, instants; image bytes are separate requests per
+`<img>`. The archive is single-user, local or on a LAN, so the number that matters is the JSON the two
+responses carry, not a CDN-shaped bandwidth bill.
+
+**Decision.**
+
+1. **The feed reads both collections whole, in two parallel queries** — `fetchPhotos`/`usePhotos` on
+   `["photos"]` and `fetchDumps`/`useDumps` on `["dumps"]` (E5-S1A; the keys are ADR-004's). No server
+   pagination and no cursor: the endpoints do not take one, and nothing measured needs one. Measured: a
+   mature archive — 300 photos and 60 dumps embedding their six photos each — is **114.1 kB of JSON
+   (8.1 kB gzipped)** for both responses together; the probe is committed at
+   `reports/probes/e5-s1a-feed-payload.mjs` and re-runs from the repository alone.
+2. **The queries carry no policy of their own.** The app-wide 30 s `staleTime` is the feed's rule as
+   written (`app/queryClient.ts`), and freshness both ways already flows through the cache: an upload
+   invalidates the `photos` prefix, and the publish lands its dump itself (ADR-024 §4).
+3. **"No duplicate keys, stable ordering" is the feed model's contract, not the wire's** (E5-S1B): a
+   total order over dated entries, with singles excluding the photos dumps hold. The queries return the
+   order as served and do not re-sort.
+4. **The threshold that would revisit this.** E5-S4 profiles a 300-item feed and records DOM nodes and
+   frame time; if windowing is needed, **cursor pagination and windowed rendering land together as one
+   backlog item** — windowing what has not been fetched is not something this client can decide alone.
+   Until then, a filter or a second consumer adds a segment to an existing key, never a new root.
+
+**Consequences.** The River renders from two cached lists and builds its whole model client-side; a
+cold load spends two requests of a few kB and no more. The client holds the archive's metadata in
+memory while the tab lives — acceptable for a single-user archive, and the same lifetime the query
+cache already had. The escape hatch is precise: server pagination is a contract change
+(`_docs/openapi.yml` is a frozen spec), and it supersedes this ADR rather than bending it.
 
 ---
 
