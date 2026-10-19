@@ -24,7 +24,7 @@
 | 3c | E4-S4C | The Aura picker UI, live preview, reset and session persistence | 2 | p0 | Done | #137 + #139 + #141 |
 | 4a | E4-S5A | The draft survives its upload — the tile keeps its stored photo | 1 | p0 | Done | #143 |
 | 4b | E4-S5B | The publish plan — six stored distinct photos, aura, optional title, pure | 1 | p0 | Done | #145 |
-| 4c | E4-S5C | The dump wire — `createDump`, optimistic insert, rollback | 1 | p0 | Todo | — |
+| 4c | E4-S5C | The dump wire — `createDump`, optimistic insert, rollback | 1 | p0 | Done | #147 |
 | 4d | E4-S5D | "Save archive" — the publish group, pending state, return, e2e | 2 | p0 | Todo | — |
 | 5 | E6-S2 | Required status checks on `main` and `develop` | 2 | p0 | Todo | — |
 
@@ -224,3 +224,20 @@ The order is deliberate:
   the count's position relative to stored/distinct was still unpinned (two reorder mutants green),
   closed by two count-failure cases. Seven mutants, each failing one test; positive control
   `>` → `>=` fails two. Row 4b flips to **Done** (`#145`).
+- 2026-10-19 — **E4-S5C merged (`4d9633e`, PR #147)** at APPROVE WITH NITS after two review rounds:
+  `createDump` posts the plan's body and `usePublishDump` owns the optimistic write — the draft
+  prepended under `optimistic-<first photo id>` (no `crypto.randomUUID` on plain-HTTP LAN origins),
+  the snapshot restored on failure or the query **reset** when there was none, and the server's dump
+  **prepended and filtered in exactly once** on success — id and any copy a read raced in — with
+  nothing invalidated and no `AbortSignal` (a landed write must reach the cache). Round 1 refused the
+  branch: probe A caught `onSuccess` dropping the dump on a mid-flight repopulation; the `photoIds`
+  sentence contradicted ADR-024 decision 5, so the whole error→sentence map **moves to S5D (#148)**,
+  whose scope names the draft-preserving wording; and the budget claim failed, its named cut (the
+  sentence map and its tests) taken. Round 2: APPROVE WITH NITS — probe A re-run passes at the tip,
+  ten mutants each fail the test that pins them (no insert 6 / no rollback 3 / no success write 3 /
+  random id 4 / `dump.id` filter 1 / old map-replace 1 / `removeQueries` 1 / empty-as-absent 1 / no
+  cancel 1 / added invalidate 1), the nits closed in the PR body (probes B/D/F recorded, the reader
+  test's scope stated exactly, the claim's arithmetic stated). Final size, re-measured at the tip
+  `c18b608`: **495 hand-written = 495 + 0** (production 109 / tests 364 / docs 22) — 95 over the
+  ~400 target, under the ~500 trigger, the atomic story claimed and judged as surviving in substance
+  (`createDump` alone would leave ~405). Row 4c flips to **Done** (`#147`); S5D (#148) follows.
