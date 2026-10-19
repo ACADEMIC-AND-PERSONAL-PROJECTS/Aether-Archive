@@ -143,4 +143,28 @@ describe("useScrollMemory — fresh visit", () => {
 
     expect(screen.getByTestId("scroller").scrollTop).toBe(0);
   });
+
+  it("should not restore when the saved position is 0", () => {
+    setScrollPosition("river", 0);
+
+    render(<Scroller viewKey="river" ready={true} />);
+
+    expect(screen.getByTestId("scroller").scrollTop).toBe(0);
+  });
+});
+
+describe("useScrollMemory — scroll during loading", () => {
+  it("should not overwrite a saved position while ready is false", () => {
+    setScrollPosition("river", 800);
+
+    const { unmount } = render(<Scroller viewKey="river" ready={false} />);
+    const el = screen.getByTestId("scroller");
+
+    Object.defineProperty(el, "scrollTop", { value: 0, writable: true, configurable: true });
+    el.dispatchEvent(new Event("scroll"));
+
+    unmount();
+
+    expect(getScrollPosition("river")).toBe(800);
+  });
 });

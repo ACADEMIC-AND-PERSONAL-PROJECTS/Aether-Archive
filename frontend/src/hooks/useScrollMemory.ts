@@ -13,19 +13,25 @@ import { useEffect, useRef } from "react";
 
 const positions = new Map<string, number>();
 
+/**
+ * @param key Must be stable for the lifetime of the component instance — changing it while mounted
+ *   does not re-trigger restoration.
+ */
 export function useScrollMemory<T extends HTMLElement = HTMLElement>(key: string, ready: boolean) {
   const ref = useRef<T>(null);
   const restored = useRef(false);
+  const readyRef = useRef(ready);
+  readyRef.current = ready;
 
   useEffect(() => {
     if (!ready || restored.current) return;
+    restored.current = true;
     const el = ref.current;
     if (!el) return;
     const saved = positions.get(key);
     if (saved !== undefined && saved > 0) {
       el.scrollTop = saved;
     }
-    restored.current = true;
   }, [key, ready]);
 
   useEffect(() => {
@@ -36,7 +42,7 @@ export function useScrollMemory<T extends HTMLElement = HTMLElement>(key: string
     function onScroll() {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
-        if (el) positions.set(key, el.scrollTop);
+        if (el && readyRef.current) positions.set(key, el.scrollTop);
       });
     }
     el.addEventListener("scroll", onScroll, { passive: true });
@@ -44,7 +50,7 @@ export function useScrollMemory<T extends HTMLElement = HTMLElement>(key: string
     return () => {
       cancelAnimationFrame(raf);
       el.removeEventListener("scroll", onScroll);
-      positions.set(key, el.scrollTop);
+      if (readyRef.current) positions.set(key, el.scrollTop);
     };
   }, [key]);
 
