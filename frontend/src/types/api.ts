@@ -49,7 +49,12 @@ export interface Dump {
 
 /** The request body of `POST /api/v1/dumps`: the `DumpCreate` schema. */
 export interface DumpCreate {
-  readonly title: string;
+  /**
+   * The dump's name after trimming, or `null` for an unnamed one. The schema lists the title as
+   * required; the archive also accepts an absent one, a superset of the bodies it describes
+   * (ADR-011 §2), and `null` is how an unnamed dump is carried on the wire.
+   */
+  readonly title: string | null;
   readonly backgroundColor: string;
   /** Exactly six distinct photo ids, in the order the dump should display them. */
   readonly photoIds: readonly string[];
