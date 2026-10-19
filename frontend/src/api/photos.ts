@@ -18,7 +18,7 @@ import type { Photo } from "../types/api";
  * `GET /api/v1/photos` — every photo in the archive, newest first.
  *
  * The list is returned **as served**: month grouping, entry ordering and the no-duplicate-keys
- * guarantee are the feed model's business (E5-S1B, `features/river/`), not the query's. The endpoint
+ * guarantee are the feed model's business (E5-S1B, `lib/feed/`), not the query's. The endpoint
  * takes no parameters (`_docs/openapi.yml`) — ADR-025 records why the feed reads the whole archive
  * rather than a page of it.
  */
