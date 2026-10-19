@@ -36,6 +36,7 @@ Statuses: `Proposed` · `Accepted` · `Superseded by ADR-NNN` · `Rejected`.
 | [ADR-024](#adr-024--the-draft-survives-its-upload-the-workshop-keeps-the-six-it-stored-and-the-publish-reads-them-in-order) | 2026-10-18 | The draft survives its upload: the workshop keeps the six it stored, and the publish reads them in order | Accepted |
 | [ADR-025](#adr-025--the-feed-reads-the-archive-whole-two-queries-no-pagination-yet-and-the-numbers-that-would-revisit-it) | 2026-10-19 | The feed reads the archive whole: two queries, no pagination yet, and the numbers that would revisit it | Accepted |
 | [ADR-026](#adr-026--no-derivative-images-yet-originals-with-lazy-loading-colour-placeholders-revisit-with-e5-s4) | 2026-10-19 | No derivative images yet: originals with lazy loading, colour placeholders, revisit with E5-S4 | Accepted |
+| [ADR-027](#adr-027--no-virtualisation-yet-300-item-dom-is-593-nodes-revisit-at-1-000-items) | 2026-10-19 | No virtualisation yet: 300-item DOM is 593 nodes, revisit at 1 000 items | Accepted |
 
 ---
 
@@ -1088,6 +1089,54 @@ directory, mapping and build step. Until that measurement lands, originals are t
 **Consequences.** No backend change; no new dependency; no storage duplication. `sizes` is set now so
 a future `srcset` addition is additive. The escape hatch: E5-S4's profile numbers, or a
 real-device pass (E6-S4) finding slow images, triggers a new ADR.
+
+---
+
+## ADR-027 — No virtualisation yet: 300-item DOM is 593 nodes, revisit at 1 000 items
+
+**Date**: 2026-10-19 · **Status**: Accepted
+
+**Context.** E5-S4 asks whether the River feed needs windowed/virtualised rendering. The archive is
+personal and local-only; the realistic ceiling is ~300 photos + ~50 dumps. The frontend rule
+(`frontend.md`) says "window/virtualise once a view exceeds ~200 nodes; measure before optimising."
+That ~200 refers to *simultaneously visible* interactive nodes; the River's nodes are inert `<img>`
+elements with `loading="lazy"` — only the viewport slice decodes.
+
+**Measurement.** A jsdom-based probe (`reports/probes/e5-s4-virtualisation-profile.test.tsx`)
+rendered the River with synthetic datasets:
+
+| Feed size | Total DOM nodes | img elements | Nodes per photo |
+|-----------|-----------------|-------------|-----------------|
+| 300 items (240 singles + 10 dumps) | 593 | 300 | ~2.0 |
+| 600 items (540 singles + 10 dumps) | 1,193 | 600 | ~2.0 |
+
+The structure is flat: each single photo is 2 nodes (`div` + `img`); each dump is ~9 nodes
+(`article` + optional `h3` + `div` + 6 `img`); each month section is 2 nodes (`section` + `h2`).
+The node-per-photo ratio is ~2.0 regardless of scale. jsdom render times (333 ms / 251 ms) are not
+real browser paint, but show linear scaling with no super-linear blowup.
+
+**Why not virtualise now.** (1) 593 nodes is well below the point where a real browser struggles —
+modern mobile Chrome handles 1–2k static nodes without jank when images are lazy-loaded. (2) The
+archive is local, so network latency is negligible; image decode is the bottleneck, and
+`loading="lazy"` + `decoding="async"` already defer it. (3) Adding `@tanstack/react-virtual` or
+`react-window` introduces a dependency, forces fixed row heights (dumps and singles differ), and
+breaks the natural scroll position the `useScrollMemory` hook relies on — cost with no measured
+benefit. (4) The LCP budget (< 1.5 s over LAN) is met by the current structure; E6-S4's real-device
+pass will confirm or challenge this.
+
+**Decision.** The River renders its full DOM. No virtualisation library is added.
+
+**Revisit threshold.** Virtualisation becomes the next story when *any* of:
+- The archive exceeds **1,000 photos** (est. ~2,000 DOM nodes), or
+- A real-device measurement (E6-S4 or later) shows frame drops during scroll at 300+ items, or
+- A new feature adds heavier per-item DOM (e.g., inline metadata, interactive controls).
+
+When that story opens, it supersedes this ADR and names its own library, row-height strategy, and
+scroll-restoration approach.
+
+**Consequences.** No new dependency; `useScrollMemory` continues to work with native scroll. The
+probe script is committed and re-runnable. The escape hatch is named above — three concrete triggers,
+not a vague "when it gets slow."
 
 ---
 
