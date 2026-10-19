@@ -1388,6 +1388,28 @@ structural (`{ photo: Photo | null }[]`), so `lib/` never imports a feature, and
 React or the network. 13 unit tests pin every sentence, the refusal order and both boundaries (six,
 80).
 
+## The publish wire and its optimistic write (E4-S5C)
+
+`createDump(body)` in `api/dumps.ts` posts the plan's `DumpCreate` as JSON and resolves with the stored
+`Dump`; `usePublishDump` is the mutation the "Save archive" action runs (E4-S5D). Its cache lifecycle
+is ADR-024 decision 4:
+
+1. `onMutate` cancels an in-flight dumps read — a late answer must not overwrite the draft — snapshots
+   `queryKeys.dumps`, and prepends the optimistic dump, whose id is `optimistic-<first photo id>`, not
+   a UUID: `crypto.randomUUID` needs a secure context, a module counter would leak between tests, and
+   the panel serializes publishes (E4-S5D). `onError` restores the snapshot, or **resets the query**
+   when the cache held no list before (the reader E5-S1 mounts is left able to fetch); `onSuccess`
+   prepends the server's dump, drops the optimistic entry and any copy a read raced in — exactly once —
+   and **nothing is invalidated**: the response is canonical.
+2. The publish takes no `AbortSignal` — leaving the view must not throw away an answer that changes what
+   the archive holds. The error→sentence vocabulary lands with the "Save archive" panel (E4-S5D), the
+   story that first shows a sentence; the hook exposes the `ApiError` and carries no wording itself.
+
+The dump feed (the River, E5-S1) does not exist yet; this slice prepares the cache entry it will read.
+The tests read the cache through their own `QueryClient`, or through a mounted `useQuery` standing in
+for E5-S1's feed: 8 tests at `api/dumps.test.tsx`, from the request's shape to the removal of a failed
+draft when there was nothing before it.
+
 ## Zero external requests — measured on the built bundle
 
 ```bash
