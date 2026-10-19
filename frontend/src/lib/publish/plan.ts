@@ -1,5 +1,4 @@
 import { orderedIds } from "../ordering/move";
-import { MAX_SELECTION } from "../upload/selection";
 
 import type { DumpCreate, Photo } from "../../types/api";
 
@@ -11,6 +10,10 @@ import type { DumpCreate, Photo } from "../../types/api";
  * it into a request body — or refuses it, in one sentence, before anything is sent. The checks mirror
  * the server's, in the order the draft can fail them: six tiles, every one stored, the six photos
  * distinct, an aura chosen (and a `#RRGGBB` one), and a title within 80 characters.
+ *
+ * Two server checks cannot be mirrored here: whether each photo exists, and whether it is already
+ * curated — both compare the request with the archive itself, which the client cannot know without a
+ * round trip. `POST /dumps` refuses them under the same `validation-failure` the wire maps (E4-S5C).
  *
  * ## The ids are the stored photos' ids
  *
@@ -27,8 +30,11 @@ import type { DumpCreate, Photo } from "../../types/api";
  * in `plan.test.ts` once per form — the split `lib/upload/selection.ts` uses for the pick.
  */
 
-/** The dump's size: six photos, the River's sections. `MAX_SELECTION` caps one pick at the same six. */
-export const DUMP_PHOTO_COUNT = MAX_SELECTION;
+/**
+ * The dump's size: six photos — the server's `ValidationConstraints.DUMP_PHOTO_COUNT`. The upload
+ * pick's `MAX_SELECTION` caps one pick at the same six; each module states its own contract.
+ */
+export const DUMP_PHOTO_COUNT = 6;
 
 /** What the plan reads from one tile: the archive photo it stored, or null while it has none. */
 export interface PublishCandidate {
@@ -106,9 +112,7 @@ export function planPublish(
 
   const trimmedTitle = title.trim();
   if (trimmedTitle.length > TITLE_MAX_LENGTH) {
-    return blocked(
-      `The title is ${trimmedTitle.length} characters — the limit is ${TITLE_MAX_LENGTH}.`,
-    );
+    return blocked(`The title is too long — the limit is ${TITLE_MAX_LENGTH}.`);
   }
 
   return {
