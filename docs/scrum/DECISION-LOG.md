@@ -34,6 +34,7 @@ Statuses: `Proposed` · `Accepted` · `Superseded by ADR-NNN` · `Rejected`.
 | [ADR-022](#adr-022--route-transitions-and-the-motion-vocabulary-css-keyframes-no-animation-library) | 2026-10-17 | Route transitions and the motion vocabulary: CSS keyframes, no animation library | Accepted |
 | [ADR-023](#adr-023--the-aura-picker-the-chosen-page-colour-is-kept-the-glass-flips-suggestions-merge-by-pixel-share) | 2026-10-17 | The aura picker: the chosen page colour is kept, the glass flips, suggestions merge by pixel share | Accepted |
 | [ADR-024](#adr-024--the-draft-survives-its-upload-the-workshop-keeps-the-six-it-stored-and-the-publish-reads-them-in-order) | 2026-10-18 | The draft survives its upload: the workshop keeps the six it stored, and the publish reads them in order | Accepted |
+| [ADR-025](#adr-025--the-feed-reads-the-archive-whole-two-queries-no-pagination-yet-and-the-numbers-that-would-revisit-it) | 2026-10-19 | The feed reads the archive whole: two queries, no pagination yet, and the numbers that would revisit it | Accepted |
 
 ---
 

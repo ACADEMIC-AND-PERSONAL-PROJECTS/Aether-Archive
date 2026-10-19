@@ -1405,10 +1405,10 @@ is ADR-024 decision 4:
    the archive holds. The error→sentence vocabulary now lives in `lib/publish/sentence.ts` (E4-S5D),
    the story that first shows a sentence; the hook exposes the `ApiError` and carries no wording itself.
 
-The dump feed (the River, E5-S1) does not exist yet; this slice prepares the cache entry it will read.
-The tests read the cache through their own `QueryClient`, or through a mounted `useQuery` standing in
-for E5-S1's feed: 8 tests at `api/dumps.test.tsx`, from the request's shape to the removal of a failed
-draft when there was nothing before it.
+The dump feed's view (the River, E5-S1C) does not exist yet; its data layer arrived with E5-S1A. The
+tests read the cache through their own `QueryClient`, or through the real reader `useDumps`: 12 tests at
+`api/dumps.test.tsx` (from the request's shape to the removal of a failed draft when there was nothing
+before it, plus the read's own pins) and 6 read pins at `api/photos.test.tsx`.
 
 ## The "Save archive" panel (E4-S5D)
 
