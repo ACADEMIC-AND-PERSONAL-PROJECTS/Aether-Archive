@@ -100,7 +100,7 @@ export function AuraPicker({ chosen, suggestions, onChoose, onReset }: AuraPicke
                   aria-label={`Use ${colour.hex}, ${percent}% mean share`}
                   title={`${percent}% mean share`}
                   onClick={() => apply(colour.hex)}
-                  className="flex h-11 w-11 items-center justify-center rounded-full aria-pressed:ring-2 aria-pressed:ring-aura-text focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/50"
+                  className="flex h-11 w-11 items-center justify-center rounded-full aria-pressed:ring-2 aria-pressed:ring-aura-text focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/70"
                 >
                   <span
                     aria-hidden="true"
@@ -131,7 +131,7 @@ export function AuraPicker({ chosen, suggestions, onChoose, onReset }: AuraPicke
           spellCheck={false}
           aria-invalid={message !== null ? true : undefined}
           aria-describedby={message !== null ? messageId : undefined}
-          className="min-h-11 w-28 rounded-[10px] bg-transparent px-3 text-sm text-aura-text [border:var(--aura-hairline)] placeholder:text-aura-muted focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-aura-text/50"
+          className="min-h-11 w-28 rounded-[10px] bg-transparent px-3 text-sm text-aura-text [border:var(--aura-hairline)] placeholder:text-aura-muted focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-aura-text/70"
         />
         {chosen !== null ? (
           <button type="button" onClick={handleReset} className={QUIET_ACTION}>

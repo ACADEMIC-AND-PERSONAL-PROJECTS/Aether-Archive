@@ -313,7 +313,7 @@ function SortableTile({
           data-testid="drag-activator"
           // `touch-action: manipulation` leaves vertical panning and pinch-zoom to the browser, so a
           // short swipe scrolls the grid instead of lifting the tile (measured in the Chromium probe).
-          className="absolute inset-0 touch-manipulation rounded-[14px] focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/50 [@media(pointer:fine)]:cursor-grab [@media(pointer:fine)]:active:cursor-grabbing"
+          className="absolute inset-0 touch-manipulation rounded-[14px] focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/70 [@media(pointer:fine)]:cursor-grab [@media(pointer:fine)]:active:cursor-grabbing"
         >
           <TileFace item={item} onPreviewError={onPreviewError} />
         </div>
@@ -323,7 +323,7 @@ function SortableTile({
           aria-label={removeLabel(item)}
           disabled={busy}
           onClick={() => onRemove(item.id)}
-          className="absolute top-1 right-1 z-10 flex h-11 w-11 cursor-pointer items-center justify-center rounded-full transition-colors duration-[var(--motion-duration-quick)] active:bg-aura-bg/20 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/50 disabled:cursor-default disabled:opacity-40"
+          className="absolute top-1 right-1 z-10 flex h-11 w-11 cursor-pointer items-center justify-center rounded-full transition-colors duration-[var(--motion-duration-quick)] active:bg-aura-bg/20 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/70 disabled:cursor-default disabled:opacity-40"
         >
           {/* The visible disc is the button's own scrim, not a second surface. */}
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-aura-bg/70 text-aura-text">

@@ -102,7 +102,7 @@ const SHEET_CLASS = `fixed inset-x-4 bottom-[calc(var(--safe-bottom)_+_1rem)] z-
  * change to the token moves this too.
  */
 const ENTRY_CLASS =
-  "flex min-h-14 w-full items-center rounded-xl px-5 text-lg text-aura-text transition-colors duration-[var(--motion-duration-quick)] active:bg-aura-text/6 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/50";
+  "flex min-h-14 w-full items-center rounded-xl px-5 text-lg text-aura-text transition-colors duration-[var(--motion-duration-quick)] active:bg-aura-text/6 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/70";
 
 export function GlassMenu({ onClose, returnFocusTo }: GlassMenuProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
