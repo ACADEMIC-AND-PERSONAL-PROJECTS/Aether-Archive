@@ -27,6 +27,8 @@ concurrency:
 
 jobs:
   backend:
+    # Required by branch protection (E6-S2): a rename here silently breaks the merge gate — see
+    # the "Branch & release policy" section of docs/scrum/SPRINT-PLAYBOOK.md before touching this.
     name: Backend — ./mvnw verify
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -60,6 +62,8 @@ jobs:
           overwrite: true
 
   frontend:
+    # Required by branch protection (E6-S2): a rename here silently breaks the merge gate — see
+    # the "Branch & release policy" section of docs/scrum/SPRINT-PLAYBOOK.md before touching this.
     name: Frontend — lint, format, typecheck, test, build
     runs-on: ubuntu-latest
     timeout-minutes: 10

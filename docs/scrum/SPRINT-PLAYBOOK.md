@@ -43,6 +43,14 @@ main     ← released code; protected; PR-only; tagged sprint-NN at each sprint 
 - Merge commits only — **no squash, no rebase, no force-push, no history rewriting**. History is append-only so nothing is ever lost.
 - The sprint release is a PR `develop` → `main`, merged at sprint close, then tagged `sprint-NN`.
 - After a release, `develop` continues from `main`; the next sprint's branches come from `develop`.
+- Both integration branches **require the CI jobs before merging** (E6-S2): the contexts
+  `Backend — ./mvnw verify` and `Frontend — lint, format, typecheck, test, build` are configured as
+  required status checks on `develop` and `main`. `strict` stays off — a branch need not carry
+  `develop`'s tip, its own head commit must pass the checks — and `enforce_admins` stays on: no
+  bypass, not even for the admin token. The gate is proven, not assumed: a deliberately failing
+  scratch PR (PR #152) read `mergeStateStatus: BLOCKED`, and `gh pr merge` exited 1 with "the base
+  branch policy prohibits the merge". Adjust the checks with a `PUT …/branches/<branch>/protection`
+  carrying the whole desired state — the endpoint replaces, it does not merge.
 
 ## Definition of Ready
 
@@ -55,6 +63,8 @@ A story is `Done` only when `DEFINITION-OF-DONE.md` is fully checked with eviden
 ## What the agent must never do
 
 - Commit or push directly to `main` or `develop` (enforced by `.claude/hooks/guard-commands.sh`).
+- Bypass the merge gate — `gh pr merge --admin`, disabling a required check, or weakening the branch
+  protection — to land a red or unchecked PR.
 - Rewrite published history (rebase, force-push, amend of a pushed commit, squash merge).
 - Mark a story done without verification evidence, or invent test results.
 - Delete the data directory, drop tables, or run destructive migrations without explicit user approval.
