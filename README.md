@@ -19,7 +19,7 @@ and record stays on your machine.
 
 ## Stack
 
-- **Frontend** — React + Vite + TypeScript, Tailwind CSS, Framer Motion, `@dnd-kit`, TanStack Query
+- **Frontend** — React + Vite + TypeScript, Tailwind CSS, `@dnd-kit`, TanStack Query
 - **Backend** — Java 21, Spring Boot 3, Maven, REST under `/api/v1`
 - **Database** — PostgreSQL 17, running locally as a Docker container (nothing leaves your machine)
 - **Storage** — local filesystem, images served by Spring at `/images/**`
@@ -59,6 +59,12 @@ cd ../frontend && npm install && npm run dev -- --host   # --host exposes it to 
 ```
 
 Then open `http://<your-LAN-IP>:5173` on your phone.
+
+> **Firewall note:** the Vite dev server binds all interfaces (`:5173`), and the Spring Boot backend
+> listens on `:8080`. If your machine runs a firewall, allow inbound TCP on both ports from your LAN
+> subnet (e.g. `192.168.0.0/24`). On Fedora/RHEL: `sudo firewall-cmd --add-port=5173/tcp --add-port=8080/tcp`.
+> On Ubuntu/Debian with `ufw`: `sudo ufw allow from 192.168.0.0/24 to any port 5173,8080 proto tcp`.
+> These rules expose the dev server to your local network only — never port-forward to the internet.
 
 The dev database keeps its data in the named volume `aether_pgdata`:
 `docker compose -f docker-compose.dev.yml down` stops it and keeps everything;
