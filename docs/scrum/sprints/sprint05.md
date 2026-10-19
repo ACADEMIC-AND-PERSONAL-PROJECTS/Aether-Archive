@@ -19,7 +19,7 @@
 | 1c | E5-S1C | The river view — markers in display serif, dump sections, quiet states | 2 | p0 | Done | #164 |
 | 1d | E5-S1D | Scroll memory — back restores, a fresh visit starts at the top | 2 | p0 | Done | #166 |
 | 2 | E5-S2 | Ambient background per dump — `--aura-bg` follows the section in view | 5 | p0 | Done | #168 |
-| 3 | E5-S3 | Image loading performance — LQIP, no CLS, the first-viewport budget | 5 | p0 | Todo | — |
+| 3 | E5-S3 | Image loading performance — LQIP, no CLS, the first-viewport budget | 5 | p0 | Done | #170 |
 | 4 | E6-S4 | Real-device verification pass (LAN) | 3 | p0 | Todo | — |
 | 5 | E5-S4 | Virtualisation decision & implementation — measure first, then decide | 3 | p1 | Todo | — |
 | 6 | E6-S3 | Accessibility audit (WCAG 2.2 AA) | 3 | p1 | Todo | — |
@@ -138,3 +138,13 @@
   guaranteed by `themeFromBackground`'s §2.2 validation. One nit (stale cache) accepted — unlikely in
   practice. Final size at tip `b32c20f`: **378 hand-written** (production 193 / tests 185) — under the
   ~400 budget. Frontend suite 493 → **504 tests** (+11). Row 2 flips to **Done** (`#168`).
+- 2026-10-19 — **E5-S3 merged (`5ae7171`, PR #170)** at APPROVE WITH NITS (one round): image loading
+  performance — explicit `sizes` on all River images (dump 2-col grid calc, singles container-width),
+  dump photos painted with `backgroundColor` as colour placeholder, single photos given `aspect-[3/4]`
+  for CLS prevention, broken images hidden on error (`display: none`). Three nits accepted: sizes
+  formula omits grid gap (no srcset yet, forward-prep only), no symmetric aspect-square test for dumps,
+  direct DOM mutation in hideOnError (pragmatic, avoids re-render). ADR-026: no derivative images yet —
+  originals with lazy loading and colour placeholders; revisit threshold is E5-S4. CLS number and LCP
+  measurement deferred to E6-S4 (real-device verification pass). Final size at tip `05ed548`:
+  **110 hand-written** (production 19 / tests 66 / docs 28) — well under the ~400 budget. Frontend
+  suite 504 → **508 tests** (+4). Row 3 flips to **Done** (`#170`).
