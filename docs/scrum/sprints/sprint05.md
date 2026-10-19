@@ -15,7 +15,7 @@
 | # | ID | Story | Points | Priority | Status | PR |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1a | E5-S1A | The feed's data layer — `GET /photos` + `GET /dumps` as queries, ADR-025 | 2 | p0 | Done | #160 |
-| 1b | E5-S1B | The feed model — `buildFeed`: months, dumps as sections, singles between | 2 | p0 | Todo | — |
+| 1b | E5-S1B | The feed model — `buildFeed`: months, dumps as sections, singles between | 2 | p0 | Done | #162 |
 | 1c | E5-S1C | The river view — markers in display serif, dump sections, quiet states | 2 | p0 | Todo | — |
 | 1d | E5-S1D | Scroll memory — back restores, a fresh visit starts at the top | 2 | p0 | Todo | — |
 | 2 | E5-S2 | Ambient background per dump — `--aura-bg` follows the section in view | 5 | p0 | Todo | — |
@@ -106,3 +106,9 @@
   (12 + 6), plus ADR-025's index row; round 2 (blocking, description-only): the PR body's size was not
   re-measured after the docs commit (386 → 395); R3 APPROVE. Frontend suite 450 → **460 tests** (+10).
   Row 1a flips to **Done** (`#160`).
+- 2026-10-19 — **E5-S1B merged (`f480b7d`, PR #162)** at APPROVE (two independent reviewer runs, both
+  APPROVE, no blocking findings): the pure feed model — `buildFeed` groups month sections, dumps keep
+  their six photos in display order, singles exclude dump-held photos, the order is total and stable
+  (`Date.parse` for fractional seconds, pinned by adversarial mutation). Final size at the tip
+  `2e4ad55`: **302 hand-written** (production 139 / tests 163) — under the ~400 budget, no claim.
+  Frontend suite 460 → **470 tests** (+10). Row 1b flips to **Done** (`#162`).
