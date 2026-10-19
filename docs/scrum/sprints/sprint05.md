@@ -14,7 +14,7 @@
 
 | # | ID | Story | Points | Priority | Status | PR |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1a | E5-S1A | The feed's data layer — `GET /photos` + `GET /dumps` as queries, ADR-025 | 2 | p0 | Todo | — |
+| 1a | E5-S1A | The feed's data layer — `GET /photos` + `GET /dumps` as queries, ADR-025 | 2 | p0 | Done | #160 |
 | 1b | E5-S1B | The feed model — `buildFeed`: months, dumps as sections, singles between | 2 | p0 | Todo | — |
 | 1c | E5-S1C | The river view — markers in display serif, dump sections, quiet states | 2 | p0 | Todo | — |
 | 1d | E5-S1D | Scroll memory — back restores, a fresh visit starts at the top | 2 | p0 | Todo | — |
@@ -92,3 +92,17 @@
   decided before the first line rather than at review (E4-S4/S5's precedent; the plan bullet's
   "re-cut at review" reading is superseded by this entry). Slices: the data layer + ADR-025 (1a), the
   pure feed model (1b), the view (1c), scroll memory (1d — DESIGN-SYSTEM §14 routes it to the River).
+- 2026-10-19 — **E5-S1A merged (`9d9c342`, PR #160)** at APPROVE after three review rounds: the feed's
+  data layer — `fetchPhotos`/`usePhotos` on `["photos"]` and `fetchDumps`/`useDumps` on `["dumps"]`,
+  with the app-wide policy and nothing on top, and the reader E4-S5C prepared (the `useQuery` stand-in
+  in `dumps.test.tsx` replaced by the real hook, so the publish's optimistic draft is now observed by
+  its actual consumer). **ADR-025**: the feed reads both collections whole, no pagination yet, and the
+  revisit threshold is E5-S4's profile (cursor pagination and windowed rendering would land together);
+  measured 114.1 kB of JSON (8.1 kB gzipped) for 300 photos + 60 dumps, probe committed at
+  `reports/probes/e5-s1a-feed-payload.mjs` — the sprint's first probe to ship its script (retro
+  commitment 3). Final size at the tip `689ac60`: **395 hand-written = 365 + 30** (production 67 /
+  tests 185 / docs 68 / probe 75) — under the ~400 budget, no claim. Round 1 (blocking): README's
+  E4-S5C passage still described the deleted stand-in and counted 8 tests — reworded and re-measured
+  (12 + 6), plus ADR-025's index row; round 2 (blocking, description-only): the PR body's size was not
+  re-measured after the docs commit (386 → 395); R3 APPROVE. Frontend suite 450 → **460 tests** (+10).
+  Row 1a flips to **Done** (`#160`).
