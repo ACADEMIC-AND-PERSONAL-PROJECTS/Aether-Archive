@@ -21,7 +21,10 @@ export function useScrollMemory<T extends HTMLElement = HTMLElement>(key: string
   const ref = useRef<T>(null);
   const restored = useRef(false);
   const readyRef = useRef(ready);
-  readyRef.current = ready;
+
+  useEffect(() => {
+    readyRef.current = ready;
+  });
 
   useEffect(() => {
     if (!ready || restored.current) return;
