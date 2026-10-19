@@ -1,10 +1,10 @@
-import { QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { PROBLEM_400, PROBLEM_500 } from "./__fixtures__/problems";
-import { ApiError, apiRequest } from "./client";
-import { createDump, usePublishDump } from "./dumps";
+import { ApiError } from "./client";
+import { createDump, fetchDumps, useDumps, usePublishDump } from "./dumps";
 import { queryKeys } from "./queryKeys";
 import { createQueryClient } from "../app/queryClient";
 
@@ -15,9 +15,10 @@ import type { ReactNode } from "react";
  * The publish wire and its optimistic write (E4-S5C), against a stubbed `fetch` and a real
  * `QueryClient`. ADR-024 decision 4 is a contract about the cache — a draft at the head before the
  * request, the server's dump in its place after it, the previous list back (or gone) when it fails,
- * exactly once even when a read raced the request. A `useQuery` on the same key stands in for the
- * reader E5-S1 will mount. Problem bodies are the measured fixtures; the six photos are built from
- * the ids the body names.
+ * exactly once even when a read raced the request. The reader E5-S1A mounts — `useDumps` — shares the
+ * same client, so the draft's effect on a mounted observer is observable; `fetchDumps` and `useDumps`
+ * are pinned in the last two describes. Problem bodies are the measured fixtures; the six photos are
+ * built from the ids the body names.
  */
 
 function photo(id: string): Photo {
@@ -87,17 +88,14 @@ function renderPublish(client = createQueryClient()) {
 }
 
 /**
- * The publish action next to the reader E5-S1 will mount — a `useQuery` on the same key — sharing one
- * client, so the draft's effect on a mounted observer is observable.
+ * The publish action next to its real reader — `useDumps` (E5-S1A) — sharing one client, so the
+ * draft's effect on a mounted observer is observable.
  */
 function renderWithReader(client = createQueryClient()) {
   const view = renderHook(
     () => ({
       publish: usePublishDump(),
-      read: useQuery({
-        queryKey: queryKeys.dumps,
-        queryFn: ({ signal }) => apiRequest<readonly Dump[]>("/dumps", { signal }),
-      }),
+      read: useDumps(),
     }),
     {
       wrapper: ({ children }: { children: ReactNode }) => (
@@ -294,11 +292,11 @@ describe("usePublishDump", () => {
       return read.promise;
     });
     const client = createQueryClient();
-    // The read E5-S1 will mount: a dumps GET that is still in flight when the publish starts.
+    // The real reader's load (E5-S1A): a dumps GET still in flight when the publish starts.
     void client
       .fetchQuery({
         queryKey: queryKeys.dumps,
-        queryFn: ({ signal }) => apiRequest<readonly Dump[]>("/dumps", { signal }),
+        queryFn: ({ signal }) => fetchDumps(signal),
       })
       .catch(() => undefined);
     const { result } = renderPublish(client);
@@ -360,5 +358,51 @@ describe("usePublishDump", () => {
       refetch.resolve(jsonResponse([OLDER]));
     });
     await waitFor(() => expect(result.current.read.data).toEqual([OLDER]));
+  });
+});
+
+describe("fetchDumps", () => {
+  it("should GET the whole list and return it in the order served", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse([STORED, OLDER]));
+
+    await expect(fetchDumps()).resolves.toEqual([STORED, OLDER]);
+
+    const [url, init] = fetchSpy.mock.calls[0] ?? [];
+    expect(url).toBe("/api/v1/dumps");
+    expect(init?.method).toBe("GET");
+  });
+
+  it("should reject a failing archive as the archive's own error", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(problemResponse(PROBLEM_500, 500));
+
+    const thrown = await fetchDumps().catch((error: unknown) => error);
+
+    expect(thrown).toBeInstanceOf(ApiError);
+    expect(thrown).toMatchObject({ kind: "http", status: 500, code: "internal-failure" });
+  });
+});
+
+describe("useDumps", () => {
+  it("should resolve with the whole list for the feed", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse([STORED, OLDER]));
+    const { result } = renderWithReader();
+
+    await waitFor(() => expect(result.current.read.isSuccess).toBe(true));
+    expect(result.current.read.data).toEqual([STORED, OLDER]);
+  });
+
+  it("should not re-read what was just read when the view moves and returns", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse([STORED]));
+    const client = createQueryClient();
+
+    const first = renderWithReader(client);
+    await waitFor(() => expect(first.result.current.read.isSuccess).toBe(true));
+    first.unmount();
+
+    const second = renderWithReader(client);
+    await waitFor(() => expect(second.result.current.read.isSuccess).toBe(true));
+
+    // One request for two mounts: the 30 s staleTime is the feed's rule (`app/queryClient.ts`).
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 });
