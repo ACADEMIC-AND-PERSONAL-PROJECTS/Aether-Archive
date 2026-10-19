@@ -1,0 +1,86 @@
+# Sprint 05 — The Time River scrolls and the background follows each dump's aura
+
+- **Dates**: 2026-10-19 → 2026-11-01 (UTC). The playbook row carried an indicative
+  2026-12-14 → 2026-12-25 window; as at Sprint 3's and 4's planning, a later row is re-planned at its
+  own planning. This sprint opens the day Sprint 4 was released (`sprint-04`, `125944b7`).
+- **Goal**: The Time River scrolls and the background follows each dump's aura.
+- **Capacity**: **27 points** committed — 6 stories, mid-band. E5-S1 is the sprint's only eight-pointer
+  (the feed and its data layer); E5-S4 is measurement-first by design and may legitimately end in a
+  recorded "not yet"; the two E6 stories audit and exercise the river in place — they are not a second
+  theme.
+- **Branch base**: `develop`
+
+## Sprint backlog
+
+| # | ID | Story | Points | Priority | Status | PR |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | E5-S1 | River feed & timeline markers — the feed, its data layer and the loading ADR | 8 | p0 | Todo | — |
+| 2 | E5-S2 | Ambient background per dump — `--aura-bg` follows the section in view | 5 | p0 | Todo | — |
+| 3 | E5-S3 | Image loading performance — LQIP, no CLS, the first-viewport budget | 5 | p0 | Todo | — |
+| 4 | E6-S4 | Real-device verification pass (LAN) | 3 | p0 | Todo | — |
+| 5 | E5-S4 | Virtualisation decision & implementation — measure first, then decide | 3 | p1 | Todo | — |
+| 6 | E6-S3 | Accessibility audit (WCAG 2.2 AA) | 3 | p1 | Todo | — |
+
+**Total: 27 points.** The order is deliberate:
+
+- **The feed first.** Everything else in the sprint stands on it: the aura flips per rendered section
+  (S2), the images only load once the feed exists to lay them out (S3), the device pass exercises four
+  real views (E6-S4), virtualisation needs a feed worth profiling (E5-S4), and the audit walks the app
+  the river has just completed (E6-S3).
+- **E5-S1 is a single row, and will likely be re-cut.** It is the sprint's eight-pointer; if its first
+  measure exceeds the ~500 hand-written trigger it is re-cut at review into slices — E4-S3's precedent,
+  never a defended exception.
+- **The backend is frozen again, with one named exception.** E5-S3 may need a derivative-image
+  directory; whoever creates derivatives names their own directory and adds its own mapping — it never
+  widens E1-S5's `images/` mapping — and the change is explicit in the story's PR.
+
+## Process commitments (from Sprint 4's retrospective — success criteria, not advice)
+
+1. **The branch is printed before the first edit.** Every editing session starts with
+   `git branch --show-current`; success is zero misrouted-commit re-cuts.
+2. **Closing a story includes the issue sweep.** Every record closes the story's issue (and its parent
+   at epic close) with a closing comment; success is a sprint-close completeness check that returns
+   zero stale Done issues.
+3. **A probe ships its script.** Probe-backed evidence commits the probe script beside its captures
+   (e.g. `reports/probes/`), re-runnable from the repository alone; success is the next probe-bearing
+   PR carrying its script.
+
+## Risks & assumptions
+
+- **The feed's data layer is entirely new.** Only the random-photo path exists today; E5-S1 adds the
+  `GET /photos` / `GET /dumps` fetchers and hooks through `api/queryKeys.ts` (ADR-004), and the
+  grouping is a pure, unit-tested function. The loading decision is an in-story ADR backed by numbers —
+  the API returns everything today, so a recorded "no pagination yet, revisit with virtualisation" is
+  a complete outcome, not a failure.
+- **E5-S2 must keep the contrast guarantee.** `--aura-bg` flips from the section in view with the
+  automatic lightness adjustment; the transition budget (≥ 600 ms, interruptible, no repaint storms
+  under fast scrolling) is measured, and the capture script ships with the evidence (commitment 3).
+- **E5-S3 decides about derivatives with a measurement.** Aspect ratios, `loading="lazy"`,
+  `decoding="async"` and `sizes` are cheap; the placeholder colour comes from `lib/color/`; CLS is
+  reported as a number at 390 px and first-viewport LCP over LAN (< 1.5 s) is reported in the PR
+  either way.
+- **E5-S4 may end "not yet".** The story's first commitment is the profile of a 300-item feed, recorded
+  in an ADR; windowing is implemented only if the numbers ask for it — otherwise the revisit threshold
+  is written down as a backlog item.
+- **E6-S3's screen-reader element has an environment limit.** There is no VoiceOver/TalkBack here; the
+  audit runs the axe gate on every view, the keyboard walkthrough, and the Chromium accessibility-tree
+  inspection, and names the residue — a real-device SR pass rides with E6-S4's owner session.
+- **E6-S4 needs the owner and their phone on the LAN.** The agent owns the setup first (host exposure,
+  firewall note, README, a checklist and a findings log); the pass itself is scheduled with the owner,
+  never claimed.
+- **Zero external requests stays the hard constraint.** The archive is local and LAN-only.
+
+## Out of scope (explicitly)
+
+- **The carried hardening and review items stay out by name** — #71 / E6-S13, #72 / E6-S14,
+  #79 / E6-S17, #73 / E6-S16, #103 / E6-S18, E6-S19, E6-S20, E6-S21, E6-S22, E6-S23. Pulling one in is
+  an explicit owner decision, never a silent over-commit.
+- **Sprint 6's delivery work stays out** — E6-S5…E6-S12 (security pass, runbook, backup, performance
+  budget, polish, container images, one-command stack, v1.0).
+- **Spec changes** — `_docs/` stays read-only; a divergence is an ADR plus explicit owner approval.
+
+## Notes / decisions during the sprint
+
+- 2026-10-19 — Sprint opened the day Sprint 4 was released (`sprint-04`, `125944b7`). Mid-band
+  capacity (27) with the feed first; the playbook's indicative window is superseded and the reason is
+  recorded above.

@@ -80,7 +80,7 @@ A story is `Done` only when `DEFINITION-OF-DONE.md` is fully checked with eviden
 | 2 | The React shell runs and the design system (colour extraction, typography, glass) is defined | 2026-10-16 → 2026-10-30 | Sprint 02 — Design System | **Released** (`sprint-02`) |
 | 3 | The signature entry experience exists: immersive splash, glass menu, first uploads | 2026-10-16 → 2026-10-17 | Sprint 03 — Splash & Workshop | **Released** (`sprint-03`) |
 | 4 | Dumps can be curated end to end (upload, order, colour, publish) with CI guarding merges | 2026-10-17 → 2026-10-31 | Sprint 04 — Workshop & CI | **Released** (`sprint-04`) |
-| 5 | The Time River scrolls and the background follows each dump's aura | 2026-12-14 → 2026-12-25 | Sprint 05 — Time River | Planned |
+| 5 | The Time River scrolls and the background follows each dump's aura | 2026-10-19 → 2026-11-01 | Sprint 05 — Time River | In progress |
 | 6 | The app is polished, containerized, documented and released as v1.0 | 2026-12-28 → 2027-01-08 | Sprint 06 — Hardening & v1.0 | Planned |
 
 ## Velocity log
