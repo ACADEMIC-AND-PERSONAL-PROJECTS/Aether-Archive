@@ -1,14 +1,18 @@
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useId, useRef, useState, type ChangeEvent } from "react";
+import { useNavigate } from "react-router";
 
 import { QUIET_ACTION } from "./actions";
 import { AuraPicker } from "./AuraPicker";
 import { SelectionGrid, type SelectionItem } from "./SelectionGrid";
 import { ApiError } from "../../api/client";
+import { usePublishDump } from "../../api/dumps";
 import { useUploadPhoto } from "../../api/photos";
 import { GlassPanel } from "../../components/GlassPanel";
 import { useAura } from "../../hooks/useAura";
 import { ENTER_FADE_BASE, LOADING_PULSE } from "../../lib/motion/tokens";
 import { moveItem } from "../../lib/ordering/move";
+import { DUMP_PHOTO_COUNT, planPublish } from "../../lib/publish/plan";
+import { publishErrorSentence } from "../../lib/publish/sentence";
 import { downscaleForUpload } from "../../lib/upload/downscale";
 import { isCurrentProgress } from "../../lib/upload/progress";
 import {
@@ -22,8 +26,8 @@ import { ACCEPT_ATTRIBUTE } from "../../lib/upload/validation";
 import type { UploadProgress } from "../../api/uploadPhoto";
 
 /**
- * `GET /curate` — the Curator's Workshop, multi-select and queue slice (E4-S2A2; the draft survives
- * its upload since E4-S5A).
+ * `GET /curate` — the Curator's Workshop: multi-select and the upload queue (E4-S2A2), the draft that
+ * survives its upload (E4-S5A), and the publish that saves it (E4-S5D).
  *
  * ## The screen
  *
@@ -91,13 +95,21 @@ import type { UploadProgress } from "../../api/uploadPhoto";
  *
  * `items` is the display order (E4-S3B): dragging a tile calls `moveItem` from `lib/ordering/move.ts`,
  * which returns a new array — or the same one for a no-op — and nothing else. The slot is the index,
- * and since E4-S5A each tile carries the archive's photo, so the publish payload this screen will one
- * day build is those six stored photos, in this order — `displayOrder` 0–5 is the index, and the order
- * is read at the publish, not at the upload, so a settled draft can still be rearranged. Reordering is
- * refused while a batch is uploading: the queue captured the array when it started, and moving a tile
- * mid-batch would leave the grid disagreeing with the requests already on the wire. The grid's own
- * header carries the sensors, the scroll rule and the keyboard path (E4-S3D): the tile is a real focus
- * stop once the sensor that listens for its keys exists.
+ * and since E4-S5A each tile carries the archive's photo, so the publish payload this screen builds is
+ * those six stored photos, in this order — the order is read at the publish, not at the upload, so a
+ * settled draft can still be rearranged. Reordering is refused while a batch is uploading or a publish
+ * is in flight: the queue captured the array and the publish has read it, so a move mid-flight would
+ * leave the wire disagreeing with the grid. The grid's own header carries the sensors, the scroll rule
+ * and the keyboard path (E4-S3D): the tile is a real focus stop once the sensor for its keys exists.
+ *
+ * ## The publish
+ *
+ * With the sixth tile the panel grows the story's second action — an optional title and "Save archive"
+ * (ADR-024 decision 2); `planPublish` decides whether the draft can leave, and a refusal is one
+ * sentence in the panel, never a disabled button. A ready plan runs `usePublishDump` (E4-S5C): the
+ * flight locks the draft ("Saving…" on the disabled button, the grid locked with it), success returns
+ * where the workshop was entered from (`navigate(-1)`), and a failure stays — the draft intact and one
+ * sentence about it (ADR-024 decision 5; the wording is `lib/publish/sentence.ts`).
  *
  * ## The files never outlive the screen
  *
@@ -135,6 +147,9 @@ export function WorkshopView() {
   const [uploading, setUploading] = useState(false);
   const [notice, setNotice] = useState("");
   const [progress, setProgress] = useState<UploadProgress>({ loaded: 0, total: 0 });
+  /** The publish's optional title, raw: the plan trims it and the server counts the trimmed value. */
+  const [title, setTitle] = useState("");
+  const titleId = useId();
 
   const controllerRef = useRef<AbortController | null>(null);
   /** Set by Cancel; the loop checks it before starting each file, and after a response wins the race. */
@@ -154,6 +169,11 @@ export function WorkshopView() {
   const mainRef = useRef<HTMLElement>(null);
 
   const upload = useUploadPhoto();
+  const publish = usePublishDump();
+  const navigate = useNavigate();
+  /** `publishing` is the mutation's own state; `busy` is one lock for both flights (decision 5). */
+  const publishing = publish.isPending;
+  const busy = uploading || publishing;
 
   /*
    * One phase, derived rather than stored: `uploading` wins, then a failed tile, then a non-empty grid,
@@ -268,10 +288,11 @@ export function WorkshopView() {
   /**
    * A drag's outcome, as one array move. The reducer returns the input array for a no-op, so a drag
    * that ends where it began does not re-render the grid. The guard repeats the grid's `busy`
-   * decision: the queue holds a snapshot of the order, and a move mid-batch must not change it.
+   * decision: the queue holds a snapshot of the order and a publish has already read the array, so a
+   * move mid-flight must not change it.
    */
   const moveSelection = (from: number, to: number): void => {
-    if (uploading) {
+    if (busy) {
       return;
     }
     setItems((previous) => {
@@ -284,7 +305,7 @@ export function WorkshopView() {
   };
 
   const removeItem = (id: string): void => {
-    if (uploading) {
+    if (busy) {
       return;
     }
     const item = items.find((candidate) => candidate.id === id);
@@ -458,6 +479,37 @@ export function WorkshopView() {
     controllerRef.current?.abort();
   };
 
+  /**
+   * The publish: the plan is pure (E4-S5B) and a refusal is one sentence in the panel; a ready plan
+   * goes through `usePublishDump` (E4-S5C), whose optimistic insert precedes the answer. Success
+   * returns where the workshop was entered from; a failure restores the cache (the hook) and shows one
+   * sentence, the draft exactly as it was (ADR-024 decision 5).
+   */
+  const saveArchive = (): void => {
+    if (busy) {
+      return;
+    }
+    const plan = planPublish(items, aura.chosen, title);
+    if (plan.status === "blocked") {
+      setNotice(plan.sentence);
+      return;
+    }
+    setNotice("");
+    void publish
+      .mutateAsync({ body: plan.body, photos: plan.photos })
+      .then(() => {
+        // A publish that landed while the curator was elsewhere must not pull them back.
+        if (aliveRef.current) {
+          navigate(-1);
+        }
+      })
+      .catch((error: unknown) => {
+        if (aliveRef.current) {
+          setNotice(publishErrorSentence(error));
+        }
+      });
+  };
+
   const percent =
     progress.total > 0 ? Math.min(100, Math.round((progress.loaded / progress.total) * 100)) : null;
 
@@ -467,9 +519,16 @@ export function WorkshopView() {
 
   const panelSentence = notice !== "" ? notice : selectionSentence(items.length);
   // The constant "Uploading." is the batch's announcement: the persistent region is the only thing
-  // announced while the queue runs, and a mid-batch failure is carried by the settled summary.
+  // announced while the queue runs, and a mid-batch failure is carried by the settled summary. The
+  // publish gets a constant for the same reason — "Saving…" is on a disabled button.
   const announcement =
-    phase === "uploading" ? "Uploading." : phase === "idle" ? notice : panelSentence;
+    phase === "uploading"
+      ? "Uploading."
+      : publishing
+        ? "Saving the dump."
+        : phase === "idle"
+          ? notice
+          : panelSentence;
 
   return (
     <>
@@ -511,7 +570,7 @@ export function WorkshopView() {
             <div className="relative z-10 flex flex-1 flex-col justify-center overflow-y-auto px-4 py-6">
               <SelectionGrid
                 items={items}
-                busy={uploading}
+                busy={busy}
                 onMove={moveSelection}
                 onRemove={removeItem}
                 onPreviewError={markPreviewBroken}
@@ -575,6 +634,7 @@ export function WorkshopView() {
                           multiple
                           accept={ACCEPT_ATTRIBUTE}
                           onChange={handlePick}
+                          disabled={publishing}
                           className="peer sr-only"
                         />
                         <span className={PICKER_LABEL_FOCUS}>Add photos</span>
@@ -586,6 +646,44 @@ export function WorkshopView() {
                       onChoose={aura.choose}
                       onReset={aura.reset}
                     />
+                    {items.length === DUMP_PHOTO_COUNT ? (
+                      // The publish group (ADR-024 decision 2): with the sixth tile the panel offers
+                      // the save; a click it cannot send is answered with one sentence.
+                      <section
+                        aria-label="Publish"
+                        className="flex flex-col gap-2 border-t border-aura-text/15 pt-3"
+                      >
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                          <label
+                            htmlFor={titleId}
+                            className="text-xs tracking-wide text-aura-muted uppercase"
+                          >
+                            Title
+                          </label>
+                          <input
+                            id={titleId}
+                            type="text"
+                            value={title}
+                            onChange={(event) => setTitle(event.target.value)}
+                            placeholder="Optional"
+                            autoComplete="off"
+                            disabled={publishing}
+                            className="min-h-11 min-w-40 flex-1 rounded-[10px] bg-transparent px-3 text-sm text-aura-text [border:var(--aura-hairline)] placeholder:text-aura-muted focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-aura-text/50 disabled:opacity-60"
+                          />
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={saveArchive}
+                            disabled={publishing}
+                            aria-busy={publishing}
+                            className={`${QUIET_ACTION} disabled:opacity-60`}
+                          >
+                            {publishing ? "Saving…" : "Save archive"}
+                          </button>
+                        </div>
+                      </section>
+                    ) : null}
                   </>
                 )}
               </GlassPanel>

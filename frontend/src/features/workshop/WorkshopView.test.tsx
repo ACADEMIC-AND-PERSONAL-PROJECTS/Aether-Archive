@@ -1,11 +1,16 @@
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { StrictMode } from "react";
+import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { WorkshopView } from "./WorkshopView";
 import { FakeXhr } from "../../api/__fixtures__/fakeXhr";
-import { PROBLEM_413_TOO_LARGE, PROBLEM_415_UNSUPPORTED } from "../../api/__fixtures__/problems";
+import {
+  PROBLEM_400,
+  PROBLEM_413_TOO_LARGE,
+  PROBLEM_415_UNSUPPORTED,
+} from "../../api/__fixtures__/problems";
 import { queryKeys } from "../../api/queryKeys";
 import { createQueryClient } from "../../app/queryClient";
 import { AURA_STORAGE_KEY } from "../../hooks/useAura";
@@ -16,7 +21,7 @@ import { ACCEPT_ATTRIBUTE, MAX_UPLOAD_BYTES } from "../../lib/upload/validation"
 import { runAxe, violationSummary } from "../../test/axe";
 
 import type { PaletteColor } from "../../lib/color/types";
-import type { Photo } from "../../types/api";
+import type { Dump, Photo } from "../../types/api";
 
 /**
  * The browser edge is not available in jsdom (no `createImageBitmap`, no canvas — ADR-018), so the
@@ -119,11 +124,23 @@ function suggestion(hex: string, weight: number): PaletteColor {
   return { hex, oklch: { l: 0.5, c: 0.05, h: 200 }, weight };
 }
 
-function renderWorkshop(): { client: QueryClient; unmount: () => void } {
+/**
+ * The workshop at `/curate`, behind a one-line `/river` — where a successful publish returns
+ * (`navigate(-1)`, E4-S5D); the tests that do not walk a return never see the stub.
+ */
+function renderWorkshop(initialEntries: readonly string[] = ["/curate"]): {
+  client: QueryClient;
+  unmount: () => void;
+} {
   const client = createQueryClient();
   const { unmount } = render(
     <QueryClientProvider client={client}>
-      <WorkshopView />
+      <MemoryRouter initialEntries={[...initialEntries]}>
+        <Routes>
+          <Route path="/river" element={<p>River stub</p>} />
+          <Route path="/curate" element={<WorkshopView />} />
+        </Routes>
+      </MemoryRouter>
     </QueryClientProvider>,
   );
   return { client, unmount };
@@ -1405,6 +1422,193 @@ describe("the queue", () => {
   });
 });
 
+/**
+ * The publish group (E4-S5D), jsdom-level throughout (ADR-024: the criterion names a mocked API): the
+ * real queue against `FakeXhr`, then the real `usePublishDump` against a `fetch` held open, so a test
+ * can read the cache between the click and the response.
+ */
+
+/** A fetch `Response` with a JSON body, the shape the archive writes for both outcomes. */
+function jsonResponse(status: number, payload: unknown): Response {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { "content-type": status < 400 ? "application/json" : "application/problem+json" },
+  });
+}
+
+/** The dumps POST, held open: the stub answers when the test says so; every other edge is shipped. */
+function stubPublishFetch(): {
+  calls: () => number;
+  lastBody: () => unknown;
+  respond: (status: number, payload: unknown) => Promise<void>;
+} {
+  let release: (response: Response) => void = () => {};
+  const gate = new Promise<Response>((done) => {
+    release = done;
+  });
+  let calls = 0;
+  let body: unknown = null;
+  const fetchSpy = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+    calls += 1;
+    body = typeof init?.body === "string" ? JSON.parse(init.body) : null;
+    return gate;
+  });
+  vi.stubGlobal("fetch", fetchSpy);
+  return {
+    calls: () => calls,
+    lastBody: () => body,
+    respond: async (status, payload) => {
+      await act(async () => {
+        release(jsonResponse(status, payload));
+        await Promise.resolve();
+      });
+    },
+  };
+}
+
+/** Six distinct stored photos, in grid order — a dump's six must be distinct. */
+function storedSix(): readonly Photo[] {
+  return ["a", "b", "c", "d", "e", "f"].map((name, index) => ({
+    ...UPLOADED,
+    id: `photo-${String(index)}-${name}`,
+    url: `/images/photo-${String(index)}-${name}.png`,
+  }));
+}
+
+/** Uploads the full six and settles them — the draft the publish needs. */
+async function uploadSixStored(): Promise<readonly Photo[]> {
+  const photos = storedSix();
+  pickFiles(screen.getByLabelText("Choose photos"), sixFiles());
+  fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+  for (let index = 0; index < photos.length; index += 1) {
+    const request = await requestAt(index);
+    await respond(request, 201, photos[index]);
+  }
+  await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "selected"));
+  return photos;
+}
+
+describe("the publish group", () => {
+  it("should offer the publish only while the draft holds six tiles", async () => {
+    renderWorkshop();
+    await uploadSixStored();
+
+    expect(screen.getByRole("button", { name: "Save archive" })).toBeVisible();
+    expect(screen.getByLabelText("Title")).toBeVisible();
+    // The group is part of the sweep: its label, field and button against the glass.
+    expect(violationSummary(await runAxe(document.body))).toEqual([]);
+
+    // Five tiles is not the dump's shape: the group leaves with the sixth tile.
+    fireEvent.click(screen.getByRole("button", { name: "Remove f.png" }));
+    expect(screen.queryByRole("button", { name: "Save archive" })).toBeNull();
+    expect(screen.queryByLabelText("Title")).toBeNull();
+  });
+
+  it("should answer a draft it cannot send in one sentence, opening no request", async () => {
+    renderWorkshop();
+    // Five stored and one refused: six tiles — the dump's shape — but a photo is still un-stored.
+    const photos = storedSix();
+    pickFiles(screen.getByLabelText("Choose photos"), sixFiles());
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+    for (let index = 0; index < photos.length; index += 1) {
+      const request = await requestAt(index);
+      if (index === 5) {
+        await respond(request, 413, PROBLEM_413_TOO_LARGE, "application/problem+json");
+      } else {
+        await respond(request, 201, photos[index]);
+      }
+    }
+    await waitFor(() => expect(screen.getByRole("main")).toHaveAttribute("data-state", "error"));
+
+    const dumps = stubPublishFetch();
+    fireEvent.click(screen.getByRole("button", { name: "Save archive" }));
+    const sentence = "1 photo isn't stored yet — upload it before saving.";
+    expect(screen.getByTestId("workshop-notice")).toHaveTextContent(sentence);
+    expect(screen.getByTestId("workshop-status")).toHaveTextContent(sentence);
+    expect(dumps.calls()).toBe(0);
+  });
+
+  it("should show the draft at the river's head before the archive answers, and return on success", async () => {
+    const { client } = renderWorkshop(["/river", "/curate"]);
+    const photos = await uploadSixStored();
+    fireEvent.change(screen.getByLabelText("Aura"), { target: { value: "#1f7a7a" } });
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Summer night" } });
+
+    const dumps = stubPublishFetch();
+    fireEvent.click(screen.getByRole("button", { name: "Save archive" }));
+
+    // In flight: the draft is locked and the button says so, and a second click opens nothing.
+    const saving = await screen.findByRole("button", { name: "Saving…" });
+    expect(saving).toBeDisabled();
+    expect(saving).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByLabelText("Title")).toBeDisabled();
+    expect(screen.getByLabelText("Add photos")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Remove a.png" })).toBeDisabled();
+    expect(screen.getByTestId("workshop-status")).toHaveTextContent("Saving the dump.");
+    await waitFor(() => expect(dumps.calls()).toBe(1));
+    fireEvent.click(saving);
+    expect(dumps.calls()).toBe(1);
+
+    // The optimistic insert is at the head before the answer — the grid's order, title and aura.
+    await waitFor(() => expect(client.getQueryData(queryKeys.dumps)).toHaveLength(1));
+    const optimistic = client.getQueryData<readonly Dump[]>(queryKeys.dumps);
+    expect(optimistic?.[0]?.id).toBe("optimistic-photo-0-a");
+    expect(optimistic?.[0]?.title).toBe("Summer night");
+    expect(optimistic?.[0]?.backgroundColor).toBe("#1f7a7a");
+    expect(optimistic?.[0]?.photos.map((photo) => photo.id)).toEqual(
+      photos.map((photo) => photo.id),
+    );
+    expect(dumps.lastBody()).toEqual({
+      title: "Summer night",
+      backgroundColor: "#1f7a7a",
+      photoIds: photos.map((photo) => photo.id),
+    });
+
+    // The server's dump replaces it exactly once (ADR-024 decision 5), and the view returns.
+    const answer: Dump = {
+      id: "3f4d2a9e-0c1b-4a7d-9e2f-6b8c0d1e2f3a",
+      title: "Summer night",
+      backgroundColor: "#1f7a7a",
+      photos,
+      createdAt: "2026-10-19T09:00:00Z",
+    };
+    await dumps.respond(201, answer);
+    expect(await screen.findByText("River stub")).toBeVisible();
+    expect(client.getQueryData<readonly Dump[]>(queryKeys.dumps)).toEqual([answer]);
+  });
+
+  it("should keep the draft and show one sentence when the archive refuses", async () => {
+    const { client } = renderWorkshop();
+    await uploadSixStored();
+    fireEvent.change(screen.getByLabelText("Aura"), { target: { value: "#1f7a7a" } });
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Summer night" } });
+
+    const dumps = stubPublishFetch();
+    fireEvent.click(screen.getByRole("button", { name: "Save archive" }));
+    await waitFor(() => expect(dumps.calls()).toBe(1));
+    await waitFor(() => expect(client.getQueryData(queryKeys.dumps)).toBeDefined());
+
+    await dumps.respond(400, PROBLEM_400);
+
+    // One sentence, and the draft-preserving one: a retry must never mean a re-upload (decision 5).
+    const sentence =
+      "The archive refused the photos — one may already be in a dump. Remove it and save again.";
+    await waitFor(() => expect(screen.getByTestId("workshop-notice")).toHaveTextContent(sentence));
+    expect(screen.getByTestId("workshop-status")).toHaveTextContent(sentence);
+
+    // The draft survives the refusal: six stored tiles, the typed title, the action ready again.
+    expect(selectedTiles()).toHaveLength(6);
+    expect(screen.getByLabelText("Title")).toHaveValue("Summer night");
+    expect(tileFor("a.png")).toHaveAttribute("data-state", "added");
+    expect(screen.getByRole("button", { name: "Remove a.png" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Save archive" })).toBeEnabled();
+    expect(screen.queryByText("River stub")).toBeNull();
+
+    // The optimistic entry is gone entirely — there was no list before the publish.
+    expect(client.getQueryData(queryKeys.dumps)).toBeUndefined();
+  });
+});
+
 describe("downscaling before upload", () => {
   it("should send the prepared File and report its size, not the original's", async () => {
     const original = fileOf(8192, "image/png", "big.png");
@@ -1480,7 +1684,11 @@ describe("StrictMode", () => {
     render(
       <StrictMode>
         <QueryClientProvider client={createQueryClient()}>
-          <WorkshopView />
+          <MemoryRouter initialEntries={["/curate"]}>
+            <Routes>
+              <Route path="/curate" element={<WorkshopView />} />
+            </Routes>
+          </MemoryRouter>
         </QueryClientProvider>
       </StrictMode>,
     );
@@ -1503,7 +1711,11 @@ describe("StrictMode", () => {
     render(
       <StrictMode>
         <QueryClientProvider client={createQueryClient()}>
-          <WorkshopView />
+          <MemoryRouter initialEntries={["/curate"]}>
+            <Routes>
+              <Route path="/curate" element={<WorkshopView />} />
+            </Routes>
+          </MemoryRouter>
         </QueryClientProvider>
       </StrictMode>,
     );
@@ -1535,7 +1747,11 @@ describe("StrictMode", () => {
     render(
       <StrictMode>
         <QueryClientProvider client={createQueryClient()}>
-          <WorkshopView />
+          <MemoryRouter initialEntries={["/curate"]}>
+            <Routes>
+              <Route path="/curate" element={<WorkshopView />} />
+            </Routes>
+          </MemoryRouter>
         </QueryClientProvider>
       </StrictMode>,
     );
