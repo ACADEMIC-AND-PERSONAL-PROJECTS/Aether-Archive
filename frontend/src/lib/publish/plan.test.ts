@@ -41,7 +41,7 @@ describe("a publishable draft", () => {
     const plan = ready(planPublish(draft(...SIX), "#1f7a7a", "Summer"));
 
     expect(plan.body.photoIds).toEqual(SIX);
-    expect(plan.body.photoIds).toHaveLength(DUMP_PHOTO_COUNT);
+    expect(DUMP_PHOTO_COUNT).toBe(6);
     expect(plan.body.backgroundColor).toBe("#1f7a7a");
     expect(plan.body.title).toBe("Summer");
     expect(plan.photos.map((stored) => stored.id)).toEqual(SIX);
@@ -58,6 +58,8 @@ describe("a publishable draft", () => {
   it("should read a blank or whitespace title as null", () => {
     expect(ready(planPublish(draft(...SIX), "#1f7a7a", "")).body.title).toBeNull();
     expect(ready(planPublish(draft(...SIX), "#1f7a7a", " \n\t ")).body.title).toBeNull();
+    // `.trim()` removes U+00A0 too; a pasted no-break space is still a blank title.
+    expect(ready(planPublish(draft(...SIX), "#1f7a7a", "\u00A0")).body.title).toBeNull();
   });
 
   it("should trim the title it sends", () => {
@@ -72,6 +74,19 @@ describe("a publishable draft", () => {
     const plan = ready(planPublish(draft(...SIX), "#1f7a7a", `${title}   `));
 
     expect(plan.body.title).toBe(title);
+  });
+
+  it("should count UTF-16 units, as the server's @Size does", () => {
+    // A surrogate pair is two units in both JS `.length` and Java's `String.length()`; 40 emoji fit
+    // exactly under the limit, 41 do not. A code-point count would let one through the client and
+    // have the server refuse it.
+    expect(ready(planPublish(draft(...SIX), "#1f7a7a", "🙂".repeat(40))).body.title).toBe(
+      "🙂".repeat(40),
+    );
+    expect(planPublish(draft(...SIX), "#1f7a7a", "🙂".repeat(41))).toEqual({
+      status: "blocked",
+      sentence: "The title is too long — the limit is 80.",
+    });
   });
 
   it("should pass an uppercase hex through as typed", () => {
@@ -124,7 +139,16 @@ describe("refusals", () => {
   });
 
   it("should refuse before an aura is chosen or while it isn't a #RRGGBB triple", () => {
-    for (const aura of [null, "", "1f7a7a", "#1f7a", "#12345g", "#1234567", " #1f7a7a "]) {
+    for (const aura of [
+      null,
+      "",
+      "1f7a7a",
+      "#1f7a",
+      "#12345g",
+      "#1234567",
+      " #1f7a7a ",
+      "#1f7a7a\n",
+    ]) {
       expect(planPublish(draft(...SIX), aura, "")).toEqual({
         status: "blocked",
         sentence: "Choose an aura before saving.",
@@ -132,12 +156,12 @@ describe("refusals", () => {
     }
   });
 
-  it("should refuse a title over 80 characters, naming its trimmed length", () => {
+  it("should refuse a title over 80 characters", () => {
     const plan = planPublish(draft(...SIX), "#1f7a7a", `  ${"t".repeat(81)}  `);
 
     expect(plan).toEqual({
       status: "blocked",
-      sentence: "The title is 81 characters — the limit is 80.",
+      sentence: "The title is too long — the limit is 80.",
     });
   });
 
@@ -151,6 +175,28 @@ describe("refusals", () => {
     expect(planPublish(draft(...SIX.slice(0, 5), null), null, "")).toEqual({
       status: "blocked",
       sentence: "1 photo isn't stored yet — upload it before saving.",
+    });
+    // One un-stored photo AND a duplicate: the un-stored photo comes before distinctness.
+    expect(
+      planPublish(
+        draft("photo-a", "photo-a", "photo-c", "photo-d", "photo-e", null),
+        "#1f7a7a",
+        "",
+      ),
+    ).toEqual({
+      status: "blocked",
+      sentence: "1 photo isn't stored yet — upload it before saving.",
+    });
+    // A duplicate AND no aura: distinctness comes before the colour.
+    expect(
+      planPublish(
+        draft("photo-a", "photo-b", "photo-c", "photo-d", "photo-e", "photo-a"),
+        null,
+        "",
+      ),
+    ).toEqual({
+      status: "blocked",
+      sentence: "The draft repeats a photo — remove the duplicate before saving.",
     });
     // Six stored, no aura, an over-long title: the colour comes before the title.
     expect(planPublish(draft(...SIX), null, "t".repeat(81))).toEqual({
