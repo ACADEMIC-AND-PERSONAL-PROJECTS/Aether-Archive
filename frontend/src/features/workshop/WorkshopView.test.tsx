@@ -465,6 +465,28 @@ describe("the picker", () => {
 });
 
 describe("the grid", () => {
+  it("should keep the selected-photo workspace responsive with every edit action present", () => {
+    renderWorkshop();
+
+    pickFiles(screen.getByLabelText("Choose photos"), sixFiles());
+
+    const main = screen.getByRole("main");
+    expect(main).toHaveClass("overflow-y-auto", "lg:overflow-hidden");
+
+    const list = screen.getByRole("list", { name: "Selected photos" });
+    const workspace = list.closest<HTMLElement>('[class*="lg:grid-cols-"]');
+    expect(workspace).not.toBeNull();
+    expect(workspace).toHaveClass(
+      "grid-cols-1",
+      "lg:grid-cols-[minmax(0,1fr)_minmax(21rem,27rem)]",
+    );
+    expect(list.querySelectorAll(":scope > li")).toHaveLength(6);
+    expect(screen.getByRole("button", { name: "Upload" })).toBeVisible();
+    expect(screen.getByLabelText("Aura")).toBeVisible();
+    expect(screen.getByLabelText("Title")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Save archive" })).toBeVisible();
+  });
+
   it("should list every file with a named remove button, and removing releases its preview", () => {
     const revoke = vi.spyOn(URL, "revokeObjectURL");
     renderWorkshop();

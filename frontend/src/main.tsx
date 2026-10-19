@@ -4,8 +4,8 @@ import { BrowserRouter } from "react-router";
 
 import { App } from "./app/App";
 import { AppProviders } from "./app/AppProviders";
-import "@fontsource/playfair-display/latin-400.css";
-import "@fontsource/playfair-display/latin-500.css";
+import "@fontsource/cormorant-garamond/latin-400.css";
+import "@fontsource/cormorant-garamond/latin-500.css";
 import "./styles/global.css";
 
 const container = document.getElementById("root");

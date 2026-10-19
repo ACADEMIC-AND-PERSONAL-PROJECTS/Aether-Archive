@@ -3,7 +3,7 @@
  *
  * Five blocks, in order:
  *   1. Scan scope     — Tailwind's build inputs, declared, never discovered (ADR-017).
- *   2. Faces          — the two families, self-hosted, never a CDN (ADR-005, ADR-019).
+ *   2. Faces          — the two families, self-hosted, never a CDN (ADR-005, ADR-028).
  *   3. Theme          — what Tailwind knows: colour namespace, type scale, the two families.
  *   4. Runtime tokens — what CSS and JS read: the fallback palette, safe areas, spacing, motion.
  *   5. Base           — dark page, full height, scrollbars, overscroll, reduced motion.
@@ -34,20 +34,19 @@
  * The two faces, both from Fontsource packages, both self-hosted by Vite: no `<link>`, no
  * CDN, no request to anyone but the app itself (ADR-005).
  *
- * Playfair Display arrives as its packaged latin subsets, imported from `main.tsx` (§4.2):
+ * Cormorant Garamond arrives as its packaged latin subsets, imported from `main.tsx` (§4.2):
  * `latin-400.css` + `latin-500.css` — the only display weights the rules allow (§4.4) — and
- * the latin subset is the only one the app can render. Inter Variable has no per-subset
- * entrypoint (every `wght*.css` ships all seven subsets: 218.5 kB of woff2, measured in
- * E2-S5), so its latin woff2 is declared here instead — one 48.3 kB file carrying the whole
- * 100–900 weight axis. Added payload, measured: 148.2 kB in total, inside the < 200 KB
- * budget; the all-static alternative weighed 209.8 kB (ADR-019).
+ * the latin subset is the only one the app can render. Manrope Variable's `wght.css` bundles
+ * six unicode subsets, so its latin woff2 is declared here instead — one 24.8 kB file carrying
+ * the whole 200–800 weight axis. The production build measures the complete emitted font payload.
  */
 @font-face {
-  font-family: "Inter Variable";
+  font-family: "Manrope Variable";
   font-style: normal;
-  font-weight: 100 900;
+  font-weight: 200 800;
   font-display: swap;
-  src: url("@fontsource-variable/inter/files/inter-latin-wght-normal.woff2") format("woff2");
+  src: url("@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2")
+    format("woff2-variations");
 }
 
 /* ------------------------------------------------------------------- 3. Theme --- */
@@ -82,7 +81,7 @@
  * components read it as `var(--aura-hairline)` (DESIGN-SYSTEM §2.2). */
 
 /*
- * The two faces (ADR-019), declared in the theme layer so the utilities compile from the same
+ * The two faces (ADR-028), declared in the theme layer so the utilities compile from the same
  * source the variables do (DESIGN-SYSTEM §4.3). Static values: unlike the palette they are
  * never rewritten at runtime, and `static` makes their emission unconditional by construction.
  * With the pinned Tailwind and today's rules the output is byte-identical without the keyword
@@ -90,8 +89,8 @@
  * `font-display` today; `font-ui` backs the body default in block 5.
  */
 @theme static {
-  --font-display: "Playfair Display", Georgia, "Times New Roman", serif;
-  --font-ui: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  --font-ui: "Manrope Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 /*
@@ -232,8 +231,8 @@
  * without dvh.
  */
 html {
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
   background-color: var(--aura-bg);
   overscroll-behavior: none;
 }
@@ -249,9 +248,11 @@ html {
 body {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
   padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+  overflow: hidden;
   overflow-wrap: break-word;
   font-family: var(--font-ui);
   letter-spacing: var(--tracking-ui);
@@ -263,6 +264,7 @@ body {
   display: flex;
   flex: 1;
   flex-direction: column;
+  min-height: 0;
 }
 
 /* No visible scrollbars, on any scroller (§6). Scrolling itself is untouched. */
@@ -272,6 +274,16 @@ body {
 
 *::-webkit-scrollbar {
   display: none;
+}
+
+/*
+ * The menu earns its extra depth because it is the one control surface floating over the splash
+ * photograph. It keeps the shared glass tint, blur and hairline; the wider radius and single soft
+ * shadow only distinguish its modal role without creating a second material.
+ */
+.glass-menu {
+  border-radius: 28px;
+  box-shadow: 0 18px 48px color-mix(in srgb, var(--aura-bg) 42%, transparent);
 }
 
 /*

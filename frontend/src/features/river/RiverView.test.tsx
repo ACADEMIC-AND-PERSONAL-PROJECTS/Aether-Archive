@@ -1,10 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, Route, Routes, useNavigate } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RiverView } from "./RiverView";
 import { createQueryClient } from "../../app/queryClient";
+import globalStyles from "../../styles/global.css?raw";
 import { runAxe, violationSummary } from "../../test/axe";
 
 import type { Dump, Photo } from "../../types/api";
@@ -187,6 +188,89 @@ describe("RiverView — quiet states", () => {
 });
 
 describe("RiverView — feed rendering", () => {
+  it("should keep the River inside a definite viewport scroller", async () => {
+    stubApi(
+      () => jsonResponse([PHOTO_A, ...DUMP_PHOTOS]),
+      () => jsonResponse([DUMP_TITLED]),
+    );
+
+    renderRiver();
+
+    await waitFor(() => expect(mainEl()).toHaveAttribute("data-state", "ready"));
+
+    expect(mainEl()).toHaveClass("min-h-0", "overflow-y-auto");
+    expect(globalStyles).toMatch(/html\s*{[^}]*height:\s*100vh;[^}]*height:\s*100dvh;/s);
+    expect(globalStyles).toMatch(
+      /body\s*{[^}]*height:\s*100vh;[^}]*height:\s*100dvh;[^}]*overflow:\s*hidden;/s,
+    );
+    expect(globalStyles).toMatch(/#root\s*{[^}]*min-height:\s*0;/s);
+  });
+
+  it("should restore the River scroll position after navigating away and back", async () => {
+    stubApi(
+      () => jsonResponse([PHOTO_A, ...DUMP_PHOTOS]),
+      () => jsonResponse([DUMP_TITLED]),
+    );
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      callback(0);
+      return 0;
+    });
+
+    function RiverHistory() {
+      const navigate = useNavigate();
+      return (
+        <>
+          <button type="button" onClick={() => navigate("/away")}>
+            Leave River
+          </button>
+          <Routes>
+            <Route path="/river" element={<RiverView />} />
+            <Route
+              path="/away"
+              element={
+                <button type="button" onClick={() => navigate(-1)}>
+                  Back to River
+                </button>
+              }
+            />
+          </Routes>
+        </>
+      );
+    }
+
+    render(
+      <QueryClientProvider client={noRetryClient()}>
+        <MemoryRouter initialEntries={["/river"]}>
+          <RiverHistory />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(mainEl()).toHaveAttribute("data-state", "ready"));
+
+    const originalRiver = mainEl();
+    let attachedScrollTop = 0;
+    Object.defineProperty(originalRiver, "scrollTop", {
+      configurable: true,
+      get: () => (originalRiver.isConnected ? attachedScrollTop : 0),
+      set: (position: number) => {
+        attachedScrollTop = position;
+      },
+    });
+    originalRiver.scrollTop = 640;
+    fireEvent.scroll(originalRiver);
+
+    fireEvent.click(screen.getByRole("button", { name: "Leave River" }));
+    await screen.findByRole("button", { name: "Back to River" });
+    expect(originalRiver.isConnected).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Back to River" }));
+    await waitFor(() => expect(mainEl()).toHaveAttribute("data-state", "ready"));
+
+    expect(mainEl()).not.toBe(originalRiver);
+    expect(mainEl().scrollTop).toBe(640);
+  });
+
   it("should render month markers in display serif", async () => {
     stubApi(
       () => jsonResponse([PHOTO_A, PHOTO_C, ...DUMP_PHOTOS]),

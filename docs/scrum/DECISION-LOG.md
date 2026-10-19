@@ -37,6 +37,7 @@ Statuses: `Proposed` · `Accepted` · `Superseded by ADR-NNN` · `Rejected`.
 | [ADR-025](#adr-025--the-feed-reads-the-archive-whole-two-queries-no-pagination-yet-and-the-numbers-that-would-revisit-it) | 2026-10-19 | The feed reads the archive whole: two queries, no pagination yet, and the numbers that would revisit it | Accepted |
 | [ADR-026](#adr-026--no-derivative-images-yet-originals-with-lazy-loading-colour-placeholders-revisit-with-e5-s4) | 2026-10-19 | No derivative images yet: originals with lazy loading, colour placeholders, revisit with E5-S4 | Accepted |
 | [ADR-027](#adr-027--no-virtualisation-yet-300-item-dom-is-593-nodes-revisit-at-1-000-items) | 2026-10-19 | No virtualisation yet: 300-item DOM is 593 nodes, revisit at 1 000 items | Accepted |
+| [ADR-028](#adr-028--editorial-redesign-image-first-responsive-layouts-and-cormorant-garamond--manrope) | 2026-10-19 | Editorial redesign: image-first responsive layouts and Cormorant Garamond + Manrope | Accepted |
 
 ---
 
@@ -1137,6 +1138,54 @@ scroll-restoration approach.
 **Consequences.** No new dependency; `useScrollMemory` continues to work with native scroll. The
 probe script is committed and re-runnable. The escape hatch is named above — three concrete triggers,
 not a vague "when it gets slow."
+
+---
+
+## ADR-028 — Editorial redesign: image-first responsive layouts and Cormorant Garamond + Manrope
+
+**Date**: 2026-10-19 · **Status**: Accepted
+
+**Context.** The canonical product specification calls for a moody, high-end editorial photo sanctuary
+with glassmorphism, an immersive zero-chrome splash, a chronological river and a photo-ordering
+workshop. It does not specify desktop composition. The delivered views technically follow the mobile
+flows, but their typography, composition and desktop use of space do not deliver that high-end intent.
+The redesign must not turn the archive into a conventional dashboard or break its mobile-first
+interaction.
+
+**Decision.**
+
+1. The art direction is **cinematic editorial luxury**, not generic "glass everywhere": rich,
+   photo-derived atmosphere; expressive display typography; intentional negative space; and carefully
+   composed images. Glass remains the shared material for controls and navigation over imagery, where
+   translucency has a real backdrop and does not compete with photos.
+2. The splash remains full-bleed and free of visible navigation chrome until the curator taps. The
+   River and Workshop adapt their composition to available width rather than stretching a phone layout;
+   the River remains a bounded scroll surface. There is no persistent header, footer or navbar.
+3. Replace the E2 baseline pair with **Cormorant Garamond** for display and **Manrope Variable** for UI.
+   Both ship as local Fontsource NPM assets with latin subsets only; no external font request is
+   permitted. Cormorant's fine editorial contrast gives titles more character, while Manrope remains
+   legible at compact mobile control sizes. Font payload is measured from the production build against
+   the existing ~200 KB budget.
+4. Responsive implementation uses fluid bounds and content-aware CSS Grid rather than fixed phone
+   widths. It must be evaluated at 390 px and 1440 px, preserve ≥44 px touch targets and keyboard paths,
+   and honor `prefers-reduced-motion`.
+5. The visual refresh does not alter `_docs/`, API payloads, file storage, or the archive's local-only
+   boundary. It uses the existing palette/theme generator and glass primitive; it adds no runtime
+   network requests.
+
+**Research.** Apple HIG's [Layout](https://developer.apple.com/design/human-interface-guidelines/layout)
+guidance informed adapting hierarchy to display sizes rather than scaling one layout. MDN's
+[`backdrop-filter`](https://developer.mozilla.org/en-US/docs/Web/CSS/backdrop-filter) documentation
+informed keeping translucent glass over actual background pixels. web.dev's
+[min(), max(), clamp()](https://web.dev/articles/min-max-clamp) informed fluid sizing with readable
+width limits. Photography portfolio references from
+[Site Builder Report](https://www.sitebuilderreport.com/inspiration/photography-portfolios) reinforced
+image hierarchy and breathing room; no layouts or assets were copied.
+
+**Consequences.** The former Playfair Display + Inter Variable choice (ADR-019) is superseded for
+product UI. The rendering contract, zero-external-request rule, local-font discipline, colour contrast
+guarantees and motion vocabulary remain. The production build emits five font files totaling
+**133,376 bytes (133.4 kB decimal)**, within the ~200 KB budget.
 
 ---
 

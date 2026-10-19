@@ -21,8 +21,9 @@ import type { Dump, Photo } from "../../types/api";
 
 type RiverState = "loading" | "empty" | "error" | "ready";
 
-const DUMP_IMG_SIZES = "calc((min(32rem, 100vw) - 2rem) / 2)";
-const SINGLE_IMG_SIZES = "min(32rem, calc(100vw - 2rem))";
+const DUMP_IMG_SIZES =
+  "(min-width: 64rem) min(22rem, calc((100vw - 25rem) / 3)), calc((100vw - 2.5rem) / 2)";
+const SINGLE_IMG_SIZES = "(min-width: 64rem) min(42rem, calc(100vw - 25rem)), calc(100vw - 2.5rem)";
 
 function hideOnError(e: SyntheticEvent<HTMLImageElement>): void {
   const img = e.currentTarget;
@@ -31,11 +32,13 @@ function hideOnError(e: SyntheticEvent<HTMLImageElement>): void {
 
 function DumpSection({ dump }: { readonly dump: Dump }) {
   return (
-    <article data-dump-id={dump.id} className="mb-12">
+    <article data-dump-id={dump.id} className="mb-14">
       {dump.title !== null && (
-        <h3 className="mb-4 font-display text-xl tracking-display text-aura-text">{dump.title}</h3>
+        <h3 className="mb-4 font-display text-xl tracking-display text-aura-text sm:text-2xl">
+          {dump.title}
+        </h3>
       )}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3">
         {dump.photos.map((photo) => (
           <img
             key={photo.id}
@@ -45,7 +48,7 @@ function DumpSection({ dump }: { readonly dump: Dump }) {
             decoding="async"
             sizes={DUMP_IMG_SIZES}
             onError={hideOnError}
-            className="aspect-square w-full rounded-lg object-cover"
+            className="aspect-square w-full rounded-xl object-cover"
             style={{ backgroundColor: dump.backgroundColor }}
           />
         ))}
@@ -56,7 +59,7 @@ function DumpSection({ dump }: { readonly dump: Dump }) {
 
 function SinglePhoto({ photo }: { readonly photo: Photo }) {
   return (
-    <div className="mb-8">
+    <div className="mb-10 lg:max-w-2xl">
       <img
         src={photo.url}
         alt=""
@@ -64,7 +67,7 @@ function SinglePhoto({ photo }: { readonly photo: Photo }) {
         decoding="async"
         sizes={SINGLE_IMG_SIZES}
         onError={hideOnError}
-        className="aspect-[3/4] w-full rounded-lg object-cover bg-aura-surface"
+        className="aspect-[3/4] w-full rounded-xl object-cover bg-aura-surface"
       />
     </div>
   );
@@ -120,7 +123,7 @@ export function RiverView() {
       ref={scrollRef}
       data-state={state}
       data-aura-transition
-      className="relative flex-1 overflow-y-auto bg-aura-bg text-aura-text"
+      className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain bg-aura-bg text-aura-text"
     >
       <h1 className="sr-only">The River</h1>
 
@@ -129,19 +132,25 @@ export function RiverView() {
       {state === "error" && <QuietError onRetry={retry} />}
 
       {state === "ready" && (
-        <div className="mx-auto max-w-lg px-4 py-12">
+        <div className="mx-auto w-full max-w-[88rem] px-4 py-10 sm:px-6 sm:py-12 lg:px-12 lg:py-16">
           {feed.map((month) => (
-            <section key={month.key} aria-label={month.label} className="mb-16">
-              <h2 className="mb-8 font-display text-2xl tracking-display text-aura-text">
+            <section
+              key={month.key}
+              aria-label={month.label}
+              className="mb-20 grid grid-cols-1 items-start gap-6 sm:gap-8 lg:grid-cols-[minmax(10rem,0.24fr)_minmax(0,1fr)] lg:gap-12 xl:gap-16"
+            >
+              <h2 className="font-display text-2xl tracking-display text-aura-text lg:sticky lg:top-12 lg:mb-0 lg:pt-1">
                 {month.label}
               </h2>
-              {month.entries.map((entry) => {
-                const key = entryKey(entry);
-                if (entry.kind === "dump") {
-                  return <DumpSection key={key} dump={entry.dump} />;
-                }
-                return <SinglePhoto key={key} photo={entry.photo} />;
-              })}
+              <div className="min-w-0">
+                {month.entries.map((entry) => {
+                  const key = entryKey(entry);
+                  if (entry.kind === "dump") {
+                    return <DumpSection key={key} dump={entry.dump} />;
+                  }
+                  return <SinglePhoto key={key} photo={entry.photo} />;
+                })}
+              </div>
             </section>
           ))}
         </div>

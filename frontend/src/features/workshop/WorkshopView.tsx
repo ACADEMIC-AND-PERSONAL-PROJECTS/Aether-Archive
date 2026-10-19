@@ -32,13 +32,12 @@ import type { UploadProgress } from "../../api/uploadPhoto";
  * ## The screen
  *
  * With nothing picked, the view is one display-serif sentence and one quiet action. Once photos are
- * picked, the photos are the screen: a grid of square thumbnails, with one glass panel at the bottom for
- * the summary and the actions. The grid is the focal point; the panel is the only chrome, and everything
- * in it is `--aura-text` because it sits on glass (DESIGN-SYSTEM §2.2, the E3-S2 measurement). Each tile
- * carries its own scrim, so a remove control and a failed preview always have a known backdrop. There is
- * no spinner and no per-tile progress: the only progress signal is E4-S1B's one 2 px line, which always
- * describes the request actually in flight (Apple HIG's one aggregate indicator per batch; fetched as a
- * reference during this story, nothing loaded at runtime).
+ * picked, the photos are the screen: a grid of square thumbnails and one glass editing surface. The
+ * grid is the focal point; the panel is the only chrome, and everything in it is `--aura-text` because
+ * it sits on glass (DESIGN-SYSTEM §2.2, the E3-S2 measurement). The controls stack below the images on
+ * a phone and sit alongside them on desktop. Each tile carries its own scrim, so a remove control and
+ * a failed preview always have a known backdrop. There is no spinner and no per-tile progress: the only
+ * progress signal is E4-S1B's one 2 px line, which always describes the request actually in flight.
  *
  * ## The cap
  *
@@ -535,7 +534,7 @@ export function WorkshopView() {
       <main
         ref={mainRef}
         data-state={phase}
-        className="relative flex flex-1 flex-col overflow-hidden bg-aura-bg"
+        className="relative flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain bg-aura-bg lg:overflow-hidden"
       >
         <h1 className="sr-only">Curator&rsquo;s Workshop</h1>
 
@@ -563,22 +562,23 @@ export function WorkshopView() {
             ) : null}
           </div>
         ) : (
-          <>
-            {/* The grid scrolls; the panel does not. The scroll container itself centres a short grid —
-                measured at E4-S2A1's review: the tile's top lands on the computed centre (a `min-h-full`
-                percentage does not resolve inside a flex-sized scroller, which put it at the top). */}
-            <div className="relative z-10 flex flex-1 flex-col justify-center overflow-y-auto px-4 py-6">
-              <SelectionGrid
-                items={items}
-                busy={busy}
-                onMove={moveSelection}
-                onRemove={removeItem}
-                onPreviewError={markPreviewBroken}
-              />
+          <div className="relative z-10 grid min-h-full w-full grid-cols-1 lg:h-full lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_minmax(21rem,27rem)]">
+            <div className="flex min-w-0 flex-col justify-center px-4 py-8 sm:px-6 lg:min-h-0 lg:overflow-y-auto lg:px-10 lg:py-12">
+              <div className="mx-auto w-full max-w-5xl">
+                <SelectionGrid
+                  items={items}
+                  busy={busy}
+                  onMove={moveSelection}
+                  onRemove={removeItem}
+                  onPreviewError={markPreviewBroken}
+                />
+              </div>
             </div>
 
-            <div className="relative z-10 mx-auto w-full max-w-md shrink-0 px-4 pb-4">
-              <GlassPanel className={`flex flex-col gap-3 px-4 py-3 ${ENTER_FADE_BASE}`}>
+            <div className="w-full px-4 pb-[calc(var(--safe-bottom)_+_1.25rem)] pt-2 sm:px-6 lg:min-h-0 lg:overflow-y-auto lg:px-6 lg:py-8 xl:px-8">
+              <GlassPanel
+                className={`mx-auto flex w-full max-w-xl flex-col gap-3 px-4 py-4 sm:px-5 lg:gap-4 ${ENTER_FADE_BASE}`}
+              >
                 {phase === "uploading" ? (
                   <>
                     <p className="text-sm text-aura-text">Uploading</p>
@@ -656,7 +656,7 @@ export function WorkshopView() {
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                           <label
                             htmlFor={titleId}
-                            className="text-xs tracking-wide text-aura-muted uppercase"
+                            className="text-xs tracking-wide text-aura-text uppercase"
                           >
                             Title
                           </label>
@@ -668,7 +668,7 @@ export function WorkshopView() {
                             placeholder="Optional"
                             autoComplete="off"
                             disabled={publishing}
-                            className="min-h-11 min-w-40 flex-1 rounded-[10px] bg-transparent px-3 text-sm text-aura-text [border:var(--aura-hairline)] placeholder:text-aura-muted focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-aura-text/70 disabled:opacity-60"
+                            className="min-h-11 min-w-40 flex-1 rounded-[10px] bg-transparent px-3 text-sm text-aura-text [border:var(--aura-hairline)] placeholder:text-aura-text focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-aura-text/70 disabled:opacity-60"
                           />
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
@@ -688,7 +688,7 @@ export function WorkshopView() {
                 )}
               </GlassPanel>
             </div>
-          </>
+          </div>
         )}
       </main>
 

@@ -25,7 +25,7 @@ import { ruleStatus, runAxe, violationSummary } from "../../test/axe";
  * exactly where it was (measured in the probe above this suite). Every assertion below about the
  * keyboard is therefore an assertion about *our* handler, which is the point of handling every `Tab`
  * explicitly instead of only the two edges: the code under test is the code a browser runs. What
- * jsdom still cannot answer is the part that needs layout — that `min-h-14` really is 56 px, that the
+ * jsdom still cannot answer is the part that needs layout — that `min-h-16` really is 64 px, that the
  * entries sit inside the sheet's rounded corners, and that the entry animation is skipped under
  * `prefers-reduced-motion: reduce`. Those are the Chromium probe's, and they are not claimed here.
  */
@@ -60,13 +60,13 @@ describe("GlassMenu — the dialog", () => {
   });
 
   it("should give every entry a comfortable target", () => {
-    // `min-h-14` is 3.5rem = 56 px, over the 44 px floor (DESIGN-SYSTEM §8); jsdom has no layout, so
+    // `min-h-16` is 4rem = 64 px, over the 44 px floor (DESIGN-SYSTEM §8); jsdom has no layout, so
     // the *rendered* height is measured in Chromium (probe output in the report) and this pins the
     // declaration the measurement is made of.
     renderMenu();
 
     for (const target of [entry("The River"), entry("Curate"), closeEntry()]) {
-      expect(target).toHaveClass("min-h-14");
+      expect(target).toHaveClass("min-h-16");
       expect(target).toHaveClass("w-full");
     }
   });

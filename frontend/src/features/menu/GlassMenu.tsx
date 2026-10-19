@@ -87,22 +87,21 @@ export interface GlassMenuProps {
 const VEIL_CLASS = `fixed inset-0 z-30 bg-aura-bg/70 ${ENTER_FADE_BASE}`;
 
 /**
- * The panel's box: a floating sheet, 16 px clear of the sides and of the home indicator (the safe
- * inset is read as a variable, so the gap survives the notch), centred and capped on wider screens,
- * entering on §5's fade + drift at `duration-base` (`ENTER_DRIFT_BASE`) — the same pattern the route
- * transition uses, one step faster.
+ * The dialog fills the viewport so its panel can sit thumb-close to the bottom on a phone and centre
+ * itself against the full-bleed image on desktop. Safe-area padding keeps both placements clear of
+ * system gestures; the panel remains capped rather than stretching with the display.
  */
-const SHEET_CLASS = `fixed inset-x-4 bottom-[calc(var(--safe-bottom)_+_1rem)] z-40 mx-auto max-w-md outline-none ${ENTER_DRIFT_BASE}`;
+const SHEET_CLASS = `fixed inset-0 z-40 flex items-end justify-center px-4 pt-[calc(var(--safe-top)_+_1rem)] pr-[calc(var(--safe-right)_+_1rem)] pb-[calc(var(--safe-bottom)_+_1rem)] pl-[calc(var(--safe-left)_+_1rem)] outline-none md:items-center md:px-8 md:py-12 ${ENTER_DRIFT_BASE}`;
 
 /**
- * One entry: 56 px tall, full width, no gap between rows (a tap between two entries is still a tap),
+ * One entry: at least 64 px tall, full width, no gap between rows (a tap between two entries is still a tap),
  * and on the text token — see the class doc above for the measured reason none of them is muted.
  *
  * The press feedback is §5's `duration-quick`, read as the variable rather than as `180ms`, so a
  * change to the token moves this too.
  */
 const ENTRY_CLASS =
-  "flex min-h-14 w-full items-center rounded-xl px-5 text-lg text-aura-text transition-colors duration-[var(--motion-duration-quick)] active:bg-aura-text/6 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/70";
+  "flex min-h-16 w-full items-center rounded-2xl px-5 text-xl font-medium tracking-wide text-aura-text transition-colors duration-[var(--motion-duration-quick)] active:bg-aura-text/6 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/70 md:px-7 md:text-2xl";
 
 export function GlassMenu({ onClose, returnFocusTo }: GlassMenuProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -184,7 +183,7 @@ export function GlassMenu({ onClose, returnFocusTo }: GlassMenuProps) {
         tabIndex={-1}
         className={SHEET_CLASS}
       >
-        <GlassPanel className="flex flex-col p-2">
+        <GlassPanel className="glass-menu flex w-full max-w-xl flex-col gap-1 p-3 sm:p-4 md:p-6">
           <Link to="/river" className={ENTRY_CLASS}>
             The River
           </Link>

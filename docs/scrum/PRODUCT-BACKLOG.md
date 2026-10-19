@@ -632,6 +632,7 @@ delivery, documentation, and a clean v1.0.
 | E6-S21 | Splash hero URL origin validation | p2 | 1 | — | Todo |
 | E6-S22 | GitHub Actions majors and Dependabot | p2 | 1 | — | Todo |
 | E6-S23 | Drag overlay stacking at short viewports | p2 | 1 | — | Todo |
+| E6-S26 | Editorial glass redesign with responsive desktop layouts (#178) | p1 | 5 | — | Todo |
 
 ### E6-S1 — CI on every PR · 5 pts · p0
 
@@ -659,6 +660,16 @@ delivery, documentation, and a clean v1.0.
 - [ ] iOS Safari + Android Chrome quirks captured (dvh, backdrop-filter, scroll, gesture conflicts).
 - [ ] Results written in `reports/` and converted into backlog items with priorities.
 - [ ] LAN setup documented in the README (host exposure, firewall note).
+
+### E6-S26 — Editorial glass redesign with responsive desktop layouts · 5 pts · p1 · #178
+
+- [ ] Rework the splash/menu, River, and Workshop into a coherent, high-end editorial/glass visual
+      direction while keeping the canonical photo-first flows and no persistent navbar.
+- [ ] Make the River and Workshop adapt to desktop widths intentionally; constrain the River scroll
+      viewport and verify scroll memory plus dump aura behavior (#176).
+- [ ] Keep touch and keyboard interactions, contrast, reduced motion, local fonts, and zero external
+      runtime requests intact.
+- [ ] Verify mobile and desktop viewports (390 px and 1440 px); update tests and record evidence.
 
 ### E6-S5 — Security & robustness pass · 5 pts · p0
 
