@@ -1,0 +1,34 @@
+# Aether Archive — public TLS edge (ADR-029).
+#
+# Caddy obtains and renews the certificate for DOMAIN automatically (Let's Encrypt). The domain must
+# resolve to this host and ports 80/443 must be reachable. For a host without a domain, use a
+# wildcard DNS name such as `aether.203.0.113.10.nip.io`.
+#
+# Only two things are public: the archive and the read-only Grafana dashboards under /grafana/.
+# Prometheus, Alertmanager and Jaeger stay bound to 127.0.0.1 and are reached through an SSH tunnel;
+# they are operational tools, not part of the visitor experience.
+{$DOMAIN} {
+	encode zstd gzip
+
+	route {
+		# Grafana is configured with serve_from_sub_path, so it expects the /grafana prefix itself.
+		redir /grafana /grafana/ 308
+		handle /grafana/* {
+			reverse_proxy grafana:3000
+		}
+
+		handle {
+			reverse_proxy web:80
+		}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

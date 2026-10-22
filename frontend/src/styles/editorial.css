@@ -1,0 +1,75 @@
+/*
+ * Aether Archive — the editorial layer (2026 redesign).
+ *
+ * The archive is a printed object, not a dashboard: ink, paper, hairlines, grain and photographs.
+ * This file carries only what a utility cannot: the fixed grain plate, the photographic vignette,
+ * the small-caps kicker used across the four views, and the selection colour.
+ *
+ * Tokens only for colour. `--ink` and `--paper` live in `global.css` §4 with the aura tokens; the
+ * grain is an SVG image, not a second palette.
+ */
+
+/* A fixed, imperceptible paper grain over the whole application. It sits above the glass menu on
+ * purpose: the menu should feel printed on the same sheet as everything else. It never takes a
+ * pointer event and it is invisible to assistive technology. */
+.aether-grain {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+  mix-blend-mode: soft-light;
+}
+
+/* The photographic vignette: the corners fall into the ink, the centre stays untouched. The
+ * linear pass keeps the top and bottom edges from meeting a bright browser chrome. */
+.aether-vignette {
+  background:
+    radial-gradient(
+      ellipse at center,
+      transparent 34%,
+      color-mix(in srgb, var(--ink) 52%, transparent) 100%
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--ink) 38%, transparent),
+      transparent 24%,
+      transparent 70%,
+      color-mix(in srgb, var(--ink) 48%, transparent)
+    );
+}
+
+/* Small caps for labels: section indices, counts, metadata. Always paired with a text colour by the
+ * caller, so it works on the splash, on the ink bar and on a dump's tinted page. */
+.aether-kicker {
+  font-size: 0.62rem;
+  line-height: 1.4;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+/* A contact-sheet slot number. It is generated content, not a text node, so the tile's accessible
+ * name and its testable text stay exactly the photo's name and status. */
+.aether-slot::before {
+  content: attr(data-slot);
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 10;
+  pointer-events: none;
+  padding: 0.125rem 0.375rem;
+  background: color-mix(in srgb, var(--aura-bg) 62%, transparent);
+  color: color-mix(in srgb, var(--aura-text) 82%, transparent);
+  font-size: 0.6rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  line-height: 1.4;
+}
+
+/* The paper highlights the way a printed page does. */
+::selection {
+  background: var(--paper);
+  color: var(--ink);
+}

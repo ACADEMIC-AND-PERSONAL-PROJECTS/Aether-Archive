@@ -92,7 +92,7 @@ export function CheckView() {
   ];
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-col gap-10 px-6 py-10 text-sm">
+    <main className="mx-auto min-h-0 w-full max-w-2xl flex-1 overflow-y-auto px-6 py-10 text-sm">
       <header className="space-y-2">
         <h1 className="font-display text-2xl tracking-display">Theme check</h1>
         <p className="text-aura-muted">
@@ -167,7 +167,7 @@ export function CheckView() {
           Type
         </h2>
         <p className="font-display text-2xl tracking-display">A dump title</p>
-        <p className="text-base">Body text — Inter Variable, the UI face.</p>
+        <p className="text-base">Body text — Manrope Variable, the UI face.</p>
         <p className="text-sm text-aura-muted">Secondary text — the muted token.</p>
         <p>
           <a href="#check-tokens" className="text-aura-accent underline underline-offset-4">

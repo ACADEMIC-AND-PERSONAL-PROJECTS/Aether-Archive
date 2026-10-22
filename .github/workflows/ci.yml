@@ -103,3 +103,11 @@ jobs:
       - name: Build
         working-directory: frontend
         run: npm run build
+
+      - name: Install the Playwright browser
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Accessibility · real browser · axe · 320/768/1280
+        working-directory: frontend
+        run: npx playwright test

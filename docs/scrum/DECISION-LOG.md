@@ -37,6 +37,7 @@ Statuses: `Proposed` · `Accepted` · `Superseded by ADR-NNN` · `Rejected`.
 | [ADR-025](#adr-025--the-feed-reads-the-archive-whole-two-queries-no-pagination-yet-and-the-numbers-that-would-revisit-it) | 2026-10-19 | The feed reads the archive whole: two queries, no pagination yet, and the numbers that would revisit it | Accepted |
 | [ADR-026](#adr-026--no-derivative-images-yet-originals-with-lazy-loading-colour-placeholders-revisit-with-e5-s4) | 2026-10-19 | No derivative images yet: originals with lazy loading, colour placeholders, revisit with E5-S4 | Accepted |
 | [ADR-027](#adr-027--no-virtualisation-yet-300-item-dom-is-593-nodes-revisit-at-1-000-items) | 2026-10-19 | No virtualisation yet: 300-item DOM is 593 nodes, revisit at 1 000 items | Accepted |
+| [ADR-028](#adr-028--editorial-redesign-image-first-responsive-layouts-and-cormorant-garamond--manrope) | 2026-10-19 | Editorial redesign: image-first responsive layouts and Cormorant Garamond + Manrope | Accepted |
 
 ---
 
@@ -1137,6 +1138,112 @@ scroll-restoration approach.
 **Consequences.** No new dependency; `useScrollMemory` continues to work with native scroll. The
 probe script is committed and re-runnable. The escape hatch is named above — three concrete triggers,
 not a vague "when it gets slow."
+
+---
+
+## ADR-028 — Editorial redesign: image-first responsive layouts and Cormorant Garamond + Manrope
+
+**Date**: 2026-10-19 · **Status**: Accepted
+
+**Context.** The canonical product specification calls for a moody, high-end editorial photo sanctuary
+with glassmorphism, an immersive zero-chrome splash, a chronological river and a photo-ordering
+workshop. It does not specify desktop composition. The delivered views technically follow the mobile
+flows, but their typography, composition and desktop use of space do not deliver that high-end intent.
+The redesign must not turn the archive into a conventional dashboard or break its mobile-first
+interaction.
+
+**Decision.**
+
+1. The art direction is **cinematic editorial luxury**, not generic "glass everywhere": rich,
+   photo-derived atmosphere; expressive display typography; intentional negative space; and carefully
+   composed images. Glass remains the shared material for controls and navigation over imagery, where
+   translucency has a real backdrop and does not compete with photos.
+2. The splash remains full-bleed and free of visible navigation chrome until the curator taps. The
+   River and Workshop adapt their composition to available width rather than stretching a phone layout;
+   the River remains a bounded scroll surface. There is no persistent header, footer or navbar.
+3. Replace the E2 baseline pair with **Cormorant Garamond** for display and **Manrope Variable** for UI.
+   Both ship as local Fontsource NPM assets with latin subsets only; no external font request is
+   permitted. Cormorant's fine editorial contrast gives titles more character, while Manrope remains
+   legible at compact mobile control sizes. Font payload is measured from the production build against
+   the existing ~200 KB budget.
+4. Responsive implementation uses fluid bounds and content-aware CSS Grid rather than fixed phone
+   widths. It must be evaluated at 390 px and 1440 px, preserve ≥44 px touch targets and keyboard paths,
+   and honor `prefers-reduced-motion`.
+5. The visual refresh does not alter `_docs/`, API payloads, file storage, or the archive's local-only
+   boundary. It uses the existing palette/theme generator and glass primitive; it adds no runtime
+   network requests.
+
+**Research.** Apple HIG's [Layout](https://developer.apple.com/design/human-interface-guidelines/layout)
+guidance informed adapting hierarchy to display sizes rather than scaling one layout. MDN's
+[`backdrop-filter`](https://developer.mozilla.org/en-US/docs/Web/CSS/backdrop-filter) documentation
+informed keeping translucent glass over actual background pixels. web.dev's
+[min(), max(), clamp()](https://web.dev/articles/min-max-clamp) informed fluid sizing with readable
+width limits. Photography portfolio references from
+[Site Builder Report](https://www.sitebuilderreport.com/inspiration/photography-portfolios) reinforced
+image hierarchy and breathing room; no layouts or assets were copied.
+
+**Consequences.** The former Playfair Display + Inter Variable choice (ADR-019) is superseded for
+product UI. The rendering contract, zero-external-request rule, local-font discipline, colour contrast
+guarantees and motion vocabulary remain. The production build emits five font files totaling
+**133,376 bytes (133.4 kB decimal)**, within the ~200 KB budget.
+
+---
+
+## ADR-029 — Public demo deployment and the observability profile
+
+**Date**: 2026-10-22 · **Status**: Accepted
+
+**Context.** The canonical product is single-user and local-first: no cloud, no external request at
+runtime, no telemetry. The Zoomcamp final project requires the same application to be deployed at a
+public URL, with tests, containers, CI/CD and a rollback path, observable metrics/traces/logs, an alert
+on user impact, and an agent that responds to it. Deploying the owner's real archive — or adding
+third-party analytics to the product — would violate the local-first stance.
+
+**Decision.**
+
+1. **The default stays local-first.** `docker compose up` runs db + api + web on the owner's machine;
+   the default profile exports no telemetry and makes no external runtime request. The canonical spec
+   continues to describe this product.
+2. **A demo/production profile is added** for the course and for self-hosting: the same images behind
+   Caddy with TLS, PostgreSQL 17, a local media volume, OTLP export, Prometheus metrics, JSON logs and
+   Grafana. It runs on **seeded/demo data**; the owner's real archive is never deployed.
+3. **Telemetry is operational only**: HTTP/JVM metrics, traces, and structured logs with
+   `traceId`/`spanId`. No PII, no image bytes, no file names, no credentials, no third-party analytics.
+   Sampling is configurable; the local profile keeps the export off.
+4. **The public demo is best-effort**, documented in `README.md` and `docs/course/FINAL-PROJECT.md`;
+   it is not a hosted service and carries no availability promise beyond the course window.
+5. **Delivery**: CI tests every pull request and push. A `v*` tag triggers `.github/workflows/release.yml`,
+   which builds the API and web images and pushes them to GHCR under both the human tag and the
+   immutable `sha-<full commit>` tag. The deploy job then SSHes to the VPS and runs
+   `scripts/deploy/deploy.sh sha-<full commit>`; branches are never deployed automatically. The script
+   pulls the images, waits for Docker health, runs the public smoke test, seeds the demo once, records
+   the tag in `state/`, and restores the previous tag if any gate fails. `scripts/deploy/rollback.sh`
+   reuses the same path. The VPS only pulls; it never builds a release.
+6. **Observability is self-hosted**, not Grafana Cloud: Prometheus scrapes the API, an OpenTelemetry
+   Collector forwards traces to Jaeger, Promtail ships JSON logs to Loki, and Alertmanager routes two
+   user-impact alerts on the publish journey. Grafana is published read-only under `/grafana/` for the
+   jury; Prometheus, Alertmanager and Jaeger stay bound to `127.0.0.1` behind an SSH tunnel. The
+   local-first stack remains telemetry-free; only the observability overlay enables tracing.
+7. **The on-call responder runs on the host**, as a systemd service, and receives Alertmanager
+   webhooks through a bearer token. It diagnoses Docker health for the API and the database, then
+   performs one safe action: restart the database, restart the API, or roll the API back to
+   `state/last-good-image`. It records an incident JSON, optionally opens one GitHub issue, and closes
+   the record when Alertmanager sends `resolved`. It never runs SQL, deletes data or calls an LLM; the
+   deterministic path needs no API key.
+8. **One origin** remains: Caddy terminates TLS, nginx serves the SPA and proxies `/api/**` and
+   `/images/**`, and `/grafana/*` goes to Grafana with `serve_from_sub_path`. The browser's CORS
+   allow-list contains the public origin only.
+
+**Consequences.** "No telemetry" is now scoped to the local-first default, not to the demo profile;
+`CLAUDE.md`, `ARCHITECTURE.md` and the README say so explicitly. The older deployment sketch that named
+Grafana Cloud, a synthetic failure flag and a containerised on-call agent is superseded by the
+implementation described in `docs/engineering/DEPLOYMENT.md` and
+`docs/engineering/OBSERVABILITY.md`: the on-call path is a deterministic host process, and the failure
+drill is a real PostgreSQL stop. The deployment introduces a domain, TLS certificates, a VPS firewall
+rule and host secrets. The Alertmanager token is a mounted file with mode 0644 because its container
+runs unprivileged; the host is single-user and `.env` holds the same value. The archive's storage model
+does not change: media stays on a local volume, and the database stays PostgreSQL. The public instance
+remains **pending** until the VPS firewall and DNS are reachable; the code path is complete.
 
 ---
 

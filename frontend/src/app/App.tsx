@@ -38,15 +38,19 @@ const CheckView = lazy(() =>
 /** The views, rendered from the current URL. Wrap in a router; supply the query cache with `AppProviders`. */
 export function App() {
   return (
-    <Suspense fallback={<RouteFallback />}>
-      <RouteTransition>
-        <Routes>
-          <Route path="/" element={<SplashView />} />
-          <Route path="/river" element={<RiverView />} />
-          <Route path="/curate" element={<WorkshopView />} />
-          <Route path="/check" element={<CheckView />} />
-        </Routes>
-      </RouteTransition>
-    </Suspense>
+    <>
+      <Suspense fallback={<RouteFallback />}>
+        <RouteTransition>
+          <Routes>
+            <Route path="/" element={<SplashView />} />
+            <Route path="/river" element={<RiverView />} />
+            <Route path="/curate" element={<WorkshopView />} />
+            <Route path="/check" element={<CheckView />} />
+          </Routes>
+        </RouteTransition>
+      </Suspense>
+      {/* A printed sheet has a grain; this one is fixed above every view, menu included. */}
+      <div aria-hidden="true" className="aether-grain" />
+    </>
   );
 }

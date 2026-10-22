@@ -11,7 +11,7 @@ import { ENTER_DRIFT_BASE, ENTER_FADE_BASE } from "../../lib/motion/tokens";
  * ## What it is made of
  *
  * One `GlassPanel` — the single material (§3) — floating above a full-screen veil. The veil is the
- * theme's own darkest tone at 70 % (`bg-aura-bg/70`), not decoration: over a *photo*, the material's
+ * theme's own darkest tone at 60 % (`bg-aura-bg/60`), not decoration: over a *photo*, the material's
  * `rgba(0, 0, 0, 0.4)` alone cannot promise legible text, because the pixels underneath are the user's
  * and may be white (NN/g's finding, DESIGN-REFERENCES §7: glass readability is a foreground-text
  * problem, and "components that appear over varied contexts must account for the many possible
@@ -19,15 +19,11 @@ import { ENTER_DRIFT_BASE, ENTER_FADE_BASE } from "../../lib/motion/tokens";
  * names: it is a *sibling* of the panel, so a tap on the panel never reaches the veil's handler and a
  * tap anywhere else closes.
  *
- * **Every entry is text, none is muted — measured, not preferred.** `--aura-muted` is the theme's
- * "secondary text / quiet labels" token, and the generator raises it until it clears 4.5:1 *on the
- * background* (§2.2). Over the veil that guarantee does not survive: for the generator's worst case —
- * the lightest background its bands allow (L 0.18) under the veil at 70 % over a *white* photo — the
- * panel is `rgb(46, 56, 57)`, where the text token reads 7.97:1 and the muted token **4.11:1** (the
- * probe photo's own theme reads 8.07:1 and 4.14:1, painted; both pairs are in the verification report,
- * and they are two palettes rather than two measurements of one) — under AA, and
- * under it for the one entry a user reaches when the other two are wrong (`GlassMenu.test.tsx` pins
- * the pair). So the dialog's words sit on `--aura-text`; the muted token's home is the page, not glass.
+ * **Every entry is text, none is muted.** `--aura-muted` is generated for the page background, not for
+ * every possible photo beneath glass. The menu keeps its controls on `--aura-text`, and the material
+ * test composites the current 60 % veil and glass over a white photo for the generator's least
+ * favourable text/background pair. The photo remains perceptible through the combined layers without
+ * making the words depend on its pixels.
  *
  * The dialog element is the positioned wrapper, not the material inside it: `GlassPanel`'s props are
  * React's own div attributes, which carry no `ref` (probed with `tsc`: TS2322 against
@@ -84,25 +80,31 @@ export interface GlassMenuProps {
  * Its entry is §5's fade-in-place (`ENTER_FADE_BASE`) — the drift is the panel's, so the scrim never
  * uncovers an edge.
  */
-const VEIL_CLASS = `fixed inset-0 z-30 bg-aura-bg/70 ${ENTER_FADE_BASE}`;
+const VEIL_CLASS = `fixed inset-0 z-30 bg-aura-bg/60 backdrop-blur-[2px] ${ENTER_FADE_BASE}`;
 
 /**
- * The panel's box: a floating sheet, 16 px clear of the sides and of the home indicator (the safe
- * inset is read as a variable, so the gap survives the notch), centred and capped on wider screens,
- * entering on §5's fade + drift at `duration-base` (`ENTER_DRIFT_BASE`) — the same pattern the route
- * transition uses, one step faster.
+ * The dialog fills the viewport so its panel can sit thumb-close to the bottom on a phone and run the
+ * full height of the right edge on desktop, leaving the splash photograph visible beside it. The
+ * panel owns its safe-area padding, so the sheet itself needs none.
  */
-const SHEET_CLASS = `fixed inset-x-4 bottom-[calc(var(--safe-bottom)_+_1rem)] z-40 mx-auto max-w-md outline-none ${ENTER_DRIFT_BASE}`;
+const SHEET_CLASS = `fixed inset-0 z-40 flex items-end justify-center p-0 outline-none md:items-stretch md:justify-end ${ENTER_DRIFT_BASE}`;
 
 /**
- * One entry: 56 px tall, full width, no gap between rows (a tap between two entries is still a tap),
+ * One entry: at least 64 px tall, full width, no gap between rows (a tap between two entries is still a tap),
  * and on the text token — see the class doc above for the measured reason none of them is muted.
  *
  * The press feedback is §5's `duration-quick`, read as the variable rather than as `180ms`, so a
  * change to the token moves this too.
  */
-const ENTRY_CLASS =
-  "flex min-h-14 w-full items-center rounded-xl px-5 text-lg text-aura-text transition-colors duration-[var(--motion-duration-quick)] active:bg-aura-text/6 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/70";
+const ENTRY_BASE_CLASS =
+  "group flex min-h-16 w-full items-center gap-4 border-b border-aura-text/10 px-6 text-aura-text transition-colors duration-[var(--motion-duration-quick)] active:bg-aura-text/6 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/70 md:px-10";
+
+const RIVER_CLASS = `${ENTRY_BASE_CLASS} min-h-24 py-5 font-display text-2xl tracking-display sm:text-3xl`;
+const CURATE_CLASS = `${ENTRY_BASE_CLASS} min-h-20 py-4 font-display text-xl tracking-display md:text-2xl`;
+const CLOSE_CLASS = `${ENTRY_BASE_CLASS} min-h-16 py-3 text-xs uppercase tracking-[0.3em]`;
+const INDEX_CLASS = "w-6 shrink-0 text-[0.6rem] font-medium tracking-[0.2em] text-aura-text/35";
+const ARROW_CLASS =
+  "ml-auto text-base font-normal text-aura-text/35 transition-transform duration-[var(--motion-duration-quick)] group-hover:translate-x-1";
 
 export function GlassMenu({ onClose, returnFocusTo }: GlassMenuProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -184,16 +186,57 @@ export function GlassMenu({ onClose, returnFocusTo }: GlassMenuProps) {
         tabIndex={-1}
         className={SHEET_CLASS}
       >
-        <GlassPanel className="flex flex-col p-2">
-          <Link to="/river" className={ENTRY_CLASS}>
-            The River
-          </Link>
-          <Link to="/curate" className={ENTRY_CLASS}>
-            Curate
-          </Link>
-          <button type="button" onClick={onClose} className={ENTRY_CLASS}>
-            Close
-          </button>
+        <GlassPanel className="glass-menu flex max-h-[88dvh] w-full max-w-xl flex-col justify-between overflow-y-auto px-0 pt-7 pb-[calc(var(--safe-bottom)+1.25rem)] md:h-full md:max-h-none md:max-w-[30rem] md:py-10 lg:max-w-[34rem]">
+          <div className="flex flex-col gap-9">
+            <div className="flex items-center justify-between gap-4 px-6 md:px-10">
+              <p className="aether-kicker text-aura-text/55">Aether Archive</p>
+              <p className="aether-kicker text-aura-text/35">Vol. 01</p>
+            </div>
+
+            <div className="px-6 md:px-10">
+              <p className="max-w-[18rem] font-display text-2xl leading-[1.04] tracking-display text-aura-text sm:text-3xl">
+                A quiet place for your photographs.
+              </p>
+            </div>
+
+            <nav aria-label="Sections" className="border-t border-aura-text/10">
+              <Link to="/river" className={RIVER_CLASS}>
+                <span aria-hidden="true" className={INDEX_CLASS}>
+                  01
+                </span>
+                <span>The River</span>
+                <span aria-hidden="true" className={ARROW_CLASS}>
+                  →
+                </span>
+              </Link>
+              <Link to="/curate" className={CURATE_CLASS}>
+                <span aria-hidden="true" className={INDEX_CLASS}>
+                  02
+                </span>
+                <span>Curate</span>
+                <span aria-hidden="true" className={ARROW_CLASS}>
+                  →
+                </span>
+              </Link>
+              <button type="button" onClick={onClose} className={CLOSE_CLASS}>
+                <span aria-hidden="true" className={INDEX_CLASS}>
+                  03
+                </span>
+                <span>Close</span>
+                <span aria-hidden="true" className={ARROW_CLASS}>
+                  ×
+                </span>
+              </button>
+            </nav>
+          </div>
+
+          <div className="mt-10 px-6 md:px-10">
+            <div className="h-px w-10 bg-aura-text/30" />
+            <p className="mt-4 max-w-[19rem] text-xs leading-relaxed text-aura-text/55">
+              Local-first. No cloud, no feed — only the photographs you chose, on the machine you
+              chose.
+            </p>
+          </div>
         </GlassPanel>
       </div>
     </>

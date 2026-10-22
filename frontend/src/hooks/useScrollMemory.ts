@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 /**
  * Remember a named view's scroll position across remounts — and forget it on page refresh (E5-S1D).
@@ -37,7 +37,7 @@ export function useScrollMemory<T extends HTMLElement = HTMLElement>(key: string
     }
   }, [key, ready]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
 
@@ -53,6 +53,7 @@ export function useScrollMemory<T extends HTMLElement = HTMLElement>(key: string
     return () => {
       cancelAnimationFrame(raf);
       el.removeEventListener("scroll", onScroll);
+      // Read before React detaches the element; scrollTop may be zero on a detached scroller.
       if (readyRef.current) positions.set(key, el.scrollTop);
     };
   }, [key]);

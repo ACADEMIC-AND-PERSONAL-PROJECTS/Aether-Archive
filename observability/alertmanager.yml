@@ -1,0 +1,43 @@
+# Alertmanager — routes the two user-impact alerts to the host-side on-call responder.
+#
+# The responder is not in a container: it needs the Docker socket to inspect and restart the stack,
+# and a socket mount in a public-facing container is a larger risk than a host process. Alertmanager
+# therefore reaches it through Docker's host gateway. The bearer token is a mounted file generated
+# from .env by `scripts/dev/oncall-token.sh`; it is never written in this file or in git.
+
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: oncall
+  group_by: [alertname, journey]
+  group_wait: 10s
+  group_interval: 30s
+  repeat_interval: 1h
+  routes:
+    - matchers:
+        - severity="critical"
+      receiver: oncall
+      continue: false
+    # Latency is a dashboard signal, not a page: it must not wake the responder.
+    - matchers:
+        - severity="warning"
+      receiver: none
+      continue: false
+
+receivers:
+  - name: oncall
+    webhook_configs:
+      - url: http://host.docker.internal:9099/alerts
+        send_resolved: true
+        max_alerts: 10
+        http_config:
+          authorization:
+            type: Bearer
+            # The token is a mounted file, not an inline secret. It is generated from .env by
+            # scripts/dev/oncall-token.sh and never committed. Mode 0644 lets the Alertmanager
+            # container's unprivileged user read it; the host is single-user and the .env already
+            # holds the same value.
+            credentials_file: /etc/alertmanager/oncall-token
+  - name: none
+

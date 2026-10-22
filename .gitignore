@@ -31,6 +31,9 @@ hs_err_pid*
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
 npm-debug.log*
 yarn-error.log*
 *.tsbuildinfo
@@ -39,3 +42,19 @@ yarn-error.log*
 **/coverage/
 **/.pytest_cache/
 reports/*.tmp
+# Committed evidence logs referenced by a report (the live copies stay gitignored).
+!reports/evidence/*.log
+
+# ── On-call runtime ───────────────────────────────────────────────────────────
+oncall/webhook-token
+oncall/incidents/*.json
+!oncall/incidents/.gitkeep
+oncall/state/*
+!oncall/state/.gitkeep
+state/*
+!state/.gitkeep
+__pycache__/
+*.pyc
+
+# ── Deploy runtime ────────────────────────────────────────────────────────────
+backups/

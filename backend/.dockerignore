@@ -1,0 +1,6 @@
+target/
+.mvn/timing.properties
+*.log
+.env
+.env.*
+!.env.example

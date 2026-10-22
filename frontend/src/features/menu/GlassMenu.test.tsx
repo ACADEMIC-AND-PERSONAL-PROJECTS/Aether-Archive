@@ -25,7 +25,7 @@ import { ruleStatus, runAxe, violationSummary } from "../../test/axe";
  * exactly where it was (measured in the probe above this suite). Every assertion below about the
  * keyboard is therefore an assertion about *our* handler, which is the point of handling every `Tab`
  * explicitly instead of only the two edges: the code under test is the code a browser runs. What
- * jsdom still cannot answer is the part that needs layout — that `min-h-14` really is 56 px, that the
+ * jsdom still cannot answer is the part that needs layout — that `min-h-16` really is 64 px, that the
  * entries sit inside the sheet's rounded corners, and that the entry animation is skipped under
  * `prefers-reduced-motion: reduce`. Those are the Chromium probe's, and they are not claimed here.
  */
@@ -60,13 +60,13 @@ describe("GlassMenu — the dialog", () => {
   });
 
   it("should give every entry a comfortable target", () => {
-    // `min-h-14` is 3.5rem = 56 px, over the 44 px floor (DESIGN-SYSTEM §8); jsdom has no layout, so
+    // `min-h-16` is 4rem = 64 px, over the 44 px floor (DESIGN-SYSTEM §8); jsdom has no layout, so
     // the *rendered* height is measured in Chromium (probe output in the report) and this pins the
     // declaration the measurement is made of.
     renderMenu();
 
     for (const target of [entry("The River"), entry("Curate"), closeEntry()]) {
-      expect(target).toHaveClass("min-h-14");
+      expect(target.className).toMatch(/(?:^|\s)min-h-(?:16|20)(?:\s|$)/);
       expect(target).toHaveClass("w-full");
     }
   });
@@ -216,22 +216,21 @@ describe("GlassMenu — the material over a photo (the scrim rule)", () => {
     ],
   });
   const WHITE = { r: 255, g: 255, b: 255 };
-  const VEIL_ALPHA = 0.7;
+  const VEIL_ALPHA = 0.6;
 
   it("should keep every entry legible over a white photo, for the lightest theme the generator allows", () => {
     /*
      * The splash's background is the user's photo, and a photo can be white. An entry sits on the veil
-     * (`bg-aura-bg/70`) plus the panel's glass (`rgba(0, 0, 0, 0.4)`), composited here the way a browser
+     * (`bg-aura-bg/60`) plus the panel's glass (`rgba(0, 0, 0, 0.4)`), composited here the way a browser
      * composites it, through the repo's own generator and contrast functions.
      */
     renderMenu();
     const veil = screen.getByTestId("menu-veil");
     // The drift guard for the arithmetic below: change the scrim's alpha in the component and this
     // fails before the numbers do.
-    expect(veil).toHaveClass("bg-aura-bg/70");
-    // ...and the token every entry wears. `--aura-muted` over this veil measures **4.11:1** for the
-    // lightest legal theme — under AA — which is why "Close" is not the quiet one (measured in the
-    // report; the generator guarantees muted against the page background, not against glass).
+    expect(veil).toHaveClass("bg-aura-bg/60");
+    // Every entry uses the stronger text token: muted is generated for the page background, not for
+    // every possible photo beneath glass.
     for (const target of [entry("The River"), entry("Curate"), closeEntry()]) {
       expect(target).toHaveClass("text-aura-text");
     }

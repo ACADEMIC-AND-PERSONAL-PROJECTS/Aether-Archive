@@ -1,6 +1,19 @@
-# Design System — Dark Glassmorphism & image-derived colour
+# Design System — editorial archive & image-derived colour
 
-> **The mandate** (user requirement, verbatim — treat as acceptance criteria, not inspiration):
+> **2026-10-22 recalibration — editorial print object.** The four views were visually below the bar
+> the product deserves, so they were recast around the archive itself: ink and paper tokens, full-bleed
+> photography, Cormorant Garamond display, Manrope UI, small-caps kickers, hairline rules, CSS-numbered
+> slots, a restrained grain. The menu is a paper index sheet on mobile and a right-hand editorial
+> column on desktop; glass is no longer the single material. The image-derived aura remains the only
+> colour source, and every tested accessibility and text contract is unchanged. Implementation:
+> `frontend/src/styles/global.css` (tokens, type scale), `frontend/src/styles/editorial.css` (grain,
+> kickers, slot numbers, selection), `frontend/src/components/ArchiveBar.tsx`.
+>
+> The original Dark Glassmorphism mandate is kept below as **history and as the source of the colour
+> extraction and typography constraints**; its surface rule ("glass is the single material") is
+> superseded by this recalibration.
+
+> **The original mandate** (user requirement, verbatim — treat as acceptance criteria, not inspiration):
 >
 > 1. *"Use local tooling to conceive a dominant-colour extraction algorithm over the uploaded images,
 >    and generate a `Dark Glassmorphism` CSS theme based on those hues."*
@@ -21,11 +34,13 @@
 1. **Images are the interface.** Chrome disappears; type appears only where it carries meaning.
 2. **Colour comes from the user's photos.** No hardcoded brand palette; the app takes on the mood of the
    images it holds.
-3. **One material, used consistently.** Glass is the single surface; it never becomes a card, a shadow or a border.
+3. **One surface system.** Photography is the field; ink on paper is the only chrome. Surfaces are
+   flat, edged by hairlines, never cards inside cards. The tint follows the aura and the text.
 4. **Motion is breath, not spectacle.** Fade and drift; never bounce, never loop, never demand attention.
 5. **Zero external requests.** Fonts, icons, images: local. A request leaving the machine is a bug.
-6. **Soft, modern, never loud.** Calm surfaces and muted colour; nothing shouts. Anything decorative
-   rather than understood gets removed (pre-PR review questions: `DESIGN-REFERENCES.md` §1.4).
+6. **Editorial, never loud.** Serif display, small caps, hairline rules, generous negative space; the
+   archive is the object. Anything decorative rather than understood gets removed (pre-PR review
+   questions: `DESIGN-REFERENCES.md` §1.4).
 
 ## 2. Colour
 

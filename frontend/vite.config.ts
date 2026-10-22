@@ -2,7 +2,7 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath } from "node:url";
 import { loadEnv } from "vite";
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 /**
  * Single config for the dev server, the production build and the test runner.
@@ -55,6 +55,8 @@ export default defineConfig(({ mode }) => {
       globals: false,
       setupFiles: ["./src/test/setup.ts"],
       restoreMocks: true,
+      // Playwright's real-browser specs are not jsdom tests; keep them out of the unit run.
+      exclude: [...configDefaults.exclude, "e2e/**"],
       // `?raw` imports must return the file's text, not the empty stub: vitest stubs CSS by
       // default, which also blanks `global.css?raw` — the theme drift test reads exactly that
       // file (E2-S6). Processing CSS makes Vite answer the raw import with the source.
