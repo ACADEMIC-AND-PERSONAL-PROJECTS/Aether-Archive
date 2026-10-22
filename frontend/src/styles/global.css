@@ -14,6 +14,7 @@
 
 @import "tailwindcss" source(none);
 @import "./glass.css";
+@import "./editorial.css";
 
 /*
  * Automatic detection walked the whole project from this file and stopped at `.gitignore`,
@@ -75,6 +76,14 @@
   --color-aura-muted: var(--aura-muted);
   --color-aura-accent: var(--aura-accent);
   --color-aura-accent-contrast: var(--aura-accent-contrast);
+
+  /*
+   * The editorial layer's fixed tones. Unlike the aura tokens they never follow a dump: this is
+   * the ink the page sits on and the paper the type is printed in.
+   */
+  --color-ink: var(--ink);
+  --color-paper: var(--paper);
+  --color-line: var(--line);
 }
 
 /* `--aura-hairline` is a border shorthand, not a colour, so no colour utility maps to it;
@@ -113,6 +122,10 @@
   --text-xl--line-height: 1.25;
   --text-2xl: clamp(2rem, 1.7rem + 2vw, 3.2rem);
   --text-2xl--line-height: 1.2;
+  --text-3xl: clamp(2.6rem, 1.9rem + 3.4vw, 4.8rem);
+  --text-3xl--line-height: 1.05;
+  --text-4xl: clamp(3.4rem, 2.2rem + 5.5vw, 7rem);
+  --text-4xl--line-height: 1;
 
   --tracking-display: -0.015em;
   --tracking-ui: 0.01em;
@@ -190,6 +203,14 @@
   --aura-accent: #b5a98f;
   --aura-accent-contrast: #0b0b0d;
 
+  /*
+   * The editorial layer (2026 redesign): a fixed ink page and a warm paper type colour, so a view
+   * keeps its own identity while a dump's aura only tints the River.
+   */
+  --ink: #080809;
+  --paper: #f2ede4;
+  --line: rgba(242, 237, 228, 0.14);
+
   /* Safe-area insets as variables (DESIGN-SYSTEM §6): zero where the device has none. */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
@@ -254,6 +275,7 @@ body {
   padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
   overflow: hidden;
   overflow-wrap: break-word;
+  color: var(--paper);
   font-family: var(--font-ui);
   letter-spacing: var(--tracking-ui);
 }
@@ -278,12 +300,23 @@ body {
 
 /*
  * The menu earns its extra depth because it is the one control surface floating over the splash
- * photograph. It keeps the shared glass tint, blur and hairline; the wider radius and single soft
- * shadow only distinguish its modal role without creating a second material.
+ * photograph. On a phone it is a bottom sheet with softened top corners; from `md` it is a
+ * full-height editorial column pinned to the right edge, so the photograph stays visible beside it.
  */
 .glass-menu {
-  border-radius: 28px;
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--aura-bg) 42%, transparent);
+  border-radius: 28px 28px 0 0;
+  border-bottom: 0;
+  box-shadow: 0 -12px 40px color-mix(in srgb, var(--ink) 55%, transparent);
+}
+
+@media (min-width: 48rem) {
+  .glass-menu {
+    border-radius: 0;
+    border-top: 0;
+    border-right: 0;
+    border-bottom: 0;
+    box-shadow: -24px 0 60px color-mix(in srgb, var(--ink) 45%, transparent);
+  }
 }
 
 /*

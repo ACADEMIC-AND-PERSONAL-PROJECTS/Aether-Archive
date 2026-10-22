@@ -6,7 +6,7 @@ WEB_PORT ?= 3000
 BASE_URL ?= http://localhost:$(WEB_PORT)
 PROD_COMPOSE := $(COMPOSE) -f docker-compose.yml -f docker-compose.prod.yml
 
-.PHONY: help up down logs ps build verify seed smoke prod-up prod-down prod-logs clean
+.PHONY: help up down logs ps build verify seed demo smoke prod-up prod-down prod-logs clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-14s %s\n", $$1, $$2}'
@@ -31,8 +31,17 @@ verify: ## Run every gate the CI runs
 	cd backend && ./mvnw -B verify
 	cd frontend && npm run lint && npm run test -- --run && npm run typecheck && npm run build
 
-seed: ## Upload 300 demo photos and a dump through the running stack
+seed: ## Upload 300 sample photos and a dump through the running stack
 	AETHER_DATA_DIR=/tmp/opencode/aether-seed ./scripts/dev/seed.sh --count 300 --base-url $(BASE_URL)
+
+demo: ## Download real demo photos, then seed 36 photos and 3 dumps (idempotent downloads)
+	./scripts/dev/fetch-demo-photos.sh
+	AETHER_DATA_DIR=/tmp/opencode/aether-seed ./scripts/dev/seed.sh \
+		--count 36 --dumps 3 \
+		--titles "Low tide|Green hours|After the rain" \
+		--aura "#7d8a7a" \
+		--source-dir /tmp/opencode/aether-demo-photos \
+		--base-url $(BASE_URL)
 
 smoke: ## Walk the API against the running stack (adds six photos and a dump)
 	AETHER_DATA_DIR=/tmp/opencode/aether-seed ./scripts/dev/smoke.sh --base-url $(BASE_URL)

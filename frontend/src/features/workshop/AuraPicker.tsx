@@ -115,7 +115,7 @@ export function AuraPicker({ chosen, suggestions, onChoose, onReset }: AuraPicke
       ) : null}
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <label htmlFor={fieldId} className="text-xs tracking-wide text-aura-text uppercase">
+        <label htmlFor={fieldId} className="aether-kicker text-aura-text/50">
           Aura
         </label>
         <input
@@ -131,7 +131,7 @@ export function AuraPicker({ chosen, suggestions, onChoose, onReset }: AuraPicke
           spellCheck={false}
           aria-invalid={message !== null ? true : undefined}
           aria-describedby={message !== null ? messageId : undefined}
-          className="min-h-11 w-28 rounded-[10px] bg-transparent px-3 text-sm text-aura-text [border:var(--aura-hairline)] placeholder:text-aura-text focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-aura-text/70"
+          className="min-h-11 w-32 border-b border-aura-text/25 bg-transparent pb-1 text-sm text-aura-text placeholder:text-aura-text/30 focus-visible:border-aura-text focus-visible:outline-none"
         />
         {chosen !== null ? (
           <button type="button" onClick={handleReset} className={QUIET_ACTION}>

@@ -480,7 +480,7 @@ describe("the grid", () => {
     expect(workspace).not.toBeNull();
     expect(workspace).toHaveClass(
       "grid-cols-1",
-      "lg:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]",
+      "lg:grid-cols-[minmax(0,1fr)_minmax(23rem,30rem)]",
     );
     expect(list).toHaveClass("grid-cols-2", "sm:grid-cols-3");
     const inspector = screen.getByRole("region", { name: "Photo inspector" });

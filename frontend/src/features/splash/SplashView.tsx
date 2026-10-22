@@ -181,9 +181,20 @@ export function SplashView() {
             src={hero.src}
             alt="A photo from your archive"
             decoding="async"
-            className="absolute inset-0 h-full w-full object-cover"
+            className="absolute inset-0 h-full w-full object-cover animate-[aether-fade_var(--motion-duration-slow)_var(--motion-ease-soft)]"
           />
         ) : null}
+
+        {/* The photograph is the whole view; the vignette and the hairline frame are print, not UI.
+            No text enters this layer, so the splash stays the text-free front door it promises. */}
+        <div
+          aria-hidden="true"
+          className="aether-vignette pointer-events-none absolute inset-0 z-0"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-3 z-10 hidden border border-paper/15 sm:inset-5 sm:block"
+        />
 
         {/* Empty and error are mutually exclusive by construction (`splashState`). The error notice is
             painted over the previous photo when a replacement failed, which is why it carries a scrim

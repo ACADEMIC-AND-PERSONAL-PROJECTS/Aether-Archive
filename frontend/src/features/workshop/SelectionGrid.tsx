@@ -316,8 +316,9 @@ function SortableTile({
       className={`min-w-0 ${isDragging ? "opacity-0" : ""}`}
     >
       <div
-        className={`relative aspect-[4/3] overflow-hidden rounded-2xl ${
-          selected ? "ring-2 ring-inset ring-aura-accent" : ""
+        data-slot={String(position).padStart(2, "0")}
+        className={`aether-slot relative aspect-[4/3] overflow-hidden rounded-[2px] ${
+          selected ? "ring-1 ring-inset ring-aura-accent" : ""
         }`}
       >
         {/* The drag surface — a sibling of the remove button, and the tile's keyboard affordance
@@ -336,7 +337,7 @@ function SortableTile({
           }}
           // `touch-action: manipulation` leaves vertical panning and pinch-zoom to the browser, so a
           // short swipe scrolls the grid instead of lifting the tile (measured in the Chromium probe).
-          className="absolute inset-0 touch-manipulation rounded-[14px] focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/70 [@media(pointer:fine)]:cursor-grab [@media(pointer:fine)]:active:cursor-grabbing"
+          className="absolute inset-0 touch-manipulation rounded-[2px] focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/70 [@media(pointer:fine)]:cursor-grab [@media(pointer:fine)]:active:cursor-grabbing"
         >
           <TileFace item={item} onPreviewError={onPreviewError} />
         </div>
@@ -529,7 +530,7 @@ export function SelectionGrid({
             data-drop-animation={reducedMotion ? "none" : `${DROP_ANIMATION_MS}ms`}
             className="w-full"
           >
-            <div className="relative aspect-[4/3] w-full scale-[1.03] overflow-hidden rounded-2xl shadow-[0_8px_24px_rgba(0,0,0,0.24)] outline outline-1 -outline-offset-1 outline-aura-text/20">
+            <div className="relative aspect-[4/3] w-full scale-[1.03] overflow-hidden rounded-[2px] shadow-[0_8px_24px_rgba(0,0,0,0.24)] outline outline-1 -outline-offset-1 outline-aura-text/20">
               <TileFace item={activeItem} onPreviewError={onPreviewError} />
               {/* A solid photo scrim, not a floating label: text stays on the lifted surface and
                   never sits directly on another photo (§3's scrim rule). */}

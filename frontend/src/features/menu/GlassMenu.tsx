@@ -80,14 +80,14 @@ export interface GlassMenuProps {
  * Its entry is §5's fade-in-place (`ENTER_FADE_BASE`) — the drift is the panel's, so the scrim never
  * uncovers an edge.
  */
-const VEIL_CLASS = `fixed inset-0 z-30 bg-aura-bg/60 ${ENTER_FADE_BASE}`;
+const VEIL_CLASS = `fixed inset-0 z-30 bg-aura-bg/60 backdrop-blur-[2px] ${ENTER_FADE_BASE}`;
 
 /**
- * The dialog fills the viewport so its panel can sit thumb-close to the bottom on a phone and centre
- * itself against the full-bleed image on desktop. Safe-area padding keeps both placements clear of
- * system gestures; the panel remains capped rather than stretching with the display.
+ * The dialog fills the viewport so its panel can sit thumb-close to the bottom on a phone and run the
+ * full height of the right edge on desktop, leaving the splash photograph visible beside it. The
+ * panel owns its safe-area padding, so the sheet itself needs none.
  */
-const SHEET_CLASS = `fixed inset-0 z-40 flex items-end justify-center px-4 pt-[calc(var(--safe-top)_+_1rem)] pr-[calc(var(--safe-right)_+_1rem)] pb-[calc(var(--safe-bottom)_+_1rem)] pl-[calc(var(--safe-left)_+_1rem)] outline-none md:items-center md:px-8 md:py-12 ${ENTER_DRIFT_BASE}`;
+const SHEET_CLASS = `fixed inset-0 z-40 flex items-end justify-center p-0 outline-none md:items-stretch md:justify-end ${ENTER_DRIFT_BASE}`;
 
 /**
  * One entry: at least 64 px tall, full width, no gap between rows (a tap between two entries is still a tap),
@@ -97,11 +97,14 @@ const SHEET_CLASS = `fixed inset-0 z-40 flex items-end justify-center px-4 pt-[c
  * change to the token moves this too.
  */
 const ENTRY_BASE_CLASS =
-  "flex min-h-16 w-full items-center rounded-2xl px-5 text-aura-text transition-colors duration-[var(--motion-duration-quick)] active:bg-aura-text/6 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/70 md:px-7";
+  "group flex min-h-16 w-full items-center gap-4 border-b border-aura-text/10 px-6 text-aura-text transition-colors duration-[var(--motion-duration-quick)] active:bg-aura-text/6 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/70 md:px-10";
 
-const RIVER_CLASS = `${ENTRY_BASE_CLASS} min-h-20 font-display text-2xl tracking-display`;
-const CURATE_CLASS = `${ENTRY_BASE_CLASS} text-lg font-medium tracking-wide md:text-xl`;
-const CLOSE_CLASS = `${ENTRY_BASE_CLASS} text-sm tracking-wide`;
+const RIVER_CLASS = `${ENTRY_BASE_CLASS} min-h-24 py-5 font-display text-2xl tracking-display sm:text-3xl`;
+const CURATE_CLASS = `${ENTRY_BASE_CLASS} min-h-20 py-4 font-display text-xl tracking-display md:text-2xl`;
+const CLOSE_CLASS = `${ENTRY_BASE_CLASS} min-h-16 py-3 text-xs uppercase tracking-[0.3em]`;
+const INDEX_CLASS = "w-6 shrink-0 text-[0.6rem] font-medium tracking-[0.2em] text-aura-text/35";
+const ARROW_CLASS =
+  "ml-auto text-base font-normal text-aura-text/35 transition-transform duration-[var(--motion-duration-quick)] group-hover:translate-x-1";
 
 export function GlassMenu({ onClose, returnFocusTo }: GlassMenuProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -183,16 +186,57 @@ export function GlassMenu({ onClose, returnFocusTo }: GlassMenuProps) {
         tabIndex={-1}
         className={SHEET_CLASS}
       >
-        <GlassPanel className="glass-menu flex w-full max-w-xl flex-col gap-1 p-4 sm:p-5 md:p-7">
-          <Link to="/river" className={RIVER_CLASS}>
-            The River
-          </Link>
-          <Link to="/curate" className={CURATE_CLASS}>
-            Curate
-          </Link>
-          <button type="button" onClick={onClose} className={CLOSE_CLASS}>
-            Close
-          </button>
+        <GlassPanel className="glass-menu flex max-h-[88dvh] w-full max-w-xl flex-col justify-between overflow-y-auto px-0 pt-7 pb-[calc(var(--safe-bottom)+1.25rem)] md:h-full md:max-h-none md:max-w-[30rem] md:py-10 lg:max-w-[34rem]">
+          <div className="flex flex-col gap-9">
+            <div className="flex items-center justify-between gap-4 px-6 md:px-10">
+              <p className="aether-kicker text-aura-text/55">Aether Archive</p>
+              <p className="aether-kicker text-aura-text/35">Vol. 01</p>
+            </div>
+
+            <div className="px-6 md:px-10">
+              <p className="max-w-[18rem] font-display text-2xl leading-[1.04] tracking-display text-aura-text sm:text-3xl">
+                A quiet place for your photographs.
+              </p>
+            </div>
+
+            <nav aria-label="Sections" className="border-t border-aura-text/10">
+              <Link to="/river" className={RIVER_CLASS}>
+                <span aria-hidden="true" className={INDEX_CLASS}>
+                  01
+                </span>
+                <span>The River</span>
+                <span aria-hidden="true" className={ARROW_CLASS}>
+                  →
+                </span>
+              </Link>
+              <Link to="/curate" className={CURATE_CLASS}>
+                <span aria-hidden="true" className={INDEX_CLASS}>
+                  02
+                </span>
+                <span>Curate</span>
+                <span aria-hidden="true" className={ARROW_CLASS}>
+                  →
+                </span>
+              </Link>
+              <button type="button" onClick={onClose} className={CLOSE_CLASS}>
+                <span aria-hidden="true" className={INDEX_CLASS}>
+                  03
+                </span>
+                <span>Close</span>
+                <span aria-hidden="true" className={ARROW_CLASS}>
+                  ×
+                </span>
+              </button>
+            </nav>
+          </div>
+
+          <div className="mt-10 px-6 md:px-10">
+            <div className="h-px w-10 bg-aura-text/30" />
+            <p className="mt-4 max-w-[19rem] text-xs leading-relaxed text-aura-text/55">
+              Local-first. No cloud, no feed — only the photographs you chose, on the machine you
+              chose.
+            </p>
+          </div>
         </GlassPanel>
       </div>
     </>
