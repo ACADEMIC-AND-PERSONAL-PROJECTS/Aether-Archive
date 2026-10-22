@@ -134,8 +134,8 @@ live instance.
 The workflow logs in to GHCR with the run's `GITHUB_TOKEN` to push. The packages may stay private:
 the deploy job passes that same short-lived token over SSH stdin, and `deploy.sh` logs in with a
 temporary `DOCKER_CONFIG` that is removed on exit. No long-lived registry credential is stored on the
-VPS. A manual deploy can set `GHCR_TOKEN`/`GHCR_USER` in the environment or run `docker login` once as
-an operator.
+VPS. A manual deploy can export `GHCR_TOKEN`/`GHCR_USER` for the command (not in `.env`) or run
+`docker login` once as an operator. A token exported for the run wins over a stale value in `.env`.
 
 ## 5. Release: tag → images → deploy
 

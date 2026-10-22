@@ -92,6 +92,10 @@ jobs:
     if: ${{ github.ref_type == 'tag' || inputs.deploy }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    # The deploy job only pulls; give the token it passes to the VPS read-only package access.
+    permissions:
+      contents: read
+      packages: read
     environment:
       name: production
       url: ${{ vars.PUBLIC_URL }}

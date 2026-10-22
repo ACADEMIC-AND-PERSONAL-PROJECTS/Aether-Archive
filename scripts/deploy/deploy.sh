@@ -7,9 +7,10 @@
 #
 # GitHub Actions calls exactly this script over SSH after publishing the images to GHCR
 # (.github/workflows/release.yml). It is also the manual path, so there is no hidden deploy state:
-# the history and the current tag live in `state/` (gitignored), the credentials live in `.env`, and
-# the Compose files are the ones in the repository. With private images, export GHCR_TOKEN (and
-# optionally GHCR_USER); the script logs in with a temporary DOCKER_CONFIG and removes it on exit.
+# the history and the current tag live in `state/` (gitignored), the application credentials live in
+# `.env`, and the Compose files are the ones in the repository. With private images, export GHCR_TOKEN
+# (and optionally GHCR_USER) for the command; do not store it in `.env`. The script logs in with a
+# temporary DOCKER_CONFIG and removes it on exit.
 #
 # A failed health check or smoke test restores the previous tag instead of leaving a half-deployed
 # archive online. A failed rollback still exits non-zero and the alerting path takes over.
@@ -37,10 +38,15 @@ if [ ! -f .env ]; then
   echo "deploy: .env is missing; copy .env.example and fill the production values" >&2
   exit 1
 fi
+# A token exported for this run must win over a stale value in `.env`: the release pipes a fresh one.
+ghcr_token_inherited="${GHCR_TOKEN:-}"
+ghcr_user_inherited="${GHCR_USER:-}"
 set -a
 # shellcheck disable=SC1091
 . ./.env
 set +a
+if [ -n "$ghcr_token_inherited" ]; then GHCR_TOKEN="$ghcr_token_inherited"; fi
+if [ -n "$ghcr_user_inherited" ]; then GHCR_USER="$ghcr_user_inherited"; fi
 
 : "${DOMAIN:?deploy: DOMAIN must be set in .env}"
 if [ -n "${SMOKE_INSECURE:-}" ] && [ "${SMOKE_INSECURE}" != "0" ]; then

@@ -1257,17 +1257,19 @@ for an org admin), and storing a long-lived `read:packages` token on the VPS wou
 radius if the host were compromised. The deploy job still has to pull the exact tag it just built.
 
 **Decision.** Keep the packages private. The deploy job passes the workflow's short-lived
-`GITHUB_TOKEN` (the `packages: write` permission includes read) over the SSH stdin; `deploy.sh` logs
-in to `ghcr.io` with `GHCR_USER` and a `DOCKER_CONFIG` created by `mktemp -d`, runs the deploy, and
-removes that directory through an `EXIT` trap. A manual deploy may export `GHCR_TOKEN`/`GHCR_USER` or
-run `docker login`; no token is written to the repository, `.env`, logs, or the host's default Docker
-config.
+`GITHUB_TOKEN` — scoped on that job to `packages: read` — over the SSH stdin; `deploy.sh` logs in to
+`ghcr.io` with `GHCR_USER` and a `DOCKER_CONFIG` created by `mktemp -d`, runs the deploy, and removes
+that directory through an `EXIT` trap. A manual deploy may export `GHCR_TOKEN`/`GHCR_USER` for the
+command (not in `.env`) or run `docker login`. The login necessarily writes a mode-700 temporary
+Docker config for the duration of the run; no token is written to the repository, `.env`, logs, or the
+host's default Docker config.
 
 **Consequences.** The VPS can pull private images without a persistent registry credential; a leaked
 workflow token expires with the job. The deploy depends on the token being passed over SSH; a manual
 `deploy.sh` without `GHCR_TOKEN` needs an operator login or public packages. The credential exists in
-the deploy process environment for the duration of the run, not in a file on the host. Revisit if the
-organization API gains visibility control or a pull-through mirror is introduced.
+a mode-700 temporary Docker config and the deploy process environment for the run, not as a persistent
+credential; a `SIGKILL` can leave the directory until reboot. Revisit if the organization API gains
+visibility control or a pull-through mirror is introduced.
 
 ---
 
