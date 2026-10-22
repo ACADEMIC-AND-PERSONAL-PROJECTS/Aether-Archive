@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiRequest } from "./client";
 import { queryKeys } from "./queryKeys";
+import { createTraceparent } from "./traceparent";
 
 import type { Dump, DumpCreate, Photo } from "../types/api";
 
@@ -59,7 +60,11 @@ export interface PublishDumpRequest {
 export async function createDump(body: DumpCreate): Promise<Dump> {
   return apiRequest<Dump>("/dumps", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      // Start the trace in the browser; the API continues it and logs the same id (ADR-029).
+      traceparent: createTraceparent(),
+    },
     body: JSON.stringify(body),
   });
 }

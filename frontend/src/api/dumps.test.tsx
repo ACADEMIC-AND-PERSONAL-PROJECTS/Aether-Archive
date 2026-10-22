@@ -120,7 +120,10 @@ describe("createDump", () => {
     const [url, init] = fetchSpy.mock.calls[0] ?? [];
     expect(url).toBe("/api/v1/dumps");
     expect(init?.method).toBe("POST");
-    expect(init?.headers).toEqual({ "Content-Type": "application/json" });
+    expect(init?.headers).toMatchObject({ "Content-Type": "application/json" });
+    expect((init?.headers as Record<string, string>).traceparent).toMatch(
+      /^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/,
+    );
     expect(JSON.parse(String(init?.body))).toEqual(body);
   });
 
