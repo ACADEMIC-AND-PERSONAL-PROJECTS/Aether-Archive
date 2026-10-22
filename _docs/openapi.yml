@@ -89,6 +89,15 @@ paths:
         - Dumps
       summary: Créer un nouveau Dump mensuel
       description: Sauvegarde l'organisation de l'Atelier du Curateur (6 photos spécifiques, ordre précis, couleur de fond).
+      parameters:
+        - name: traceparent
+          in: header
+          required: false
+          description: Contexte W3C Trace Context (`00-<trace-id>-<span-id>-<flags>`) créé par le navigateur pour rattacher la publication à la trace du frontend (ADR-029). Absent, l'API démarre sa propre trace.
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$'
+            example: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
       requestBody:
         required: true
         content:

@@ -104,11 +104,14 @@ Dev mode without containers: `docker compose -f docker-compose.dev.yml up -d`, t
 
 ## 4. Public deployment
 
-**Status: BLOCKED — the VPS provider firewall does not accept the development machine.**
+**Status: VPS reachable; 80/443 accept traffic; first release pending.**
 
-The target is the existing DigitalOcean host `165.232.81.136`. It answers ICMP but TCP 22/80/443 time
-out from the development network, so the droplet firewall (or UFW) must allow the operator address and
-the public web ports before the first deployment.
+The target is the existing Oracle Cloud VPS `168.138.70.166` (Ubuntu 24.04, 2 vCPU, 1 GB RAM plus a
+2 GB swap added for the stack). SSH works as `ubuntu` with the local `~/.ssh/digital_ocean` key; Docker
+29.8.1 and Compose are installed. TCP 22, 80 and 443 answer from the development network — 80 and 443
+were proven with temporary listeners before the first deploy — and the host `iptables` accepts them and
+persists the rules. `168.138.70.166.nip.io` already resolves to the host. The only remaining step is
+the first `v*` release, the public smoke and the TLS certificate.
 
 The code path is complete and does not depend on that network fix:
 
@@ -150,10 +153,10 @@ git tag -a v1.0.0 -m "Aether Archive v1.0.0" && git push origin v1.0.0
 | 2 | **Product Specification** | DONE | `_docs/aether_archive_specs.md`, `_docs/openapi.yml`, `docs/scrum/PRODUCT-BACKLOG.md`, public issues/milestones (#180, #7) |
 | 3 | **Agent Team Specification** | DONE | `docs/agents/TEAM.md` (roles, handoffs, invariants), `.claude/agents/*`, `.claude/skills/*`, `CLAUDE.md` |
 | 4 | **Context Management** | DONE | `AGENTS.md` (entry point), `CLAUDE.md` (<200 lines), `.claude/rules/*` path-scoped, `docs/` modular, `reports/` evidence |
-| 5 | **Application** | DONE | The four views, upload/publish, one-command stack; editorial redesign screenshots in `reports/evidence/`; verified by the suites and the E6-S4 browser pass. The physical-device pass is a separate, explicitly unclaimed check. |
+| 5 | **Application** | DONE | The four views, upload/publish, one-command stack; editorial redesign screenshots in `reports/evidence/`; verified by the backend/frontend suites and the real-browser axe pass at 320/768/1280 (`frontend/e2e/a11y.spec.ts`). The physical-device pass is a separate, explicitly unclaimed check. |
 | 6 | **Testing** | DONE | `make verify`; backend `./mvnw verify` (307 tests, Testcontainers PostgreSQL), frontend `npm run test` (518 tests), lint/typecheck/build in CI, on-call unit tests, deploy shell checks. Evidence: `reports/`, `/tmp/opencode/mvn-verify.log` (local). |
 | 7 | **Containerization** | DONE | `backend/Dockerfile`, `frontend/Dockerfile`, `docker-compose.yml`, healthchecks, persistent volumes, non-root API, bounded logs; base stack healthy on `http://localhost:3000`. |
-| 8 | **Deployment** | **BLOCKED** | `docker-compose.prod.yml`, `docker/Caddyfile`, `docs/engineering/DEPLOYMENT.md`; the release/deploy scripts are shipped; blocked on the VPS firewall/DNS (see §4). |
+| 8 | **Deployment** | **IN PROGRESS** | `docker-compose.prod.yml`, `docker/Caddyfile`, `docs/engineering/DEPLOYMENT.md`; the release/deploy scripts are shipped; the VPS is reachable on 22/80/443 and `168.138.70.166.nip.io` resolves; the first public release is the remaining step (see §4). |
 | 9 | **CI/CD** | **DONE (pipeline); first public run pending** | `.github/workflows/ci.yml` (tests on every PR), `.github/workflows/release.yml` (GHCR build/push + SSH deploy), `scripts/deploy/{deploy,rollback,smoke,backup}.sh`; the deploy job is gated on `VPS_*` secrets. |
 | 10 | **Observability** | **DONE (local); public pending** | `docker-compose.observability.yml`, `observability/`, `backend/src/main/resources/application-prod.yml`, `logback-spring.xml`, `frontend/src/api/traceparent.ts`; dashboard and traces in `reports/evidence/`; runbook in `docs/engineering/OBSERVABILITY.md`. |
 | 11 | **Alerting** | **DONE (local drill); public pending** | `observability/alerts.yml`, `observability/alertmanager.yml`; `AetherPublish5xxRate` fired for real; incident record and screenshots in `reports/observability-incident-drill-20261022.md`. |
@@ -221,8 +224,8 @@ receiving a latency alert; the final run is the critical one recorded in the rep
 
 `oncall/` is a small **host** process (systemd, `oncall/aether-oncall.service`), not a container. It
 needs the Docker socket to restart services; giving that power to a public-facing container would be a
-larger risk. It listens on `0.0.0.0:9099` behind the Docker host gateway with a bearer token from
-`ONCALL_WEBHOOK_TOKEN`.
+larger risk. It binds `127.0.0.1` and the Docker bridge gateway (never `0.0.0.0`) and requires a bearer
+token from `ONCALL_WEBHOOK_TOKEN`.
 
 1. receives the Alertmanager webhook (idempotent per fingerprint), returns `202`;
 2. diagnoses Docker health for `api` and `db`, plus the last 60 API log lines;
@@ -278,9 +281,10 @@ database in 8 seconds, and a resolved incident:
   prepared but not completed on hardware; the report says so rather than claiming a pass.
 - **The public demo is seeded**, not the owner's real archive. The local-first default remains the
   product.
-- **The VPS deployment is blocked** until the host firewall allows the operator and DNS resolves; the
-  deployment criterion is deliberately marked `BLOCKED`, not `DONE`. The release, deploy, smoke,
-  rollback and backup code is complete and exercised locally.
+- **The VPS deployment is in progress**: SSH, DNS and 80/443 are verified on `168.138.70.166`; the
+  first `v*` release and public smoke are the remaining steps. The deployment criterion stays
+  `IN PROGRESS`, not `DONE`, until that smoke passes. The release, deploy, smoke, rollback, backup and
+  restore paths are complete and exercised locally.
 - **The on-call path is deterministic by design**; it is not a general incident agent. It never runs
   SQL and never deletes data.
 - **Known frontend issues** #176 (River scroller), #177 (first-publish cache) and #179 (menu history)
