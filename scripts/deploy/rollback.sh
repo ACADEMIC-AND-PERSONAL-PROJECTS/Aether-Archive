@@ -23,8 +23,9 @@ if [ ! -f "$STATE_DIR/history.tsv" ]; then
 fi
 
 previous_tag="$(awk -F'\t' -v current="$current_tag" '
-  $2 == "success" && $3 != current { tag = $3 }
-  END { print tag }
+  $2 != "success" { next }
+  $3 == current { print previous; exit }
+  { previous = $3 }
 ' "$STATE_DIR/history.tsv")"
 
 if [ -z "$previous_tag" ]; then

@@ -5,8 +5,9 @@
 #
 # `make prod-up` and scripts/deploy/deploy.sh wrap that command. Caddy is the only public entry
 # point: it terminates TLS, redirects HTTP to HTTPS, proxies the app to the internal `web` service
-# and publishes the read-only Grafana dashboards under /grafana/. Neither the API, PostgreSQL nor the
-# observability UIs publish a host port.
+# and publishes the read-only Grafana dashboards under /grafana/. Neither the API nor PostgreSQL
+# publishes a host port; the observability UIs publish only on 127.0.0.1 for an SSH tunnel, never on
+# a public interface.
 services:
   api:
     environment:

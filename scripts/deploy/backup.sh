@@ -22,8 +22,26 @@ set +a
 
 BACKUP_DIR="${BACKUP_DIR:-backups}"
 RETENTION_DAYS="${RETENTION_DAYS:-7}"
+if [[ ! "$RETENTION_DAYS" =~ ^[1-9][0-9]*$ ]]; then
+  echo "backup: RETENTION_DAYS must be a positive integer" >&2
+  exit 2
+fi
+case "$BACKUP_DIR" in
+  /*)
+    echo "backup: BACKUP_DIR must be relative to the repository (got an absolute path)" >&2
+    exit 2
+    ;;
+esac
 mkdir -p "$BACKUP_DIR"
 BACKUP_ABS="$(cd "$BACKUP_DIR" && pwd)"
+REPO_ABS="$(pwd)"
+case "$BACKUP_ABS/" in
+  "$REPO_ABS"/*) ;;
+  *)
+    echo "backup: BACKUP_DIR must resolve inside $REPO_ABS" >&2
+    exit 2
+    ;;
+esac
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 
 # The database and media services do not depend on the production overlay, so the backup also works
@@ -40,14 +58,18 @@ else
 fi
 
 if docker volume inspect aether_stack_media >/dev/null 2>&1; then
+  # The media files are readable only by the API user (0600), so tar must run as root; it then hands
+  # the finished tarball to the invoking user so retention can delete it. Root also records the
+  # volume files' original ownership for a root restore.
   docker run --rm \
+    -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" -e STAMP="$stamp" \
     -v aether_stack_media:/media:ro \
     -v "${BACKUP_ABS}:/backup" \
-    alpine:3.21 tar czf "/backup/media-$stamp.tar.gz" -C /media .
+    alpine:3.21 sh -c 'tar czf "/backup/media-${STAMP}.tar.gz" -C /media . && chown "${HOST_UID}:${HOST_GID}" "/backup/media-${STAMP}.tar.gz"'
   echo "backup: media-$stamp.tar.gz"
 else
   echo "backup: media volume not found; skipped the archive tarball" >&2
 fi
 
-find "$BACKUP_DIR" -type f -mtime "+${RETENTION_DAYS}" -delete
+find "$BACKUP_ABS" -maxdepth 1 -type f -mtime "+${RETENTION_DAYS}" -delete
 echo "backup: retention ${RETENTION_DAYS}d in $BACKUP_ABS"

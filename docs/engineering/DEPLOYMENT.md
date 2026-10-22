@@ -215,23 +215,27 @@ another success. The on-call responder has a narrower automatic path: it recreat
 - `backups/media-<utc>.tar.gz` — the `aether_stack_media` volume;
 - deletes files older than `RETENTION_DAYS` (7).
 
-Copy `backups/` off the VPS; it is gitignored. Restore, with the API stopped:
+Copy `backups/` off the VPS; it is gitignored. Restore the database with the shipped script, which
+stops the API, drops and recreates the `public` schema, applies the dump with `ON_ERROR_STOP=1`, starts
+the API again and waits for its healthcheck:
 
 ```bash
 cd /opt/aether
-docker compose -f docker-compose.yml -f docker-compose.observability.yml \
-  -f docker-compose.prod.yml stop api
-gunzip -c backups/db-<utc>.sql.gz | \
-  docker compose -f docker-compose.yml -f docker-compose.observability.yml \
-    -f docker-compose.prod.yml exec -T db psql -U aether -d aether
+./scripts/deploy/restore.sh backups/db-<utc>.sql.gz --yes
+```
+
+Restore the media volume separately (the API can stay up):
+
+```bash
 docker run --rm -v aether_stack_media:/media \
   -v "$PWD/backups:/backup" alpine:3.21 \
   tar xzf "/backup/media-<utc>.tar.gz" -C /media
-docker compose -f docker-compose.yml -f docker-compose.observability.yml \
-  -f docker-compose.prod.yml start api
 ```
 
-Restores are destructive; take a fresh dump first if the current data might still be wanted.
+A plain `pg_dump | psql` on top of the live schema fails on the first existing table, which is why the
+script replaces the schema instead. Restores are destructive; take a fresh dump first if the current
+data might still be wanted. The restore path was drilled on the local stack: dump, drop/recreate,
+restore, healthcheck, row counts compared (`reports/`).
 
 ## 9. Observability and on-call in production
 
@@ -244,13 +248,14 @@ Restores are destructive; take a fresh dump first if the current data might stil
     -L 16686:127.0.0.1:16686 deploy@VPS_HOST
   ```
 
-- Install the responder once:
+- Install the responder once (the script substitutes the deploy user and checkout path, opens only
+  Docker's private ranges to port 9099, and enables the unit):
 
   ```bash
-  sudo cp /opt/aether/oncall/aether-oncall.service /etc/systemd/system/
-  sudo systemctl daemon-reload
-  sudo systemctl enable --now aether-oncall.service
+  sudo /opt/aether/oncall/install-service.sh ubuntu   # use the actual deploy user
+  systemctl status aether-oncall.service --no-pager
   curl -fsS http://127.0.0.1:9099/healthz
+  ss -ltnp | grep 9099
   ```
 
 Details, alert rules and the runbook: `docs/engineering/OBSERVABILITY.md`; responder security model:

@@ -9,7 +9,7 @@ OBS_COMPOSE := $(COMPOSE) -f docker-compose.yml -f docker-compose.override.yml -
 # Production has no published web port: Caddy is the only public entry point.
 PROD_COMPOSE := $(COMPOSE) -f docker-compose.yml -f docker-compose.observability.yml -f docker-compose.prod.yml
 
-.PHONY: help up down logs ps build verify seed demo smoke observe-up observe-down observe-ps observe-logs oncall prod-up prod-down prod-logs deploy-smoke backup rollback clean
+.PHONY: help up down logs ps build verify seed demo smoke observe-up observe-down observe-ps observe-logs oncall a11y prod-up prod-down prod-logs deploy-smoke backup restore rollback clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-14s %s\n", $$1, $$2}'
@@ -34,7 +34,7 @@ verify: ## Run every gate the CI runs
 	cd backend && ./mvnw -B verify
 	cd frontend && npm run lint && npm run format:check && npm run test -- --run && npm run typecheck && npm run build
 	python3 -m unittest discover -s oncall -p 'test_*.py'
-	bash -n scripts/dev/oncall-token.sh oncall/run.sh scripts/deploy/*.sh scripts/demo/*.sh
+	bash -n scripts/dev/oncall-token.sh oncall/run.sh oncall/install-service.sh scripts/deploy/*.sh scripts/demo/*.sh
 
 seed: ## Upload 300 sample photos and a dump through the running stack
 	AETHER_DATA_DIR=/tmp/opencode/aether-seed ./scripts/dev/seed.sh --count 300 --base-url $(BASE_URL)
@@ -85,8 +85,14 @@ deploy-smoke: ## Walk a deployed origin (BASE_URL=https://your.domain)
 backup: ## Back up PostgreSQL and the media volume to backups/
 	./scripts/deploy/backup.sh
 
+restore: ## DESTRUCTIVE: restore a dump (make restore DUMP=backups/db-<utc>.sql.gz)
+	./scripts/deploy/restore.sh "$(DUMP)" --yes
+
 rollback: ## Roll back to the previous successful image (VPS, scripts/deploy/rollback.sh)
 	./scripts/deploy/rollback.sh
+
+a11y: ## Real-browser axe contrast pass at 320/768/1280 (needs npx playwright install chromium)
+	cd frontend && npm run test:a11y
 
 clean: ## DESTRUCTIVE: stop the local stack and delete its database and media volumes
 	@printf 'This deletes aether_stack_pgdata and aether_stack_media. Type "yes": ' && read -r ok && [ "$$ok" = "yes" ]

@@ -42,6 +42,12 @@ set -a
 set +a
 
 : "${DOMAIN:?deploy: DOMAIN must be set in .env}"
+if [ -n "${SMOKE_INSECURE:-}" ] && [ "${SMOKE_INSECURE}" != "0" ]; then
+  echo "deploy: refusing SMOKE_INSECURE=$SMOKE_INSECURE; production smoke must verify the public certificate" >&2
+  echo "deploy: use ./scripts/deploy/smoke.sh with SMOKE_INSECURE=1 only for a local Caddy rehearsal" >&2
+  exit 1
+fi
+unset SMOKE_INSECURE
 if [ -z "${POSTGRES_PASSWORD:-}" ] || [ "${POSTGRES_PASSWORD}" = "change-me-local" ]; then
   echo "deploy: set a real POSTGRES_PASSWORD in .env" >&2
   exit 1

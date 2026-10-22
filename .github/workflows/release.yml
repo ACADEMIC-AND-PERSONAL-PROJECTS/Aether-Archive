@@ -130,6 +130,9 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
         run: |
+          # Run the scripts from the exact commit that produced the images. The VPS clone persists
+          # across releases, so without this fetch/checkout a tag could deploy new images with old
+          # Compose/Caddy/deploy scripts.
           ssh -i ~/.ssh/deploy_key \
             -o IdentitiesOnly=yes \
             -o BatchMode=yes \
@@ -138,4 +141,9 @@ jobs:
             -o ConnectTimeout=15 \
             -p "$VPS_PORT" \
             "$VPS_USER@$VPS_HOST" \
-            "cd /opt/aether && ./scripts/deploy/deploy.sh 'sha-${GITHUB_SHA}'"
+            "set -euo pipefail; cd /opt/aether; \
+             test -z \"\$(git status --porcelain)\" || { echo 'deploy: dirty checkout in /opt/aether' >&2; exit 1; }; \
+             git fetch --force --tags origin '+refs/heads/*:refs/remotes/origin/*'; \
+             git checkout --detach '${GITHUB_SHA}'; \
+             test \"\$(git rev-parse HEAD)\" = '${GITHUB_SHA}'; \
+             ./scripts/deploy/deploy.sh 'sha-${GITHUB_SHA}'"
