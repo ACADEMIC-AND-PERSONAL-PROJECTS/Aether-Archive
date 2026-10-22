@@ -1,0 +1,20 @@
+# Aether Archive — public TLS edge (ADR-029).
+#
+# Caddy obtains and renews the certificate for DOMAIN automatically (Let's Encrypt). The domain must
+# resolve to this host and ports 80/443 must be reachable. For a host without a domain, use a
+# wildcard DNS name such as `aether.203.0.113.10.nip.io`.
+{$DOMAIN} {
+	encode zstd gzip
+
+	reverse_proxy web:80
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

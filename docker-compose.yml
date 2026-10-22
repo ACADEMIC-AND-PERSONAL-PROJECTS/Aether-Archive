@@ -1,0 +1,120 @@
+# Aether Archive — one-command stack (ADR-010, ADR-029).
+#
+#   docker compose up -d --build        # local: web on http://localhost:3000
+#   docker compose ps                   # wait for "healthy"
+#   docker compose logs -f api
+#
+# On the VPS, production is the same file plus the prod override (Caddy + TLS); the local
+# `docker-compose.override.yml` is not loaded by that command:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Every credential and public origin comes from the repository-root `.env` (gitignored). The
+# defaults below make a fresh clone start; they are placeholders, not secrets.
+name: aether-archive
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-aether}
+      POSTGRES_USER: ${POSTGRES_USER:-aether}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-local}
+    volumes:
+      - aether_stack_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-aether} -d ${POSTGRES_DB:-aether}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks: [aether]
+    security_opt: [no-new-privileges:true]
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  api:
+    image: ${AETHER_API_IMAGE:-aether-archive-api:local}
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-aether}
+      POSTGRES_USER: ${POSTGRES_USER:-aether}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-local}
+      AETHER_DATA_DIR: /data
+      AETHER_MAX_UPLOAD_MB: ${AETHER_MAX_UPLOAD_MB:-15}
+      AETHER_CORS_ALLOWED_ORIGINS: ${AETHER_PUBLIC_ORIGIN:-http://localhost:3000,http://192.168.*.*:3000}
+      SERVER_PORT: "8080"
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318/v1/traces}
+    volumes:
+      - aether_stack_media:/data
+    expose: ["8080"]
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://127.0.0.1:8080/actuator/health | grep -q '\"status\":\"UP\"'",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    networks: [aether]
+    security_opt: [no-new-privileges:true]
+    init: true
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  web:
+    image: ${AETHER_WEB_IMAGE:-aether-archive-web:local}
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    expose: ["80"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks: [aether]
+    security_opt: [no-new-privileges:true]
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  # Distinct from the development database volume (`aether_pgdata`) on purpose: a compose
+  # experiment must never point the product at a half-seeded dev database.
+  aether_stack_pgdata:
+    name: aether_stack_pgdata
+  aether_stack_media:
+    name: aether_stack_media
+
+networks:
+  aether:
+    name: aether

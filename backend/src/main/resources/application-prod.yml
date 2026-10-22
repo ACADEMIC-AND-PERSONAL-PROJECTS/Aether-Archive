@@ -2,6 +2,31 @@ spring:
   main:
     banner-mode: off
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  metrics:
+    tags:
+      application: aether-archive
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      # The compose stack points this at the collector; an operator can override it with the
+      # standard OTLP environment variable. A failed export never fails a request.
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+
 logging:
   level:
     root: INFO
+    # The export path is noisy when no collector is running; keep the app logs readable.
+    io.opentelemetry: WARN
+    io.micrometer: WARN
