@@ -1247,6 +1247,30 @@ remains **pending** until the VPS firewall and DNS are reachable; the code path 
 
 ---
 
+## ADR-030 — Private GHCR images, run-scoped pull credential
+
+**Date**: 2026-10-22 · **Status**: Accepted
+
+**Context.** The release workflow pushes `sha-<commit>` images to GHCR. The packages are owned by the
+organization and private; the organization's API rejects the documented visibility change (404 even
+for an org admin), and storing a long-lived `read:packages` token on the VPS would widen the blast
+radius if the host were compromised. The deploy job still has to pull the exact tag it just built.
+
+**Decision.** Keep the packages private. The deploy job passes the workflow's short-lived
+`GITHUB_TOKEN` (the `packages: write` permission includes read) over the SSH stdin; `deploy.sh` logs
+in to `ghcr.io` with `GHCR_USER` and a `DOCKER_CONFIG` created by `mktemp -d`, runs the deploy, and
+removes that directory through an `EXIT` trap. A manual deploy may export `GHCR_TOKEN`/`GHCR_USER` or
+run `docker login`; no token is written to the repository, `.env`, logs, or the host's default Docker
+config.
+
+**Consequences.** The VPS can pull private images without a persistent registry credential; a leaked
+workflow token expires with the job. The deploy depends on the token being passed over SSH; a manual
+`deploy.sh` without `GHCR_TOKEN` needs an operator login or public packages. The credential exists in
+the deploy process environment for the duration of the run, not in a file on the host. Revisit if the
+organization API gains visibility control or a pull-through mirror is introduced.
+
+---
+
 ## Template for new ADRs
 
 ```markdown

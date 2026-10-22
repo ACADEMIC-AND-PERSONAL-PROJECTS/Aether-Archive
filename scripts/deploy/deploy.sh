@@ -8,7 +8,8 @@
 # GitHub Actions calls exactly this script over SSH after publishing the images to GHCR
 # (.github/workflows/release.yml). It is also the manual path, so there is no hidden deploy state:
 # the history and the current tag live in `state/` (gitignored), the credentials live in `.env`, and
-# the Compose files are the ones in the repository.
+# the Compose files are the ones in the repository. With private images, export GHCR_TOKEN (and
+# optionally GHCR_USER); the script logs in with a temporary DOCKER_CONFIG and removes it on exit.
 #
 # A failed health check or smoke test restores the previous tag instead of leaving a half-deployed
 # archive online. A failed rollback still exits non-zero and the alerting path takes over.
@@ -70,6 +71,20 @@ export AETHER_WEB_IMAGE="$WEB_IMAGE"
 
 BASE_URL="https://${DOMAIN}"
 COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.observability.yml -f docker-compose.prod.yml)
+
+# The release workflow pipes its short-lived GITHUB_TOKEN over the SSH stdin. Log in with a
+# run-scoped Docker config and remove it on exit: no long-lived registry credential is stored on
+# the VPS, and a manual deploy without GHCR_TOKEN behaves exactly as before.
+if [ -n "${GHCR_TOKEN:-}" ]; then
+  GHCR_USER="${GHCR_USER:-github-actions}"
+  DOCKER_CONFIG="$(mktemp -d)"
+  export DOCKER_CONFIG
+  cleanup_ghcr() { rm -rf "$DOCKER_CONFIG"; }
+  trap cleanup_ghcr EXIT
+  printf '%s' "$GHCR_TOKEN" | docker login "$REGISTRY" --username "$GHCR_USER" --password-stdin >/dev/null
+  unset GHCR_TOKEN
+  echo "deploy: authenticated to $REGISTRY with the run-scoped token"
+fi
 STATE_DIR="state"
 mkdir -p "$STATE_DIR"
 
@@ -124,7 +139,7 @@ fi
 # 3. Pull and start. --wait makes Compose the first health gate; the smoke test is the second.
 if ! "${COMPOSE[@]}" pull api web; then
   echo "deploy: could not pull $TAG from $REGISTRY." >&2
-  echo "deploy: make the GHCR packages public, or run 'docker login $REGISTRY' on the VPS." >&2
+  echo "deploy: check the run-scoped GHCR credential, or make the packages public / run 'docker login $REGISTRY' on the VPS." >&2
   record failed
   exit 1
 fi
