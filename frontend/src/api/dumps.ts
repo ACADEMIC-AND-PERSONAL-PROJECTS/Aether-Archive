@@ -1,7 +1,8 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiRequest } from "./client";
 import { queryKeys } from "./queryKeys";
+import { createTraceparent } from "./traceparent";
 
 import type { Dump, DumpCreate, Photo } from "../types/api";
 
@@ -21,13 +22,33 @@ import type { Dump, DumpCreate, Photo } from "../types/api";
  * lands it at the head and drops the optimistic entry and any copy a read raced in — exactly once. A
  * refetch would spend a request to learn what the response already says.
  *
- * **The reader arrives with E5-S1, and the failure sentences with E4-S5D.** No hook reads
- * `queryKeys.dumps` yet, so `onMutate`'s cancel and the tests' `QueryClient` stand in for the River
- * feed this module prepares. The hook exposes the `ApiError` and says nothing about it: the
- * error→sentence vocabulary belongs to the story that first shows a curator a sentence. Unlike the
- * upload, the publish takes no `AbortSignal` — leaving the view must not throw away an answer that
- * changes what the archive holds; the 10 s deadline still bounds a wedged backend.
+ * **The reader arrived with E5-S1A, and the failure sentences with E4-S5D.** `useDumps` below is the
+ * River feed's read, and the mounted reader is what `onMutate`'s cancel protects: a response landing
+ * between its optimistic insert and the request would overwrite the draft. The hook still exposes the
+ * `ApiError` and says nothing about it — the error→sentence vocabulary lives in the view that shows
+ * the sentence, not here. Unlike the upload, the publish takes no `AbortSignal` — leaving the view
+ * must not throw away an answer that changes what the archive holds; the 10 s deadline still bounds a
+ * wedged backend.
  */
+
+/** `GET /api/v1/dumps` — every dump ever published, newest first, its photos in display order. */
+export async function fetchDumps(signal?: AbortSignal): Promise<readonly Dump[]> {
+  return apiRequest<readonly Dump[]>("/dumps", signal ? { signal } : {});
+}
+
+/**
+ * The reader E4-S5C prepared this module for: the River's dump query (E5-S1A).
+ *
+ * Defaults from the app-wide policy (`app/queryClient.ts`), deliberately nothing on top: the 30 s
+ * `staleTime` covers moving between views, and every change to this list arrives through the cache
+ * rather than a refetch — `usePublishDump` below lands the server's dump itself (ADR-024 §4).
+ */
+export function useDumps() {
+  return useQuery({
+    queryKey: queryKeys.dumps,
+    queryFn: ({ signal }) => fetchDumps(signal),
+  });
+}
 
 /** One publish: the body the plan produced and the six photos it names, in display order. */
 export interface PublishDumpRequest {
@@ -39,7 +60,11 @@ export interface PublishDumpRequest {
 export async function createDump(body: DumpCreate): Promise<Dump> {
   return apiRequest<Dump>("/dumps", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      // Start the trace in the browser; the API continues it and logs the same id (ADR-029).
+      traceparent: createTraceparent(),
+    },
     body: JSON.stringify(body),
   });
 }

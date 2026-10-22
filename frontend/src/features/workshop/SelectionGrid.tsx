@@ -56,11 +56,10 @@ import type { Photo } from "../../types/api";
  *
  * ## The tile
  *
- * A photo, a dark scrim that is always mounted, and a remove button in the corner. The scrim is the
- * E4-S1A fix carried into the grid: when a preview cannot decode, the `<img>` is dropped but the tile is
- * not, so the browser's broken-image glyph never shows and the layout does not shift — the scrim is the
- * backdrop either way. `loading="lazy"` and `decoding="async"` follow the rendering rule for every image
- * except the splash hero.
+ * A photo, a remove button in the corner, and (only when decoding fails) the E4-S1A scrim. A healthy
+ * preview is left unobscured so the contact sheet reads as photographs rather than dark tiles.
+ * `loading="lazy"` and `decoding="async"` follow the rendering rule for every image except the splash
+ * hero.
  *
  * The remove button is a real `<button>` with its own 44 × 44 hit area. Its visible disc is smaller
  * (28 px) so a 114 px thumbnail is not half covered by a control, but the tappable area is the whole
@@ -83,11 +82,16 @@ import type { Photo } from "../../types/api";
  * ## The keyboard path (E4-S3D)
  *
  * dnd-kit's `attributes` put the drag surface in the tab order with `role="button"`, a name that
- * states the photo's position and file, and `aria-describedby` pointing at its built-in instructions;
+ * states the photo's position and file, `aria-pressed` for inspector selection, and `aria-describedby`
+ * pointing at its built-in instructions;
  * `KeyboardSensor` with `sortableKeyboardCoordinates` turns Space/Enter into a lift, the arrows into
  * moves to the nearest tile, Space/Enter into a drop and Escape into a cancel. Without the coordinate
  * getter the sensor moves the overlay in 25 px steps and never changes the order. E4-S3B deliberately
  * shipped no focus stop without a sensor; the two land together here.
+ *
+ * A pointer click also selects a tile without lifting it. The Workshop's inspector supplies explicit
+ * earlier/later buttons, the single-pointer alternative to dragging; long-press touch and keyboard
+ * sorting remain available.
  *
  * Announcements (`lib/ordering/announce.ts`) are built from the current array, so a reader hears
  * "Photo 2 of 6 moved to position 4." rather than generated ids. The first `over` in a drag is the
@@ -127,13 +131,11 @@ import type { Photo } from "../../types/api";
  *
  * ## The state line
  *
- * Under each tile, one short sentence: "Waiting", "Uploading", "Added", or the per-file failure sentence.
- * A screen reader hears the file's name first (the `sr-only` span), so six "Waiting" lines do not become
- * six anonymous ones. The line is ordinary text, not a live region: the workshop mounts one persistent
- * status region for announcements, and inserting a second one per tile would multiply every event by six.
- * `data-state` on the list item carries the same information for tests and for anyone inspecting the DOM;
- * `data-photo-id`, present only once the tile is `added`, carries the archive photo's id — the value the
- * publish will read.
+ * Waiting is present for assistive technology but not repeated in the visible contact sheet. Upload,
+ * success and per-file failure remain visible in a solid photo scrim; they are ordinary text, not live
+ * regions, because the Workshop mounts one persistent status region for announcements. `data-state` on
+ * the list item carries the state for tests and DOM inspection; `data-photo-id`, present only once the
+ * tile is `added`, carries the archive photo's id — the value the publish will read.
  */
 
 /**
@@ -168,9 +170,12 @@ export interface SelectionItem {
 
 export interface SelectionGridProps {
   readonly items: readonly SelectionItem[];
+  /** The photo selected for the inspector and pointer-based ordering controls. */
+  readonly selectedId: string | null;
   /** True while an upload is running: removal and dragging wait for the request to settle. */
   readonly busy: boolean;
   readonly onMove: (from: number, to: number) => void;
+  readonly onSelect: (id: string) => void;
   readonly onRemove: (id: string) => void;
   readonly onPreviewError: (id: string) => void;
 }
@@ -227,7 +232,7 @@ function tileLabel(item: SelectionItem, position: number, total: number): string
     : `Photo ${position} of ${total}: ${item.file.name}`;
 }
 
-/** The artwork layer shared by the tile and its drag overlay: scrim, then the preview if it decoded. */
+/** The artwork layer shared by the tile and its drag overlay: the photo, or a quiet failed-preview scrim. */
 function TileFace({
   item,
   onPreviewError,
@@ -237,10 +242,13 @@ function TileFace({
 }) {
   return (
     <>
-      {/* Always mounted: the known backdrop a failed preview falls back to (E4-S1A). */}
-      <div data-testid="tile-scrim" aria-hidden="true" className="absolute inset-0 bg-aura-bg/70" />
-
-      {item.previewBroken ? null : (
+      {item.previewBroken ? (
+        <div
+          data-testid="tile-scrim"
+          aria-hidden="true"
+          className="absolute inset-0 bg-aura-bg/70"
+        />
+      ) : (
         <img
           src={item.previewUrl}
           alt=""
@@ -260,16 +268,20 @@ function SortableTile({
   item,
   position,
   total,
+  selected,
   busy,
   reducedMotion,
+  onSelect,
   onRemove,
   onPreviewError,
 }: {
   readonly item: SelectionItem;
   readonly position: number;
   readonly total: number;
+  readonly selected: boolean;
   readonly busy: boolean;
   readonly reducedMotion: boolean;
+  readonly onSelect: (id: string) => void;
   readonly onRemove: (id: string) => void;
   readonly onPreviewError: (id: string) => void;
 }) {
@@ -299,10 +311,16 @@ function SortableTile({
       data-state={item.state}
       data-photo-id={item.photo?.id}
       data-dragging={isDragging ? "true" : undefined}
+      data-selected={selected ? "true" : undefined}
       // The slot stays measured while its photo is in the overlay; only the paint is hidden.
       className={`min-w-0 ${isDragging ? "opacity-0" : ""}`}
     >
-      <div className="relative aspect-square overflow-hidden rounded-[14px]">
+      <div
+        data-slot={String(position).padStart(2, "0")}
+        className={`aether-slot relative aspect-[4/3] overflow-hidden rounded-[2px] ${
+          selected ? "ring-1 ring-inset ring-aura-accent" : ""
+        }`}
+      >
         {/* The drag surface — a sibling of the remove button, and the tile's keyboard affordance
             since E4-S3D: the attributes put it in the tab order and dnd-kit's sensor listens. */}
         <div
@@ -310,10 +328,16 @@ function SortableTile({
           {...attributes}
           {...listeners}
           aria-label={tileLabel(item, position, total)}
+          aria-pressed={selected}
           data-testid="drag-activator"
+          onClick={() => {
+            if (!busy) {
+              onSelect(item.id);
+            }
+          }}
           // `touch-action: manipulation` leaves vertical panning and pinch-zoom to the browser, so a
           // short swipe scrolls the grid instead of lifting the tile (measured in the Chromium probe).
-          className="absolute inset-0 touch-manipulation rounded-[14px] focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/50 [@media(pointer:fine)]:cursor-grab [@media(pointer:fine)]:active:cursor-grabbing"
+          className="absolute inset-0 touch-manipulation rounded-[2px] focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/70 [@media(pointer:fine)]:cursor-grab [@media(pointer:fine)]:active:cursor-grabbing"
         >
           <TileFace item={item} onPreviewError={onPreviewError} />
         </div>
@@ -323,7 +347,7 @@ function SortableTile({
           aria-label={removeLabel(item)}
           disabled={busy}
           onClick={() => onRemove(item.id)}
-          className="absolute top-1 right-1 z-10 flex h-11 w-11 cursor-pointer items-center justify-center rounded-full transition-colors duration-[var(--motion-duration-quick)] active:bg-aura-bg/20 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/50 disabled:cursor-default disabled:opacity-40"
+          className="absolute top-1 right-1 z-10 flex h-11 w-11 cursor-pointer items-center justify-center rounded-full transition-colors duration-[var(--motion-duration-quick)] active:bg-aura-bg/20 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/70 disabled:cursor-default disabled:opacity-40"
         >
           {/* The visible disc is the button's own scrim, not a second surface. */}
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-aura-bg/70 text-aura-text">
@@ -340,12 +364,19 @@ function SortableTile({
             </svg>
           </span>
         </button>
-      </div>
 
-      <p className="mt-1 text-xs break-words text-aura-text">
-        <span className="sr-only">{item.file.name === "" ? "Photo" : item.file.name}: </span>
-        {statusSentence(item)}
-      </p>
+        {item.state === "waiting" ? (
+          <p className="sr-only">
+            <span>{item.file.name === "" ? "Photo" : item.file.name}: </span>
+            {statusSentence(item)}
+          </p>
+        ) : (
+          <p className="absolute inset-x-0 bottom-0 bg-aura-bg/80 px-2 py-2 text-xs break-words text-aura-text">
+            <span className="sr-only">{item.file.name === "" ? "Photo" : item.file.name}: </span>
+            {statusSentence(item)}
+          </p>
+        )}
+      </div>
     </li>
   );
 }
@@ -353,8 +384,10 @@ function SortableTile({
 /** The grid: a list for assistive tech, and one focal point — the photos. */
 export function SelectionGrid({
   items,
+  selectedId,
   busy,
   onMove,
+  onSelect,
   onRemove,
   onPreviewError,
 }: SelectionGridProps) {
@@ -462,15 +495,21 @@ export function SelectionGrid({
         strategy={rectSortingStrategy}
         disabled={busy}
       >
-        <ul role="list" aria-label="Selected photos" className="grid grid-cols-3 items-start gap-2">
+        <ul
+          role="list"
+          aria-label="Selected photos"
+          className="grid grid-cols-2 items-start gap-3 sm:grid-cols-3 sm:gap-4"
+        >
           {items.map((item, index) => (
             <SortableTile
               key={item.id}
               item={item}
               position={index + 1}
               total={items.length}
+              selected={item.id === selectedId}
               busy={busy}
               reducedMotion={reducedMotion}
+              onSelect={onSelect}
               onRemove={onRemove}
               onPreviewError={onPreviewError}
             />
@@ -491,13 +530,13 @@ export function SelectionGrid({
             data-drop-animation={reducedMotion ? "none" : `${DROP_ANIMATION_MS}ms`}
             className="w-full"
           >
-            <div className="relative aspect-square w-full scale-[1.03] overflow-hidden rounded-[14px] shadow-[0_8px_24px_rgba(0,0,0,0.24)] outline outline-1 -outline-offset-1 outline-aura-text/20">
+            <div className="relative aspect-[4/3] w-full scale-[1.03] overflow-hidden rounded-[2px] shadow-[0_8px_24px_rgba(0,0,0,0.24)] outline outline-1 -outline-offset-1 outline-aura-text/20">
               <TileFace item={activeItem} onPreviewError={onPreviewError} />
-              {/* A gradient scrim, not a floating label: the text stays on the lifted surface and
+              {/* A solid photo scrim, not a floating label: text stays on the lifted surface and
                   never sits directly on another photo (§3's scrim rule). */}
               <div
                 data-testid="drag-overlay-scrim"
-                className="absolute inset-x-0 bottom-0 bg-linear-to-t from-aura-bg/85 via-aura-bg/75 to-transparent px-2 pt-7 pb-1.5"
+                className="absolute inset-x-0 bottom-0 bg-aura-bg/80 px-2 pt-3 pb-1.5"
               >
                 <p className="text-xs break-words text-aura-text">{statusSentence(activeItem)}</p>
               </div>

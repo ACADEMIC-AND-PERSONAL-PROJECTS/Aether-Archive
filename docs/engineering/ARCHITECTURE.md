@@ -1,13 +1,15 @@
 # Architecture — Aether Archive
 
-> Status: **target architecture**. It describes what the sprints build; sections are marked `TARGET` until
-> the corresponding story lands. Keep it honest: when reality diverges, update this file in the same PR.
+> Status: **current architecture**. The product slice is built; sections are marked `TARGET` only where
+> the course production slice has not landed yet. Keep it honest: when reality diverges, update this
+> file in the same PR.
 
 ## 1. Context
 
 Aether Archive is a **single-user, local-first** application. One machine (the owner's) runs both the
-backend and the frontend build; a phone on the same LAN opens the app in a browser. Nothing leaves the
-machine: no cloud, no external request at runtime, no telemetry.
+backend and the frontend build; a phone on the same LAN opens the app in a browser. The default
+deployment leaves the machine: no cloud, no external request at runtime, no telemetry. The public demo
+profile (ADR-029) is a separate, seeded deployment with operational signals only.
 
 ```text
 ┌──────────────┐        LAN (http://192.168.x.x:3000)        ┌───────────────────────────┐
@@ -113,7 +115,7 @@ frontend/src/
 | **Security** | Local-only threat model: upload safety, path traversal guards, no secrets, no external calls (`ADR-008`). |
 | **Performance** | Mobile budget: LCP < 1.5 s over LAN, no layout shift, lazy images, ≤ 64 px downscale for extraction. |
 | **Accessibility** | WCAG 2.2 AA target for interactive UI: focus trap, keyboard paths, ≥ 4.5:1 contrast, reduced motion. |
-| **Observability** | Log lines per meaningful operation; no telemetry; verification evidence lands in `reports/`. |
+| **Observability** | Local default: log lines per meaningful operation, no telemetry. Demo/prod profile (ADR-029): self-hosted Prometheus, Grafana, Alertmanager, OTel Collector, Jaeger, Loki/Promtail; Actuator metrics, traces and JSON logs with `traceId`/`spanId`; publish-journey alerts and a host-side on-call responder. Only Grafana is public (`/grafana/`). No PII or image content. |
 | **Process** | SCRUM artefacts in-repo, one story per branch, merge commits, retro per sprint (`ADR-002`, `ADR-003`, `ADR-007`). |
 
 ## 8. Deployment / runbook
@@ -126,15 +128,28 @@ cd backend && ./mvnw spring-boot:run                    # API + images on :8080
 cd frontend && npm install && npm run dev -- --host     # Vite :5173 for the phone
 ```
 
-**v1.0 (target, E6-S11/S12)** — the whole stack as containers, one command:
+**Container stack (landed for the course slice, ADR-029)** — the whole stack as containers, one command:
 
 ```bash
-cp .env.example .env && docker compose up
+cp .env.example .env && docker compose up -d --build
 # Phone: http://<LAN-IP>:3000 (nginx serves the SPA and proxies /api + /images)
 ```
 
-Backup = `pg_dump` of the database + a copy of `images/` (scripted in E6-S7, documented in E6-S6).
-Full container requirements: `docs/engineering/DEPLOYMENT.md`.
+**Production/demo (ADR-029)** — Caddy terminates TLS on 80/443; only the internal network reaches the
+API and PostgreSQL. Production is the base + observability + prod overlays:
+
+```bash
+DOMAIN=aether.example.com docker compose -f docker-compose.yml \
+  -f docker-compose.observability.yml -f docker-compose.prod.yml up -d --build
+```
+
+The release path is a `v*` tag: `.github/workflows/release.yml` builds the images, pushes them to GHCR
+and runs `scripts/deploy/deploy.sh` on the VPS. The script is health-gated, smoke-tested, seeds the
+demo once, records the live tag and can roll back the previous one. Runbook, TLS, CD, backup and
+restore: `docs/engineering/DEPLOYMENT.md`; signals and alerts: `docs/engineering/OBSERVABILITY.md`.
+
+Backup = `scripts/deploy/backup.sh` (pg_dump + media volume) before every deploy, with 7-day
+retention; restore steps are in the deployment runbook.
 
 ## 9. Known open decisions
 

@@ -1,0 +1,158 @@
+# Release: publish immutable images, then deploy the same tag to the VPS.
+#
+# Supply chain: checkout is pinned to a commit SHA, the rest uses the runner's Docker CLI (no
+# unpinned third-party action runs with the repository token), and the deploy job receives its SSH
+# credentials from the `production` environment. The images are tagged twice: the human tag
+# (`v1.0.0`) and the immutable `sha-<full>` that the VPS actually runs.
+#
+# The deployment is deliberately allowed to be skipped when the VPS secrets are absent: the images
+# are still published and the workflow emits a warning instead of failing on a repository that has
+# not been connected yet. Once VPS_HOST, VPS_USER, VPS_SSH_KEY and VPS_KNOWN_HOSTS exist, every v*
+# tag deploys and runs the same smoke test a human would.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: "Deploy this commit to the VPS after publishing the images"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_OWNER: academic-and-personal-projects
+  API_IMAGE: ghcr.io/academic-and-personal-projects/aether-archive-api
+  WEB_IMAGE: ghcr.io/academic-and-personal-projects/aether-archive-web
+
+jobs:
+  publish:
+    name: Publish images to GHCR
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Resolve the release tag
+        id: meta
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            tag="${GITHUB_REF_NAME}"
+          else
+            tag="sha-${GITHUB_SHA}"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "publishing $tag from $GITHUB_SHA"
+
+      - name: Log in to GHCR
+        run: echo "${{ github.token }}" | docker login "$REGISTRY" --username "${{ github.actor }}" --password-stdin
+
+      - name: Build and push the API image
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          docker build \
+            --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            -t "${API_IMAGE}:${TAG}" \
+            -t "${API_IMAGE}:sha-${GITHUB_SHA}" \
+            ./backend
+          docker push "${API_IMAGE}:${TAG}"
+          docker push "${API_IMAGE}:sha-${GITHUB_SHA}"
+
+      - name: Build and push the web image
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          docker build \
+            --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            -t "${WEB_IMAGE}:${TAG}" \
+            -t "${WEB_IMAGE}:sha-${GITHUB_SHA}" \
+            ./frontend
+          docker push "${WEB_IMAGE}:${TAG}"
+          docker push "${WEB_IMAGE}:sha-${GITHUB_SHA}"
+
+  deploy:
+    name: Deploy to the VPS
+    needs: publish
+    if: ${{ github.ref_type == 'tag' || inputs.deploy }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # The deploy job only pulls; give the token it passes to the VPS read-only package access.
+    permissions:
+      contents: read
+      packages: read
+    environment:
+      name: production
+      url: ${{ vars.PUBLIC_URL }}
+    steps:
+      - name: Check the deployment secrets
+        id: guard
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          if [ -z "$VPS_HOST" ] || [ -z "$VPS_USER" ] || [ -z "$VPS_SSH_KEY" ] || [ -z "$VPS_KNOWN_HOSTS" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Deploy skipped: set VPS_HOST, VPS_USER, VPS_SSH_KEY and VPS_KNOWN_HOSTS (production environment) first."
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install the deploy key
+        if: steps.guard.outputs.ready == 'true'
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Deploy and smoke test
+        if: steps.guard.outputs.ready == 'true'
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
+        run: |
+          # Run the scripts from the exact commit that produced the images. The VPS clone persists
+          # across releases, so without this fetch/checkout a tag could deploy new images with old
+          # Compose/Caddy/deploy scripts.
+          #
+          # The images are private by default. Pass the workflow's short-lived token over SSH stdin;
+          # deploy.sh logs in with a temporary DOCKER_CONFIG and removes it on exit, so the VPS never
+          # stores a long-lived GHCR credential.
+          printf '%s\n' "${{ github.token }}" | \
+          ssh -i ~/.ssh/deploy_key \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            -o ConnectTimeout=15 \
+            -p "$VPS_PORT" \
+            "$VPS_USER@$VPS_HOST" \
+            "set -euo pipefail; read -r GHCR_TOKEN; export GHCR_TOKEN; export GHCR_USER='${{ github.actor }}'; cd /opt/aether; \
+             test -z \"\$(git status --porcelain)\" || { echo 'deploy: dirty checkout in /opt/aether' >&2; exit 1; }; \
+             git fetch --force --tags origin '+refs/heads/*:refs/remotes/origin/*'; \
+             git checkout --detach '${GITHUB_SHA}'; \
+             test \"\$(git rev-parse HEAD)\" = '${GITHUB_SHA}'; \
+             ./scripts/deploy/deploy.sh 'sha-${GITHUB_SHA}'"

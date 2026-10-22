@@ -14,7 +14,9 @@ import {
 import { queryKeys } from "../../api/queryKeys";
 import { createQueryClient } from "../../app/queryClient";
 import { AURA_STORAGE_KEY } from "../../hooks/useAura";
+import { compositeOver, contrastRatio, hexToRgb, parseColor } from "../../lib/color/contrast";
 import { suggestPalette } from "../../lib/color/suggest";
+import { FALLBACK_THEME, themeFromBackground } from "../../lib/color/theme";
 import { downscaleForUpload } from "../../lib/upload/downscale";
 import { MAX_SELECTION } from "../../lib/upload/selection";
 import { ACCEPT_ATTRIBUTE, MAX_UPLOAD_BYTES } from "../../lib/upload/validation";
@@ -465,6 +467,83 @@ describe("the picker", () => {
 });
 
 describe("the grid", () => {
+  it("should keep the selected-photo workspace responsive with every edit action present", () => {
+    renderWorkshop();
+
+    pickFiles(screen.getByLabelText("Choose photos"), sixFiles());
+
+    const main = screen.getByRole("main");
+    expect(main).toHaveClass("overflow-y-auto", "lg:overflow-hidden");
+
+    const list = screen.getByRole("list", { name: "Selected photos" });
+    const workspace = list.closest<HTMLElement>('[class*="lg:grid-cols-"]');
+    expect(workspace).not.toBeNull();
+    expect(workspace).toHaveClass(
+      "grid-cols-1",
+      "lg:grid-cols-[minmax(0,1fr)_minmax(23rem,30rem)]",
+    );
+    expect(list).toHaveClass("grid-cols-2", "sm:grid-cols-3");
+    const inspector = screen.getByRole("region", { name: "Photo inspector" });
+    expect(inspector).toBeVisible();
+    expect(inspector).not.toHaveClass("hidden", "lg:hidden");
+    expect(list.querySelectorAll(":scope > li")).toHaveLength(6);
+    expect(screen.getByRole("button", { name: "Upload" })).toBeVisible();
+    expect(screen.getByLabelText("Aura")).toBeVisible();
+    expect(screen.getByLabelText("Title")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Save archive" })).toBeVisible();
+  });
+
+  it("should select a contact-sheet photo and move it with the inspector controls", () => {
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [
+      fileOf(16, "image/png", "a.png"),
+      fileOf(16, "image/png", "b.png"),
+      fileOf(16, "image/png", "c.png"),
+    ]);
+
+    expect(activatorFor("a.png")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("main").style.backgroundImage).toContain("blob:preview-1");
+    expect(screen.getByRole("button", { name: "Move earlier" })).toBeDisabled();
+
+    fireEvent.click(activatorFor("c.png"));
+
+    expect(activatorFor("c.png")).toHaveAttribute("aria-pressed", "true");
+    expect(activatorFor("a.png")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("main").style.backgroundImage).toContain("blob:preview-3");
+    expect(screen.getByText("Photo · 3 of 3")).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: "Move earlier" }));
+
+    expect(tileLines()).toEqual(["a.png: Waiting", "c.png: Waiting", "b.png: Waiting"]);
+    expect(activatorFor("c.png")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Photo · 2 of 3")).toBeVisible();
+  });
+
+  it("should preserve glass text contrast over pale and dark selected-photo pixels", () => {
+    renderWorkshop();
+    pickFiles(screen.getByLabelText("Choose photos"), [fileOf(16, "image/png", "cover.png")]);
+
+    const wash = screen.getByTestId("workshop-photo-wash");
+    expect(wash).toHaveClass("bg-aura-bg/55");
+    expect(screen.getByTestId("workshop-inspector-wash")).toHaveClass("bg-aura-bg/70");
+    const combinedWashAlpha = 0.55 + (1 - 0.55) * 0.7;
+
+    const themes = [FALLBACK_THEME, themeFromBackground("#15191b"), themeFromBackground("#f1eee8")];
+    const photoExtremes = [
+      { r: 0, g: 0, b: 0 },
+      { r: 255, g: 255, b: 255 },
+    ];
+
+    for (const theme of themes) {
+      const glass = parseColor(theme.glass);
+      for (const photo of photoExtremes) {
+        const washed = compositeOver(hexToRgb(theme.bg), combinedWashAlpha, photo);
+        const panel = compositeOver(glass.rgb, glass.alpha, washed);
+        expect(contrastRatio(hexToRgb(theme.text), panel)).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
   it("should list every file with a named remove button, and removing releases its preview", () => {
     const revoke = vi.spyOn(URL, "revokeObjectURL");
     renderWorkshop();
@@ -476,6 +555,7 @@ describe("the grid", () => {
 
     const list = screen.getByRole("list", { name: "Selected photos" });
     expect(within(list).getAllByRole("listitem")).toHaveLength(3);
+    expect(screen.getByRole("main").style.backgroundImage).toContain("blob:preview-1");
     const removeB = screen.getByRole("button", { name: "Remove b.png" });
     expect(removeB).toHaveClass("h-11", "w-11");
     // The file's name is the tile's accessible prefix, so six "Waiting" lines never become anonymous.
@@ -492,6 +572,13 @@ describe("the grid", () => {
     expect(screen.getByTestId("workshop-notice")).toHaveTextContent("2 photos selected.");
     expect(screen.getByTestId("workshop-status")).toHaveTextContent("2 photos selected.");
     expect(screen.queryByRole("button", { name: "Remove b.png" })).toBeNull();
+    expect(screen.getByRole("main").style.backgroundImage).toContain("blob:preview-1");
+
+    fireEvent.click(activatorFor("c.png"));
+    expect(screen.getByRole("main").style.backgroundImage).toContain("blob:preview-3");
+    fireEvent.click(screen.getByRole("button", { name: "Remove c.png" }));
+    expect(revoke).toHaveBeenCalledWith("blob:preview-3");
+    expect(screen.getByRole("main").style.backgroundImage).toContain("blob:preview-1");
   });
 
   it("should return to the picker and focus it when the last tile is removed", async () => {
@@ -505,7 +592,7 @@ describe("the grid", () => {
     await waitFor(() => expect(screen.getByLabelText("Choose photos")).toHaveFocus());
   });
 
-  it("should show the per-file state under each tile", async () => {
+  it("should keep waiting quiet and show meaningful upload and error states on the tile", async () => {
     renderWorkshop();
     pickFiles(screen.getByLabelText("Choose photos"), [
       fileOf(16, "image/png", "a.png"),
@@ -515,6 +602,7 @@ describe("the grid", () => {
     expect(tileFor("a.png")).toHaveAttribute("data-state", "waiting");
     expect(tileFor("a.png")).toHaveTextContent("Waiting");
     expect(tileFor("b.png")).toHaveTextContent("Waiting");
+    expect(tileFor("a.png").querySelector("p.sr-only")).toHaveTextContent("Waiting");
 
     const first = await startUpload();
     await waitFor(() => expect(tileFor("a.png")).toHaveAttribute("data-state", "uploading"));
@@ -772,11 +860,11 @@ describe("reordering", () => {
       "Move cancelled. Photo 1 of 3 is back in position 1.",
     );
     expect(tileLines()).toEqual(["a.png: Waiting", "b.png: Waiting", "c.png: Waiting"]);
-    // dnd-kit clears its own overlay and the source slot's dragging state on cancel; the array never
-    // saw the move, so the order is untouched.
+    // dnd-kit clears its own overlay and source-slot dragging state; the selected-photo state is
+    // separate and remains pressed, while the array never saw the cancelled move.
     expect(screen.queryByTestId("drag-overlay")).toBeNull();
     expect(document.querySelector('[data-dragging="true"]')).toBeNull();
-    expect(first).not.toHaveAttribute("aria-pressed");
+    expect(first).toHaveAttribute("aria-pressed", "true");
     await settleDragListeners();
   });
 

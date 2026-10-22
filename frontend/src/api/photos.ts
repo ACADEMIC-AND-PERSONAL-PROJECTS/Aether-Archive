@@ -9,9 +9,38 @@ import type { Photo } from "../types/api";
 /**
  * The photo queries (ADR-004), one function each and one hook on top of it.
  *
- * `fetchRandomPhoto` is plain TypeScript with no React import, so the request and its failure mapping
- * are reachable without a renderer; `useRandomPhoto` is the only thing a view sees.
+ * `fetchPhotos` is the River's read (E5-S1A) and `fetchRandomPhoto` is the splash hero's; both are
+ * plain TypeScript with no React import, so the request and its failure mapping are reachable
+ * without a renderer, and `usePhotos` / `useRandomPhoto` are the only things a view sees.
  */
+
+/**
+ * `GET /api/v1/photos` — every photo in the archive, newest first.
+ *
+ * The list is returned **as served**: month grouping, entry ordering and the no-duplicate-keys
+ * guarantee are the feed model's business (E5-S1B, `lib/feed/`), not the query's. The endpoint
+ * takes no parameters (`_docs/openapi.yml`) — ADR-025 records why the feed reads the whole archive
+ * rather than a page of it.
+ */
+export async function fetchPhotos(signal?: AbortSignal): Promise<readonly Photo[]> {
+  return apiRequest<readonly Photo[]>("/photos", signal ? { signal } : {});
+}
+
+/**
+ * The archive's whole feed, for the River (E5-S1A).
+ *
+ * **No policy of its own, on purpose.** The app-wide 30 s `staleTime` is the feed's rule as written
+ * (`app/queryClient.ts`: "moving between `/`, `/river` and `/curate` must not re-read what was just
+ * read"), and a successful upload invalidates the `photos` prefix this key is the root of
+ * (`useUploadPhoto` below) — both directions of freshness are already wired, so neither is
+ * re-decided here.
+ */
+export function usePhotos() {
+  return useQuery({
+    queryKey: queryKeys.photos,
+    queryFn: ({ signal }) => fetchPhotos(signal),
+  });
+}
 
 /** `GET /api/v1/photos/random` — one photo of the archive, chosen by the server on every call. */
 export async function fetchRandomPhoto(signal?: AbortSignal): Promise<Photo> {

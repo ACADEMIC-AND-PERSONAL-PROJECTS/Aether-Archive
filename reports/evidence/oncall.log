@@ -1,0 +1,13 @@
+2026-10-22 19:14:55,495 INFO aether.oncall aether-oncall listening on 0.0.0.0:9099 (compose: -f docker-compose.yml -f docker-compose.override.yml -f docker-compose.observability.yml)
+2026-10-22 19:14:56,316 INFO aether.oncall 127.0.0.1 - "GET /healthz HTTP/1.1" 200 -
+2026-10-22 19:14:56,330 INFO aether.oncall 127.0.0.1 - "GET /healthz HTTP/1.1" 200 -
+2026-10-22 19:24:18,667 INFO aether.oncall incident received id=20261022T192418Z-0b90efa2 alert=AetherPublishLatency
+2026-10-22 19:24:18,667 INFO aether.oncall 172.24.0.11 - "POST /alerts HTTP/1.1" 202 -
+2026-10-22 19:24:27,274 INFO aether.oncall incident 20261022T192418Z-0b90efa2 status=remediated action=restart_db
+2026-10-22 19:26:03,208 INFO aether.oncall 127.0.0.1 - "GET /healthz HTTP/1.1" 200 -
+2026-10-22 19:26:03,223 INFO aether.oncall 127.0.0.1 - "GET /healthz HTTP/1.1" 200 -
+2026-10-22 19:28:18,663 INFO aether.oncall incident received id=20261022T192818Z-cbafc00e alert=AetherPublish5xxRate
+2026-10-22 19:28:18,663 INFO aether.oncall 172.24.0.11 - "POST /alerts HTTP/1.1" 202 -
+2026-10-22 19:28:27,179 INFO aether.oncall incident 20261022T192818Z-cbafc00e status=remediated action=restart_db
+2026-10-22 19:30:18,666 INFO aether.oncall incident resolved id=20261022T192818Z-cbafc00e
+2026-10-22 19:30:18,666 INFO aether.oncall 172.24.0.11 - "POST /alerts HTTP/1.1" 202 -

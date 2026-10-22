@@ -550,9 +550,17 @@ opens on tap, feels tactile, and gets out of the way.
 | E5-S3 | Image loading performance (LQIP, no CLS) | p0 | 5 | 5 | Todo |
 | E5-S4 | Virtualisation decision & implementation | p1 | 3 | 5 | Todo |
 
-### E5-S1 — River feed & timeline markers · 8 pts · p0
+### E5-S1 — River feed & timeline markers · 8 pts · p0 · **pre-cut into S1A (2) + S1B (2) + S1C (2) + S1D (2)**
 
 *As the curator, I want to scroll my whole archive, so that I can relive it in order.*
+
+> Split before implementation: **S1A** is the feed's data layer — `GET /photos` + `GET /dumps` as queries
+> and **ADR-025** (the archive is read whole; the numbers that would revisit pagination belong to E5-S4);
+> **S1B** is the pure feed model — `buildFeed` groups month sections, dumps keep their six photos in
+> display order, singles are the photos no dump holds, the order is total and no key duplicates;
+> **S1C** is the view — month markers in display serif, dump sections, single photos, the quiet states;
+> **S1D** is scroll memory — returning restores the position, a fresh visit starts at the top
+> (DESIGN-SYSTEM §14 routes it to the River). Points unchanged.
 
 - [ ] Infinite vertical feed grouped by month, markers in display serif, generous negative space.
 - [ ] Pagination or cursor-based loading (decide with an ADR); no duplicate keys, stable ordering.
@@ -624,6 +632,7 @@ delivery, documentation, and a clean v1.0.
 | E6-S21 | Splash hero URL origin validation | p2 | 1 | — | Todo |
 | E6-S22 | GitHub Actions majors and Dependabot | p2 | 1 | — | Todo |
 | E6-S23 | Drag overlay stacking at short viewports | p2 | 1 | — | Todo |
+| E6-S26 | Editorial glass redesign with responsive desktop layouts (#178) | p1 | 5 | — | Todo |
 
 ### E6-S1 — CI on every PR · 5 pts · p0
 
@@ -651,6 +660,16 @@ delivery, documentation, and a clean v1.0.
 - [ ] iOS Safari + Android Chrome quirks captured (dvh, backdrop-filter, scroll, gesture conflicts).
 - [ ] Results written in `reports/` and converted into backlog items with priorities.
 - [ ] LAN setup documented in the README (host exposure, firewall note).
+
+### E6-S26 — Editorial glass redesign with responsive desktop layouts · 5 pts · p1 · #178
+
+- [ ] Rework the splash/menu, River, and Workshop into a coherent, high-end editorial/glass visual
+      direction while keeping the canonical photo-first flows and no persistent navbar.
+- [ ] Make the River and Workshop adapt to desktop widths intentionally; constrain the River scroll
+      viewport and verify scroll memory plus dump aura behavior (#176).
+- [ ] Keep touch and keyboard interactions, contrast, reduced motion, local fonts, and zero external
+      runtime requests intact.
+- [ ] Verify mobile and desktop viewports (390 px and 1440 px); update tests and record evidence.
 
 ### E6-S5 — Security & robustness pass · 5 pts · p0
 
