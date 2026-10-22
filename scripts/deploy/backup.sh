@@ -31,10 +31,18 @@ case "$BACKUP_DIR" in
     echo "backup: BACKUP_DIR must be relative to the repository (got an absolute path)" >&2
     exit 2
     ;;
+  *..*)
+    echo "backup: BACKUP_DIR must not contain '..'" >&2
+    exit 2
+    ;;
 esac
 mkdir -p "$BACKUP_DIR"
 BACKUP_ABS="$(cd "$BACKUP_DIR" && pwd)"
 REPO_ABS="$(pwd)"
+if [ "$BACKUP_ABS" = "$REPO_ABS" ]; then
+  echo "backup: BACKUP_DIR must not be the repository root" >&2
+  exit 2
+fi
 case "$BACKUP_ABS/" in
   "$REPO_ABS"/*) ;;
   *)

@@ -29,7 +29,8 @@ review; merge commit only; record the outcome in the sprint doc and `reports/`.
 | --- | --- |
 | Whole stack, one command | `docker compose up -d --build` → `http://localhost:3000` |
 | Demo archive | `make demo` (36 attributed photos + 3 dumps); `make seed` for 300 generated photos |
-| Every gate the CI runs | `make verify` |
+| Hermetic gates (backend, frontend, on-call, shell) | `make verify` |
+| Real-browser contrast | `make a11y` (needs Chromium; CI runs it after the build) |
 | Backend only | `cd backend && ./mvnw verify` |
 | Frontend only | `cd frontend && npm run lint && npm run test -- --run && npm run typecheck && npm run build` |
 | Observability | `make observe-up` → Grafana `:3001`; `make oncall` in a second terminal |

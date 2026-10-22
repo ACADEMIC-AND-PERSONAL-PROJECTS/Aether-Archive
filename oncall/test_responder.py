@@ -155,16 +155,23 @@ class BindTests(unittest.TestCase):
             ["127.0.0.1", "172.17.0.1"],
         )
 
+    def test_refuses_a_wildcard_listener(self) -> None:
+        for value in ("0.0.0.0", "::", "[::]", "127.0.0.1,0.0.0.0"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                bind_addresses(value)
+
 
 class ResponderTestBase(unittest.TestCase):
     def setUp(self) -> None:
         self.tempdir = tempfile.TemporaryDirectory()
-        self.addCleanup(self.tempdir.cleanup)
         self.incident_dir = Path(self.tempdir.name)
         patcher = patch("responder.INCIDENT_DIR", self.incident_dir)
         patcher.start()
         self.addCleanup(patcher.stop)
         self.responder = Responder("test-token")
+        # LIFO: join the workers, then delete the temporary directory, then remove the patch.
+        self.addCleanup(self.tempdir.cleanup)
+        self.addCleanup(self.responder.join_handlers)
 
     def record(self, incident: str) -> dict:
         return json.loads((self.incident_dir / f"{incident}.json").read_text(encoding="utf-8"))
@@ -294,6 +301,7 @@ class ResolvedRaceTests(ResponderTestBase):
                 files[0].stem,
                 lambda record: record.get("action", {}).get("returnCode") == 0,
             )
+            self.responder.join_handlers()
 
         self.assertIsNone(new_id)
         self.assertEqual(data["status"], "resolved")
@@ -322,13 +330,8 @@ class ResolvedRaceTests(ResponderTestBase):
         with self.responder._lock:
             self.responder._open[fp] = new_id
         self.responder._resolve(fp)
-        with (
-            patch("responder.container_state", return_value=ContainerState(True, "healthy")),
-            patch("responder.compose_logs", return_value=""),
-            patch.object(self.responder, "_github_issue", return_value=None),
-            patch.object(self.responder, "_apply", return_value={"changed": True, "returnCode": 0}),
-        ):
-            accepted = self.responder.accept({"alerts": [self.alert()]})
+        # Registration only: this test is about the open/resolved state, not the remediation worker.
+        accepted = self.responder.accept({"alerts": [self.alert()]}, dispatch=False)
         self.assertEqual(accepted["accepted"], 1)
         self.assertIn(fp, self.responder._open)
         self.assertNotIn(fp, self.responder._resolved)

@@ -148,7 +148,9 @@ git push origin v1.0.0
    `ghcr.io/academic-and-personal-projects/aether-archive-{api,web}:v1.0.0` and the immutable
    `:sha-<full commit>` tag;
 2. deploys only if the four VPS secrets exist; otherwise it publishes the images and emits a warning;
-3. opens an SSH connection with `StrictHostKeyChecking=yes` and runs
+3. opens an SSH connection with `StrictHostKeyChecking=yes`, fetches the exact release commit,
+   detaches at `GITHUB_SHA`, aborts on a dirty checkout, asserts `git rev-parse HEAD` equals the
+   release commit, and only then runs
    `cd /opt/aether && ./scripts/deploy/deploy.sh 'sha-<full commit>'`.
 
 `deploy.sh` runs on the VPS and is the only deployment path (the workflow does not recreate the

@@ -44,8 +44,10 @@ photos 48
 dumps 5
 ```
 
-The same counts before and after the restore, the API healthcheck green, and `ON_ERROR_STOP=1` armed:
-the path is repeatable. The media tarball contains 12 PNG files (the locally uploaded photos; the demo
+The `Container …` lines in the transcript are Compose's output from the final `start api` (the script
+suppresses only the stop); this is an excerpt from the live run, not a reconstruction. The same counts
+before and after the restore, the API healthcheck green, and `ON_ERROR_STOP=1` armed: the path is
+repeatable. The media tarball contains 12 PNG files (the locally uploaded photos; the demo
 photos are recorded as external attributed URLs) and is restored separately with the documented
 `docker run ... tar xzf` command.
 

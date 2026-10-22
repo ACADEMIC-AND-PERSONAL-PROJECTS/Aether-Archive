@@ -273,6 +273,9 @@ class Responder:
         # Fingerprints resolved while a handler was still starting or remediating. The handler must
         # not resurrect the record after Alertmanager has closed it. A new firing clears the marker.
         self._resolved: set[str] = set()
+        # Live remediation workers; tests join them before their temporary incident directory is
+        # removed, and shutdown can wait for them instead of killing an in-flight write.
+        self._threads: set[threading.Thread] = set()
         self._load_open_incidents()
 
     def _load_open_incidents(self) -> None:
@@ -288,7 +291,7 @@ class Responder:
             if fp:
                 self._open[fp] = str(data.get("id", path.stem))
 
-    def accept(self, payload: Any) -> dict[str, int]:
+    def accept(self, payload: Any, *, dispatch: bool = True) -> dict[str, int]:
         alerts = parse_alertmanager_payload(payload)
         accepted = 0
         resolved = 0
@@ -306,11 +309,42 @@ class Responder:
                 new_id = incident_id(fp)
                 self._open[fp] = new_id
             accepted += 1
+            if not dispatch:
+                continue
             thread = threading.Thread(
-                target=self._handle, args=(alert, fp, new_id), daemon=True, name=f"incident-{new_id}"
+                target=self._run_handler, args=(alert, fp, new_id), daemon=True, name=f"incident-{new_id}"
             )
+            with self._lock:
+                self._threads.add(thread)
             thread.start()
         return {"accepted": accepted, "resolved": resolved}
+
+    def _run_handler(self, alert: dict[str, Any], fp: str, new_id: str) -> None:
+        try:
+            self._handle(alert, fp, new_id)
+        finally:
+            with self._lock:
+                self._threads.discard(threading.current_thread())
+
+    def join_handlers(self, timeout: float = 5.0) -> None:
+        """Wait for remediation workers; used by tests and shutdown, never by a request handler."""
+        deadline = time.monotonic() + timeout
+        while True:
+            with self._lock:
+                threads = list(self._threads)
+            if not threads:
+                return
+            for thread in threads:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                thread.join(remaining)
+            with self._lock:
+                live = [thread for thread in self._threads if thread.is_alive()]
+            if not live:
+                return
+            if time.monotonic() >= deadline:
+                raise TimeoutError(f"{len(live)} incident handler(s) still running")
 
     def _resolve(self, fp: str) -> None:
         with self._lock:
@@ -583,7 +617,12 @@ class OnCallHandler(BaseHTTPRequestHandler):
 def bind_addresses(value: str | None = None) -> list[str]:
     """Explicit listen addresses. Never default to 0.0.0.0: the token is a plain bearer token."""
     raw = value if value is not None else os.environ.get("ONCALL_BIND", "127.0.0.1")
-    return [address.strip() for address in raw.split(",") if address.strip()]
+    addresses = [address.strip() for address in raw.split(",") if address.strip()]
+    wildcards = {"0.0.0.0", "::", "[::]"}
+    forbidden = [address for address in addresses if address in wildcards]
+    if forbidden:
+        raise ValueError(f"ONCALL_BIND must not listen on a wildcard address: {', '.join(forbidden)}")
+    return addresses
 
 
 def main() -> int:
@@ -595,7 +634,11 @@ def main() -> int:
     if not token:
         LOG.error("ONCALL_WEBHOOK_TOKEN is required; refusing to start")
         return 2
-    addresses = bind_addresses()
+    try:
+        addresses = bind_addresses()
+    except ValueError as error:
+        LOG.error("%s", error)
+        return 2
     if not addresses:
         LOG.error("ONCALL_BIND must contain at least one address")
         return 2

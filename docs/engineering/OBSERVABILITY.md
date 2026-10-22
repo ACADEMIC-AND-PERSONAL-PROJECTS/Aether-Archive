@@ -22,7 +22,9 @@ journey, not around host graphs.
 Every service runs with a bounded log rotation (`10m × 3`). The API exports a histogram for
 `http.server.requests`, without which the p95 alert and panel would have no buckets
 (`backend/src/main/resources/application-prod.yml`). The frontend sends a W3C `traceparent` on the
-publish request (`frontend/src/api/traceparent.ts`), so the trace begins at the click.
+publish request (`frontend/src/api/traceparent.ts`), so the trace begins at the click. The optional
+header is declared on `POST /dumps` in `_docs/openapi.yml`; an absent header simply starts a new
+server-side trace.
 
 **Not collected:** photo content, filenames, request bodies, query strings, passwords, tokens, user
 identifiers. The public demo is seeded; it is not a real archive.
