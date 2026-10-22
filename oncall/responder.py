@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import ipaddress
 import json
 import logging
 import os
@@ -327,7 +328,7 @@ class Responder:
                 self._threads.discard(threading.current_thread())
 
     def join_handlers(self, timeout: float = 5.0) -> None:
-        """Wait for remediation workers; used by tests and shutdown, never by a request handler."""
+        """Wait for remediation workers; used by tests and the shutdown path."""
         deadline = time.monotonic() + timeout
         while True:
             with self._lock:
@@ -618,8 +619,16 @@ def bind_addresses(value: str | None = None) -> list[str]:
     """Explicit listen addresses. Never default to 0.0.0.0: the token is a plain bearer token."""
     raw = value if value is not None else os.environ.get("ONCALL_BIND", "127.0.0.1")
     addresses = [address.strip() for address in raw.split(",") if address.strip()]
-    wildcards = {"0.0.0.0", "::", "[::]"}
-    forbidden = [address for address in addresses if address in wildcards]
+    forbidden: list[str] = []
+    for address in addresses:
+        literal = address.strip("[]")
+        try:
+            wildcard = ipaddress.ip_address(literal).is_unspecified
+        except ValueError:
+            # Hostnames are allowed; the bind fails loudly if they resolve to an unusable address.
+            wildcard = False
+        if wildcard:
+            forbidden.append(address)
     if forbidden:
         raise ValueError(f"ONCALL_BIND must not listen on a wildcard address: {', '.join(forbidden)}")
     return addresses
@@ -675,6 +684,10 @@ def main() -> int:
     finally:
         for _, server in servers:
             server.server_close()
+        try:
+            responder.join_handlers(timeout=5)
+        except TimeoutError:
+            LOG.warning("incident handlers still running at shutdown")
     return 0
 
 

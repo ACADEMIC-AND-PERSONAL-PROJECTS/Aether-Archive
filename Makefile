@@ -30,7 +30,7 @@ ps: ## Show local stack health
 build: ## Build both images without starting
 	$(COMPOSE) build
 
-verify: ## Run every gate the CI runs
+verify: ## Run the hermetic gates (backend, frontend, on-call, shell)
 	cd backend && ./mvnw -B verify
 	cd frontend && npm run lint && npm run format:check && npm run test -- --run && npm run typecheck && npm run build
 	python3 -m unittest discover -s oncall -p 'test_*.py'

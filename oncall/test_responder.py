@@ -156,7 +156,7 @@ class BindTests(unittest.TestCase):
         )
 
     def test_refuses_a_wildcard_listener(self) -> None:
-        for value in ("0.0.0.0", "::", "[::]", "127.0.0.1,0.0.0.0"):
+        for value in ("0.0.0.0", "::", "[::]", "0:0:0:0:0:0:0:0", "127.0.0.1,0.0.0.0"):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 bind_addresses(value)
 
