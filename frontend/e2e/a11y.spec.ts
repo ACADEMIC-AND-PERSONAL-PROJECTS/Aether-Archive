@@ -76,6 +76,8 @@ async function audit(page: Page): Promise<string[]> {
 }
 
 test("River and Curate keep text at WCAG AA contrast at 320/768/1280", async ({ page }) => {
+  // A stored aura from a previous run must not decide the Curate colours under test.
+  await page.addInitScript(() => window.sessionStorage.clear());
   await page.route("**/api/v1/photos", (route) =>
     route.fulfill({
       status: 200,
@@ -112,6 +114,8 @@ test("River and Curate keep text at WCAG AA contrast at 320/768/1280", async ({ 
 
     await page.goto("/curate");
     await page.waitForSelector('main[data-state="idle"]');
+    // Match the River wait: the aura tokens are registered @property transitions; audit the end state.
+    await page.waitForTimeout(500);
     expect(await audit(page), `Curate at ${width}px`).toEqual([]);
   }
 });
