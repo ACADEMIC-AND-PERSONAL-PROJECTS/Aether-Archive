@@ -1,6 +1,7 @@
 # Local-only override, loaded automatically by `docker compose up` (no `-f`).
-# Production uses `-f docker-compose.yml -f docker-compose.prod.yml`, which does not load this file,
-# so the web port is never published directly when Caddy is the public entry point.
+# Production uses `-f docker-compose.yml -f docker-compose.observability.yml -f docker-compose.prod.yml`,
+# which does not load this file, so the web port is never published directly when Caddy is the public
+# entry point.
 services:
   web:
     ports:
