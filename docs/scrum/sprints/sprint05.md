@@ -23,8 +23,10 @@
 | 4 | E6-S4 | Real-device verification pass (LAN) | 3 | p0 | Todo | — |
 | 5 | E5-S4 | Virtualisation decision & implementation — measure first, then decide | 3 | p1 | Done | #172 |
 | 6 | E6-S3 | Accessibility audit (WCAG 2.2 AA) | 3 | p1 | Done | #174 |
+| 7 | E6-FINAL | Course final submission — editorial redesign + production evidence (atomic-story exception) | — | p0 | In review | #181 |
 
-**Total: 27 points.** The order is deliberate:
+**Total: 27 points** for the estimated stories; E6-FINAL is the unestimated course submission. The
+order is deliberate:
 
 - **The feed first.** Everything else in the sprint stands on it: the aura flips per rendered section
   (S2), the images only load once the feed exists to lay them out (S3), the device pass exercises four
@@ -168,3 +170,15 @@
   `f9d5f6e`: **87 hand-written** (production 10 / report 77) — well under the ~400 budget.
   Frontend suite 510 → **510 tests** (no new tests — fix is a CSS class swap). Row 6 flips to
   **Done** (`#174`).
+- 2026-10-22 — **E6-FINAL (course submission) claims the atomic-story exception.** The
+  DataTalksClub final project is one interlocked story: the 12 rubric criteria are judged on a single
+  public commit (redesign + containers + deployment + observability + on-call + the evidence that
+  proves each), and the deadline is 2026-10-26. Slicing it into sub-400-line PRs would leave the
+  public demo without the artifact the rubric grades; the production layer is what the deployment,
+  alerting and on-call criteria measure, not an optional appendix. The exception is claimed by name
+  from `.claude/rules/git-workflow.md`; the reviewer judges it. Size re-measured at the branch tip
+  `a3b5dbd` with `git diff --numstat origin/develop...HEAD`: **8,150 total changed lines, 7,170
+  hand-written** (excluded as generated: 687-line Grafana dashboard, 128-line `package-lock.json`,
+  129 lines of incident JSON, 36-line attribution table; 11 binary PNGs contribute none). Review
+  round 1 requested changes (7 blocking); the fixes are in round 2 and the outcome is recorded in the
+  PR and this log.
