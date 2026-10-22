@@ -1189,6 +1189,47 @@ guarantees and motion vocabulary remain. The production build emits five font fi
 
 ---
 
+## ADR-029 — Public demo deployment and the observability profile
+
+**Date**: 2026-10-22 · **Status**: Accepted
+
+**Context.** The canonical product is single-user and local-first: no cloud, no external request at
+runtime, no telemetry. The Zoomcamp final project requires the same application to be deployed at a
+public URL, with tests, containers, CI/CD and a rollback path, observable metrics/traces/logs, an alert
+on user impact, and an agent that responds to it. Deploying the owner's real archive — or adding
+third-party analytics to the product — would violate the local-first stance.
+
+**Decision.**
+
+1. **The default stays local-first.** `docker compose up` runs db + api + web on the owner's machine;
+   the default profile exports no telemetry and makes no external runtime request. The canonical spec
+   continues to describe this product.
+2. **A demo/production profile is added** for the course and for self-hosting: the same images behind
+   Caddy with TLS, PostgreSQL 17, a local media volume, OTLP export, Prometheus metrics, JSON logs and
+   Grafana. It runs on **seeded/demo data**; the owner's real archive is never deployed.
+3. **Telemetry is operational only**: HTTP/JVM metrics, traces, and structured logs with
+   `traceId`/`spanId`. No PII, no image bytes, no file names, no credentials, no third-party analytics.
+   Sampling is configurable; the local profile keeps the export off.
+4. **The public demo is best-effort**, documented in `README.md` and `docs/course/FINAL-PROJECT.md`;
+   it is not a hosted service and carries no availability promise beyond the course window.
+5. **Delivery**: CI builds and tests every change; CD deploys `develop` to the dev environment
+   automatically and `main` to production with a manual approval. Every deploy records the image tag,
+   is health-gated, and can roll back to the previous good tag. GHCR stores the images; the VPS only
+   pulls them.
+6. **The on-call responder** receives Grafana alerts and performs only safe, reversible actions —
+   rollback to the last good image or disable a failing flag. It records each incident (GitHub issue)
+   and escalates when no safe action exists. The deterministic path never depends on an LLM key.
+7. **One origin** remains: Caddy terminates TLS, nginx serves the SPA and proxies `/api/**` and
+   `/images/**`. The browser's CORS allow-list contains the public origin only.
+
+**Consequences.** "No telemetry" is now scoped to the local-first default, not to the demo profile;
+`CLAUDE.md`, `ARCHITECTURE.md` and the README say so explicitly. The deployment introduces a domain,
+TLS certificates, a VPS firewall rule and host secrets, which are documented in
+`docs/engineering/DEPLOYMENT.md`. The archive's storage model does not change: media stays on a local
+volume, and the database stays PostgreSQL.
+
+---
+
 ## Template for new ADRs
 
 ```markdown

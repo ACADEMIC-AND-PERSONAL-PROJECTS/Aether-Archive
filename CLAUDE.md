@@ -87,7 +87,7 @@ Branch model: `main` (released) ← `develop` (integration) ← `feature/*` (one
 4. Keep PRs small and single-story. If a branch grows past ~500 changed lines, split it — one exception,
    claimed and judged: the atomic-story clause in `.claude/rules/git-workflow.md`.
 5. Never fake verification. If a test or a build cannot run, say so and report it as `SKIPPED`.
-6. Never commit secrets, `.env`, or local data. No telemetry, no analytics, no external requests.
+6. Never commit secrets, `.env`, or local data. The local-first default has no telemetry, no analytics and no external runtime requests. The public demo profile (ADR-029) exports operational signals only — no PII, no image content, no file names. Never add third-party analytics.
 7. Ask before anything destructive: deleting the data directory, dropping tables, `rm -rf`, migrations
    that lose data.
 

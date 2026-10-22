@@ -1,88 +1,162 @@
 # Aether Archive
 
-> A local-first, mobile-first digital sanctuary for aesthetic photos and monthly 6-picture "dumps".
+> A local-first, mobile-first digital sanctuary for aesthetic photos and monthly six-picture dumps.
 > Images are the product — the interface stays almost invisible.
 
-Aether Archive runs entirely on your own machine and is designed to be opened from a phone on the
-same local network — `http://<LAN-IP>:5173` in development, `http://<LAN-IP>:3000` in the containerized
-v1.0. Nothing is uploaded to the cloud, no third-party requests are made at runtime, and every image
-and record stays on your machine.
+[![CI](https://github.com/ACADEMIC-AND-PERSONAL-PROJECTS/Aether-Archive/actions/workflows/ci.yml/badge.svg)](https://github.com/ACADEMIC-AND-PERSONAL-PROJECTS/Aether-Archive/actions/workflows/ci.yml)
 
-## Concept
+**Final project — DataTalksClub AI Dev Tools Zoomcamp (2026).**
+Public demo: _added by the deployment step; see issue #180 for the current status._
+Criteria evidence: [`docs/course/FINAL-PROJECT.md`](docs/course/FINAL-PROJECT.md).
 
-| View | What it is |
+## The problem
+
+Personal photos accumulate faster than anyone curates them. Camera rolls are a stream; cloud galleries
+are built for storage, sharing and engagement; neither gives a private, quiet ritual for looking at the
+pictures you actually love. The result is an archive you never revisit — and a monthly "dump" of six
+favourites that never gets made.
+
+Aether Archive is a small answer to that: a **local-first** sanctuary with one image on screen, a
+deliberate monthly dump, and no feed, no likes, no third-party requests. It is designed to be opened
+from a phone on the same network, not to harvest attention.
+
+## What it does
+
+| View | Behaviour |
 | --- | --- |
-| **The Immersive Splash** | A single random photo, full-screen, zero UI. Tap anywhere to open the menu. |
-| **The Glassmorphism Menu** | Dark glass overlay (`backdrop-filter: blur(15px)`), elegant typography, three entries: The River, Curate, Close. |
-| **The Time River** | Infinite vertical feed of everything ever uploaded; the page background melts into each dump's own colour as you scroll. |
-| **The Curator's Workshop** | Pick up to 6 images, drag them into order, choose the "aura" colour, publish the dump. |
+| **The Immersive Splash** | One random photo, full-bleed, no visible chrome. Tap anywhere to open the menu; pull down to re-roll. |
+| **The Glass Menu** | A dark glass sheet with three entries: The River, Curate, Close. Escape and the veil close it; focus is trapped and returned. |
+| **The Time River** | The chronological archive: every photo and every six-picture dump, grouped by month. The page wears the aura of the dump in view and remembers your scroll position. |
+| **The Curator's Workshop** | Add up to six photos, drag them into order, choose the aura, add an optional title, publish the dump. Uploads are downscaled client-side, one request at a time, with per-file refusal messages. |
 
-## Stack
+The expected behaviour is deliberately small: **open → look → curate → publish → return to the River.**
+There is no account, no social graph, no recommendation engine.
 
-- **Frontend** — React + Vite + TypeScript, Tailwind CSS, Framer Motion, `@dnd-kit`, TanStack Query
-- **Backend** — Java 21, Spring Boot 3, Maven, REST under `/api/v1`
-- **Database** — PostgreSQL 17, running locally as a Docker container (nothing leaves your machine)
-- **Storage** — local filesystem, images served by Spring at `/images/**`
-- **Typography** — Fontsource NPM packages (self-hosted, zero external requests)
-- **Packaging** — Docker Compose at v1.0 (db + api + web); see `docs/engineering/DEPLOYMENT.md`
+## Quickstart — one command
+
+```bash
+git clone https://github.com/ACADEMIC-AND-PERSONAL-PROJECTS/Aether-Archive.git
+cd Aether-Archive
+cp .env.example .env          # optional; the defaults work
+docker compose up -d --build  # db + api + web
+# open http://localhost:3000
+```
+
+Seed a realistic demo archive (300 photos and one dump) through the running API:
+
+```bash
+make seed
+```
+
+Stop it without losing data: `docker compose down`. The named volumes
+`aether_stack_pgdata` and `aether_stack_media` keep the archive. `make clean` is the explicit,
+destructive reset.
+
+### Development without containers
+
+```bash
+docker compose -f docker-compose.dev.yml up -d     # PostgreSQL on 127.0.0.1:5432
+(cd backend && ./mvnw spring-boot:run)             # API on :8080
+(cd frontend && npm install && npm run dev)        # Vite on :5173, LAN-bound
+```
+
+Open `http://<LAN-IP>:5173` on a phone. The Vite proxy and the container's nginx both keep the API on
+the **same origin** as the app; that is why no API URL or CORS configuration is needed in the client.
+
+## Architecture
+
+```text
+phone / browser
+      │  HTTPS
+      ▼
+  Caddy (TLS)  ──▶  web (nginx: SPA + /api + /images proxy)
+                         │
+                         ▼
+                    api (Spring Boot 21)
+                    │            │
+                    ▼            ▼
+             PostgreSQL 17   /data (images, named volume)
+```
+
+- **Frontend** — React 19, Vite, TypeScript, Tailwind CSS 4, TanStack Query, `@dnd-kit`, Fontsource
+  (self-hosted; zero runtime requests to a third party).
+- **Backend** — Java 21, Spring Boot 3.5, Maven, Flyway, REST under `/api/v1`, images at `/images/**`.
+- **Database** — PostgreSQL 17, schema owned by Flyway.
+- **Delivery** — multi-stage Dockerfiles, one `docker-compose.yml`, a production overlay with Caddy,
+  GitHub Actions CI, and GHCR images promoted by CD.
+- **Signals** — Actuator/Prometheus metrics, OpenTelemetry traces, JSON logs with `traceId`/`spanId`;
+  no PII and no image content in telemetry.
+
+## Production readiness
+
+This repository is also the final project for the Zoomcamp, so the product slice is wrapped in the
+course's production criteria:
+
+| Concern | Where |
+| --- | --- |
+| Containers / one command | `docker-compose.yml`, `backend/Dockerfile`, `frontend/Dockerfile` |
+| Public deployment | `docker-compose.prod.yml`, `docker/Caddyfile`, `docs/engineering/DEPLOYMENT.md` |
+| CI/CD + rollback | `.github/workflows/`, `scripts/deploy/` |
+| Observability | `backend/src/main/resources/application-prod.yml`, `logback-spring.xml`, `docker/observability/` |
+| Alerting + on-call | `docs/course/FINAL-PROJECT.md`, `oncall/` |
+| Agent team + context | `AGENTS.md`, `CLAUDE.md`, `docs/agents/TEAM.md`, `.claude/` |
+
+The local-first default remains telemetry-free. The public demo is a deployment profile with seeded
+data; it exports operational signals only. The decision is recorded in `docs/scrum/DECISION-LOG.md`
+(ADR-029).
+
+## Testing
+
+```bash
+make verify
+```
+
+This runs the same gates as CI: `./mvnw verify` for the backend (unit + integration with Testcontainers
+PostgreSQL) and `lint`, `test`, `typecheck`, `build` for the frontend. The last full run recorded
+**307 backend tests** and **515 frontend tests**; the reports live in `reports/`. The browser-dependent
+checks (safe areas, real camera roll, physical iOS/Android) are documented in
+`reports/device-verification-sprint05.md` and are not claimed as automated coverage.
+
+## How the work is done
+
+The project is built by an **agent team** with explicit handoffs, context maps and evidence:
+
+- `AGENTS.md` — entry point for any coding agent.
+- `CLAUDE.md` — invariants, commands, branch and merge rules.
+- `docs/agents/TEAM.md` — roles, handoff protocol, context management, what is never delegated.
+- `.claude/agents/`, `.claude/rules/`, `.claude/skills/`, `.claude/hooks/` — the implementation.
+- `docs/scrum/` — public backlog, sprint plans, definition of done, ADRs.
+- GitHub issues and milestones — the public task tracker (epic #180 is this course slice).
+
+Hard rules: one story per branch, no direct pushes to `main`/`develop`, no history rewriting, merge
+commits only, and every claim verified by a command or a report.
 
 ## Repository layout
 
-```
-backend/          Spring Boot application
-frontend/         React + Vite application
-_docs/            Canonical specs (read-only): product spec + OpenAPI contract
-docs/             scrum/ (backlog, playbook, DoD, ADRs) · engineering/ (architecture, design system)
-retrospectives/   One sprintNN.md after every sprint
-reports/          Generated verification and analysis reports
-.claude/          Agent setup: rules, skills, commands, subagents, hooks
-```
-
-## Getting started
-
-Backend and frontend are scaffolded in Sprint 1 and Sprint 2 (see `docs/scrum/PRODUCT-BACKLOG.md`).
-
-```bash
-# 1. Environment
-cp .env.example .env        # optional; review the POSTGRES_* values, set AETHER_DATA_DIR if you want
-                            # another location than the default ~/AetherArchive_Data
-
-# 2. Dev database — PostgreSQL 17 container, listening on 127.0.0.1 only
-docker compose -f docker-compose.dev.yml up -d
-docker compose -f docker-compose.dev.yml ps          # wait for "healthy"
-
-# 3. Backend (scaffolded; the /api/v1 endpoints land during Sprint 1)
-cd backend && ./mvnw spring-boot:run
-
-# 4. Frontend (from Sprint 2 onwards)
-cd ../frontend && npm install && npm run dev -- --host   # --host exposes it to your phone
+```text
+backend/          Spring Boot API, Flyway migrations, tests
+frontend/         React/Vite app, design system, tests
+docker/           Caddyfile and observability configuration
+scripts/          dev seed/smoke, deploy and rollback helpers
+_docs/            canonical product spec + OpenAPI contract (read-only)
+docs/             scrum/ · engineering/ · agents/ · course/
+reports/          verification, security and device evidence
 ```
 
-Then open `http://<your-LAN-IP>:5173` on your phone.
+## Documentation
 
-The dev database keeps its data in the named volume `aether_pgdata`:
-`docker compose -f docker-compose.dev.yml down` stops it and keeps everything;
-only an explicit `down -v` deletes the archive. If port 5432 is already taken by another
-PostgreSQL, set `AETHER_DB_PORT=5433` in `.env` — the compose file and the backend both read it.
+- [Final-project criteria map](docs/course/FINAL-PROJECT.md)
+- [Architecture](docs/engineering/ARCHITECTURE.md) · [Design system](docs/engineering/DESIGN-SYSTEM.md)
+- [Deployment](docs/engineering/DEPLOYMENT.md) · [Decision log](docs/scrum/DECISION-LOG.md)
+- [Product backlog](docs/scrum/PRODUCT-BACKLOG.md) · [Sprint playbook](docs/scrum/SPRINT-PLAYBOOK.md)
+- [Agent team](docs/agents/TEAM.md)
 
-**v1.0 (planned, Sprint 6):** the whole stack runs as containers —
-`cp .env.example .env && docker compose up`, then open `http://<your-LAN-IP>:3000`.
-Details: `docs/engineering/DEPLOYMENT.md`.
+## Status
 
-## How this project is built
-
-The project follows a lightweight SCRUM process driven by an agent:
-
-- `docs/scrum/PRODUCT-BACKLOG.md` — complete, prioritised backlog (epics → user stories → acceptance criteria)
-- `docs/scrum/SPRINT-PLAYBOOK.md` — sprint rhythm, ceremonies and branch/merge policy
-- `docs/scrum/DEFINITION-OF-DONE.md` — the checklist every story must pass
-- `retrospectives/` — a written retrospective after each sprint
-
-Workflow in one line: **backlog → sprint plan → feature branch off `develop` → commit often →
-PR → review → merge commit → sprint release PR into `main` → retrospective.**
-
-Hard rules: no direct commits to `main`/`develop`, no rebase, no force-push, no squash merge —
-history is append-only so nothing is ever lost.
+The product slice (splash, menu, River, Workshop) is complete and tested; Sprint 5 of the project plan
+is closed except for a physical-device pass that requires real iOS/Android hardware. The Zoomcamp slice
+adds containers, deployment, CD, observability, alerting, the on-call responder and an editorial
+redesign of the four existing views. Known frontend findings are tracked as issues #176, #177 and #179.
 
 ## License
 

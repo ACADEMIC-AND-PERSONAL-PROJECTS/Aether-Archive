@@ -1,13 +1,15 @@
 # Architecture — Aether Archive
 
-> Status: **target architecture**. It describes what the sprints build; sections are marked `TARGET` until
-> the corresponding story lands. Keep it honest: when reality diverges, update this file in the same PR.
+> Status: **current architecture**. The product slice is built; sections are marked `TARGET` only where
+> the course production slice has not landed yet. Keep it honest: when reality diverges, update this
+> file in the same PR.
 
 ## 1. Context
 
 Aether Archive is a **single-user, local-first** application. One machine (the owner's) runs both the
-backend and the frontend build; a phone on the same LAN opens the app in a browser. Nothing leaves the
-machine: no cloud, no external request at runtime, no telemetry.
+backend and the frontend build; a phone on the same LAN opens the app in a browser. The default
+deployment leaves the machine: no cloud, no external request at runtime, no telemetry. The public demo
+profile (ADR-029) is a separate, seeded deployment with operational signals only.
 
 ```text
 ┌──────────────┐        LAN (http://192.168.x.x:3000)        ┌───────────────────────────┐
@@ -113,7 +115,7 @@ frontend/src/
 | **Security** | Local-only threat model: upload safety, path traversal guards, no secrets, no external calls (`ADR-008`). |
 | **Performance** | Mobile budget: LCP < 1.5 s over LAN, no layout shift, lazy images, ≤ 64 px downscale for extraction. |
 | **Accessibility** | WCAG 2.2 AA target for interactive UI: focus trap, keyboard paths, ≥ 4.5:1 contrast, reduced motion. |
-| **Observability** | Log lines per meaningful operation; no telemetry; verification evidence lands in `reports/`. |
+| **Observability** | Local default: log lines per meaningful operation, no telemetry. Demo/prod profile (ADR-029): Actuator/Prometheus metrics, OpenTelemetry traces, JSON logs with `traceId`/`spanId`, Grafana dashboards, a publish-journey alert and the on-call responder. No PII or image content. |
 | **Process** | SCRUM artefacts in-repo, one story per branch, merge commits, retro per sprint (`ADR-002`, `ADR-003`, `ADR-007`). |
 
 ## 8. Deployment / runbook
@@ -126,12 +128,21 @@ cd backend && ./mvnw spring-boot:run                    # API + images on :8080
 cd frontend && npm install && npm run dev -- --host     # Vite :5173 for the phone
 ```
 
-**v1.0 (target, E6-S11/S12)** — the whole stack as containers, one command:
+**Container stack (landed for the course slice, ADR-029)** — the whole stack as containers, one command:
 
 ```bash
-cp .env.example .env && docker compose up
+cp .env.example .env && docker compose up -d --build
 # Phone: http://<LAN-IP>:3000 (nginx serves the SPA and proxies /api + /images)
 ```
+
+**Production/demo (ADR-029)** — Caddy terminates TLS on 80/443; only the internal network reaches the
+API and PostgreSQL:
+
+```bash
+DOMAIN=aether.example.com docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+Runbook, TLS, CD and rollback: `docs/engineering/DEPLOYMENT.md`.
 
 Backup = `pg_dump` of the database + a copy of `images/` (scripted in E6-S7, documented in E6-S6).
 Full container requirements: `docs/engineering/DEPLOYMENT.md`.
