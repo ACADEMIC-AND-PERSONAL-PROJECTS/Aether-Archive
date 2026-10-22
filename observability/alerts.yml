@@ -1,0 +1,72 @@
+# Prometheus alert rules — user impact first (ADR-029).
+#
+# The publish journey is the one flow the product promises: six photos become a dump. The two
+# critical rules therefore describe what a reader feels (failed saves, slow saves) rather than a
+# host graph. `AetherApiDown` catches the coarser case where the scrape itself disappears; the
+# on-call responder uses the same notification path for both.
+
+groups:
+  - name: aether-archive
+    rules:
+      - alert: AetherPublish5xxRate
+        expr: |
+          sum(rate(http_server_requests_seconds_count{
+            job="aether-api",
+            method="POST",
+            uri="/api/v1/dumps",
+            status=~"5.."
+          }[2m]))
+          /
+          clamp_min(sum(rate(http_server_requests_seconds_count{
+            job="aether-api",
+            method="POST",
+            uri="/api/v1/dumps"
+          }[2m])), 0.001)
+          > 0.05
+        for: 1m
+        labels:
+          severity: critical
+          journey: publish
+          service: aether-api
+        annotations:
+          summary: "Publish is failing with 5xx responses"
+          description: >-
+            {{ $value | humanizePercentage }} of dump publishes failed over the last two minutes.
+            A reader cannot save a dump. Runbook: docs/engineering/OBSERVABILITY.md#publish-5xx
+          runbook_url: "https://github.com/ACADEMIC-AND-PERSONAL-PROJECTS/Aether-Archive/blob/main/docs/engineering/OBSERVABILITY.md#publish-5xx"
+
+      - alert: AetherPublishLatency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(http_server_requests_seconds_bucket{
+              job="aether-api",
+              method="POST",
+              uri="/api/v1/dumps"
+            }[5m]))
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+          journey: publish
+          service: aether-api
+        annotations:
+          summary: "Publish p95 latency is above two seconds"
+          description: >-
+            The save path is slow enough that the workshop feels broken. Check the database and
+            the API traces before touching the frontend.
+          runbook_url: "https://github.com/ACADEMIC-AND-PERSONAL-PROJECTS/Aether-Archive/blob/main/docs/engineering/OBSERVABILITY.md#publish-latency"
+
+      - alert: AetherApiDown
+        expr: up{job="aether-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          journey: availability
+          service: aether-api
+        annotations:
+          summary: "The Aether Archive API is not scrapeable"
+          description: >-
+            Prometheus has failed to scrape /actuator/prometheus for one minute. The public site may
+            be serving a shell that cannot save anything.
+          runbook_url: "https://github.com/ACADEMIC-AND-PERSONAL-PROJECTS/Aether-Archive/blob/main/docs/engineering/OBSERVABILITY.md#api-down"

@@ -1,0 +1,28 @@
+[Unit]
+Description=Aether Archive on-call responder (Alertmanager webhook -> deterministic remediation)
+Documentation=https://github.com/ACADEMIC-AND-PERSONAL-PROJECTS/Aether-Archive/blob/main/oncall/README.md
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# The repository checkout that holds .env, the Compose files and oncall/.
+WorkingDirectory=/opt/aether
+# The responder reads ONCALL_WEBHOOK_TOKEN, ONCALL_GITHUB_TOKEN and friends from the same .env as
+# the stack. run.sh also regenerates oncall/webhook-token for Alertmanager before starting.
+EnvironmentFile=/opt/aether/.env
+Environment="AETHER_COMPOSE_ARGS=-f docker-compose.yml -f docker-compose.observability.yml -f docker-compose.prod.yml"
+ExecStart=/opt/aether/oncall/run.sh
+Restart=on-failure
+RestartSec=5
+# The deploy user owns the checkout and belongs to the docker group. The responder needs the Docker
+# socket to restart the API and PostgreSQL; running it as a host service keeps a writable socket out
+# of every container.
+User=deploy
+Group=docker
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

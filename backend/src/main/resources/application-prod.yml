@@ -15,6 +15,11 @@ management:
   metrics:
     tags:
       application: aether-archive
+    distribution:
+      # Publish latency is a user-facing signal: without the histogram the Prometheus endpoint
+      # only exposes count/sum and the p95 panels and alert have nothing to read.
+      percentiles-histogram:
+        http.server.requests: true
   tracing:
     sampling:
       probability: 1.0
