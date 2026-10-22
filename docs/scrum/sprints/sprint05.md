@@ -182,3 +182,8 @@ order is deliberate:
   129 lines of incident JSON, 36-line attribution table; 11 binary PNGs contribute none). Review
   round 1 requested changes (7 blocking); the fixes are in round 2 and the outcome is recorded in the
   PR and this log.
+- 2026-10-22 — **Commit hygiene note (non-blocking review finding).** Five commits in the final slice
+  omit the `[E6-FINAL]` story id (`dd9c3f8`, `19869f7`, `bc69ee5`, `6708367`, `5c8e21e`) and
+  `709727b` is a `wip` commit. History is not rewritten — the repository forbids rebase/force on shared
+  branches — so this is recorded as a retrospective action instead: story id in every final-slice
+  commit message, no `wip` on a release branch.

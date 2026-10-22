@@ -134,9 +134,12 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Promtail needs the Docker socket to know which containers exist. It is read-only, and the
-  # process has no-new-privileges. The on-call responder takes the opposite trade-off: it needs to
-  # restart services, so it runs on the host instead of mounting a writable socket.
+  # Promtail needs the Docker socket to know which containers exist. `:ro` prevents writes through the
+  # mount but is not a security boundary: the Docker API is root-equivalent, so a compromised
+  # Promtail could control the daemon. The image is pinned, it has no-new-privileges, and it is only
+  # on the private compose network; a socket proxy is the next hardening step if this pipeline is
+  # ever fed untrusted input. The on-call responder takes the opposite trade-off: it needs to restart
+  # services, so it runs on the host instead of mounting a writable socket.
   promtail:
     image: grafana/promtail:3.3.2
     restart: unless-stopped
