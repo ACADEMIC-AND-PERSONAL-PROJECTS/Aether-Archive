@@ -115,7 +115,7 @@ frontend/src/
 | **Security** | Local-only threat model: upload safety, path traversal guards, no secrets, no external calls (`ADR-008`). |
 | **Performance** | Mobile budget: LCP < 1.5 s over LAN, no layout shift, lazy images, ≤ 64 px downscale for extraction. |
 | **Accessibility** | WCAG 2.2 AA target for interactive UI: focus trap, keyboard paths, ≥ 4.5:1 contrast, reduced motion. |
-| **Observability** | Local default: log lines per meaningful operation, no telemetry. Demo/prod profile (ADR-029): Actuator/Prometheus metrics, OpenTelemetry traces, JSON logs with `traceId`/`spanId`, Grafana dashboards, a publish-journey alert and the on-call responder. No PII or image content. |
+| **Observability** | Local default: log lines per meaningful operation, no telemetry. Demo/prod profile (ADR-029): self-hosted Prometheus, Grafana, Alertmanager, OTel Collector, Jaeger, Loki/Promtail; Actuator metrics, traces and JSON logs with `traceId`/`spanId`; publish-journey alerts and a host-side on-call responder. Only Grafana is public (`/grafana/`). No PII or image content. |
 | **Process** | SCRUM artefacts in-repo, one story per branch, merge commits, retro per sprint (`ADR-002`, `ADR-003`, `ADR-007`). |
 
 ## 8. Deployment / runbook
@@ -136,16 +136,20 @@ cp .env.example .env && docker compose up -d --build
 ```
 
 **Production/demo (ADR-029)** — Caddy terminates TLS on 80/443; only the internal network reaches the
-API and PostgreSQL:
+API and PostgreSQL. Production is the base + observability + prod overlays:
 
 ```bash
-DOMAIN=aether.example.com docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+DOMAIN=aether.example.com docker compose -f docker-compose.yml \
+  -f docker-compose.observability.yml -f docker-compose.prod.yml up -d --build
 ```
 
-Runbook, TLS, CD and rollback: `docs/engineering/DEPLOYMENT.md`.
+The release path is a `v*` tag: `.github/workflows/release.yml` builds the images, pushes them to GHCR
+and runs `scripts/deploy/deploy.sh` on the VPS. The script is health-gated, smoke-tested, seeds the
+demo once, records the live tag and can roll back the previous one. Runbook, TLS, CD, backup and
+restore: `docs/engineering/DEPLOYMENT.md`; signals and alerts: `docs/engineering/OBSERVABILITY.md`.
 
-Backup = `pg_dump` of the database + a copy of `images/` (scripted in E6-S7, documented in E6-S6).
-Full container requirements: `docs/engineering/DEPLOYMENT.md`.
+Backup = `scripts/deploy/backup.sh` (pg_dump + media volume) before every deploy, with 7-day
+retention; restore steps are in the deployment runbook.
 
 ## 9. Known open decisions
 

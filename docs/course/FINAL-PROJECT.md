@@ -22,7 +22,7 @@ The product's expected behaviour is deliberately small:
 
 1. Open the app on a phone on the same network.
 2. See **one** random photo, full-bleed, with no visible UI.
-3. Tap to open a glass menu: **The River** (the chronological archive), **Curate** (the workshop),
+3. Tap to open the menu: **The River** (the chronological archive), **Curate** (the workshop),
    **Close**.
 4. In the River, scroll through monthly chapters; each six-picture dump carries its own "aura" colour,
    and the page background wears it while the dump is in view.
@@ -50,18 +50,29 @@ phone / browser
                               └── proxies /api/** and /images/** ──▶ api (Spring Boot 3.5, Java 21)
                                                                         ├── PostgreSQL 17 (Flyway)
                                                                         └── /data (images volume)
+
+  Caddy /grafana/* ──▶ Grafana (read-only dashboards)
+  Prometheus ◀── api:8080/actuator/prometheus      Alertmanager ──▶ host-side on-call responder
+  api ──OTLP──▶ Collector ──▶ Jaeger               logs ──▶ Promtail ──▶ Loki
 ```
 
 - **Frontend:** React 19, Vite, TypeScript, Tailwind CSS 4, TanStack Query, `@dnd-kit`, Fontsource
-  (self-hosted). Four routes: `/`, `/river`, `/curate`, `/check`.
+  (self-hosted). Four routes: `/`, `/river`, `/curate`, `/check` (a deterministic design check page,
+  not a product feature).
 - **Backend:** Spring Boot 3.5, Java 21, Maven, Flyway, REST under `/api/v1`, images under `/images/**`.
 - **Database:** PostgreSQL 17, schema owned by Flyway; Testcontainers in the tests.
 - **One origin:** nginx proxies the API and the images, so the client has no API base URL and the
   browser never needs CORS. The Vite dev server mirrors that proxy.
-- **Delivery:** multi-stage Dockerfiles, `docker-compose.yml` for the whole stack, a production
-  overlay with Caddy, GHCR images, and GitHub Actions for CI/CD.
+- **Delivery:** multi-stage Dockerfiles, one base Compose file plus local/observability/production
+  overlays, GHCR images, a `v*` release workflow, health-gated deploy/rollback scripts.
 - **Signals:** Actuator/Prometheus, OpenTelemetry traces, JSON logs with `traceId`/`spanId`; no PII and
-  no image bytes in telemetry.
+  no image bytes in telemetry. The local-first stack keeps tracing off.
+
+The editorial redesign (2026-10-22) recast the four existing views as a print object: ink and paper
+tokens, full-bleed photography, serif display type, small-caps kickers, hairline rules, grain and
+restrained motion. The redesign deliberately keeps every tested accessibility and text contract. The
+evidence is `reports/evidence/app-*.png` and the commit `feat(ui): recast the archive as an editorial
+print object`.
 
 ---
 
@@ -69,10 +80,17 @@ phone / browser
 
 ```bash
 cp .env.example .env
-docker compose up -d --build
+docker compose up -d --build        # db + api + web
 # open http://localhost:3000
-make seed        # optional: 300 demo photos + one dump through the API
-make verify      # the same gates as CI
+make demo                           # 36 attributed photos + 3 dumps through the API
+make verify                         # the same gates as CI
+```
+
+The full local stack with observability:
+
+```bash
+make observe-up                     # app :3000, Grafana :3001, Prometheus :9090, Jaeger :16686
+make oncall                         # host-side responder in a second terminal
 ```
 
 The local stack uses the named volumes `aether_stack_pgdata` and `aether_stack_media`;
@@ -86,26 +104,41 @@ Dev mode without containers: `docker compose -f docker-compose.dev.yml up -d`, t
 
 ## 4. Public deployment
 
-**Status: BLOCKED — the VPS firewall is closed to the development machine.**
+**Status: BLOCKED — the VPS provider firewall does not accept the development machine.**
 
-The target is the existing DigitalOcean host `165.232.81.136` (SSH alias in the local config, key
-`digital_ocean`). It answers ICMP but TCP 22/80/443 time out, so the droplet firewall (or UFW) must
-allow the current public IP before the deployment can proceed. Once open:
+The target is the existing DigitalOcean host `165.232.81.136`. It answers ICMP but TCP 22/80/443 time
+out from the development network, so the droplet firewall (or UFW) must allow the operator address and
+the public web ports before the first deployment.
+
+The code path is complete and does not depend on that network fix:
+
+- `.github/workflows/release.yml` — a `v*` tag builds and pushes both images to GHCR, then (when the
+  VPS secrets exist) SSHes to `/opt/aether` and runs the deploy script.
+- `scripts/deploy/deploy.sh` — validates the environment, backs up PostgreSQL and media, pulls the
+  immutable `sha-<commit>` tag, waits for health, runs the public smoke test, seeds the demo once,
+  records the tag and history, and restores the previous tag on failure.
+- `scripts/deploy/rollback.sh`, `scripts/deploy/backup.sh`, `scripts/deploy/smoke.sh`.
+- `docker-compose.prod.yml` + `docker/Caddyfile` — Caddy on 80/443, automatic TLS, `/grafana/*` routed
+  to the read-only dashboards.
+- `docs/engineering/DEPLOYMENT.md` — the VPS preparation, secrets, first release, rollback, restore
+  and security checklist.
+
+Once the firewall/DNS step is done:
 
 ```bash
-# on the VPS, once
-git clone https://github.com/ACADEMIC-AND-PERSONAL-PROJECTS/Aether-Archive.git /opt/aether/dev
-cd /opt/aether/dev && cp .env.example .env   # set POSTGRES_PASSWORD, DOMAIN, AETHER_PUBLIC_ORIGIN
+# on the VPS
+git clone https://github.com/ACADEMIC-AND-PERSONAL-PROJECTS/Aether-Archive.git /opt/aether
+cd /opt/aether
+cp .env.example .env
+# DOMAIN, POSTGRES_PASSWORD, GRAFANA_ADMIN_PASSWORD, ONCALL_WEBHOOK_TOKEN, AETHER_PUBLIC_ORIGIN
+sudo cp oncall/aether-oncall.service /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now aether-oncall
 
-# from the repository root, with DOMAIN set
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# from the repository, once the VPS secrets are configured
+git tag -a v1.0.0 -m "Aether Archive v1.0.0" && git push origin v1.0.0
 ```
 
-Caddy obtains TLS for `DOMAIN` (a real domain or a `<ip>.nip.io` name). The production overlay publishes
-only 80/443; PostgreSQL and the API stay on the internal network. The deploy runbook and rollback are
-in `docs/engineering/DEPLOYMENT.md`.
-
-**Live URL:** _to be inserted after the firewall is opened and the first deploy completes._
+**Live URL:** _to be inserted after the firewall is opened and the first release completes._
 
 ---
 
@@ -113,21 +146,22 @@ in `docs/engineering/DEPLOYMENT.md`.
 
 | # | Criterion | Status | Evidence |
 | --- | --- | --- | --- |
-| 1 | **Problem Description** | DONE | `README.md` §The problem / §What it does; this document §1; public demo URL above |
+| 1 | **Problem Description** | DONE | `README.md` §The problem / §What it does; this document §1 |
 | 2 | **Product Specification** | DONE | `_docs/aether_archive_specs.md`, `_docs/openapi.yml`, `docs/scrum/PRODUCT-BACKLOG.md`, public issues/milestones (#180, #7) |
 | 3 | **Agent Team Specification** | DONE | `docs/agents/TEAM.md` (roles, handoffs, invariants), `.claude/agents/*`, `.claude/skills/*`, `CLAUDE.md` |
 | 4 | **Context Management** | DONE | `AGENTS.md` (entry point), `CLAUDE.md` (<200 lines), `.claude/rules/*` path-scoped, `docs/` modular, `reports/` evidence |
-| 5 | **Application** | WIP | End-to-end app (splash, River, Workshop, upload/publish) and one-command stack; `docker compose up -d --build`. Verified by the test suites and the E6-S4 browser pass. |
-| 6 | **Testing** | DONE | `make verify`; backend `./mvnw verify` (307 tests, Testcontainers PostgreSQL), frontend `npm run test` (515 tests), lint/typecheck/build in CI. Evidence: `reports/`. |
-| 7 | **Containerization** | WIP | `backend/Dockerfile`, `frontend/Dockerfile`, `docker-compose.yml`, healthchecks, persistent volumes, non-root API. Build verified locally (see build log). |
-| 8 | **Deployment** | BLOCKED | `docker-compose.prod.yml`, `docker/Caddyfile`, `docs/engineering/DEPLOYMENT.md`; blocked on the VPS firewall (see §4). |
-| 9 | **CI/CD** | WIP | `.github/workflows/ci.yml` (tests on every PR); deploy-dev/deploy-prod workflows and rollback next. |
-| 10 | **Observability** | WIP | Actuator + Prometheus registry + OTel bridge/exporter (`backend/pom.xml`), JSON logs with trace/span ids (`logback-spring.xml`), prod config (`application-prod.yml`); Grafana dashboard and frontend trace propagation next. |
-| 11 | **Alerting** | WIP | One alert on the publish journey (5xx rate / latency) in Grafana, routed to the on-call responder; to be created with the Grafana stack. |
-| 12 | **On-Call Agent** | WIP | `oncall/` responder: receives the Grafana webhook, reads the deploy/health signals, rolls back to the last good image and records the incident; to be implemented and demoed with an injected failure. |
+| 5 | **Application** | DONE | The four views, upload/publish, one-command stack; editorial redesign screenshots in `reports/evidence/`; verified by the suites and the E6-S4 browser pass. The physical-device pass is a separate, explicitly unclaimed check. |
+| 6 | **Testing** | DONE | `make verify`; backend `./mvnw verify` (307 tests, Testcontainers PostgreSQL), frontend `npm run test` (518 tests), lint/typecheck/build in CI, on-call unit tests, deploy shell checks. Evidence: `reports/`, `/tmp/opencode/mvn-verify.log` (local). |
+| 7 | **Containerization** | DONE | `backend/Dockerfile`, `frontend/Dockerfile`, `docker-compose.yml`, healthchecks, persistent volumes, non-root API, bounded logs; base stack healthy on `http://localhost:3000`. |
+| 8 | **Deployment** | **BLOCKED** | `docker-compose.prod.yml`, `docker/Caddyfile`, `docs/engineering/DEPLOYMENT.md`; the release/deploy scripts are shipped; blocked on the VPS firewall/DNS (see §4). |
+| 9 | **CI/CD** | **DONE (pipeline); first public run pending** | `.github/workflows/ci.yml` (tests on every PR), `.github/workflows/release.yml` (GHCR build/push + SSH deploy), `scripts/deploy/{deploy,rollback,smoke,backup}.sh`; the deploy job is gated on `VPS_*` secrets. |
+| 10 | **Observability** | **DONE (local); public pending** | `docker-compose.observability.yml`, `observability/`, `backend/src/main/resources/application-prod.yml`, `logback-spring.xml`, `frontend/src/api/traceparent.ts`; dashboard and traces in `reports/evidence/`; runbook in `docs/engineering/OBSERVABILITY.md`. |
+| 11 | **Alerting** | **DONE (local drill); public pending** | `observability/alerts.yml`, `observability/alertmanager.yml`; `AetherPublish5xxRate` fired for real; incident record and screenshots in `reports/observability-incident-drill-20261022.md`. |
+| 12 | **On-Call Agent** | **DONE (local drill); production install pending** | `oncall/` responder + tests + systemd unit + runbook; the drill restarted PostgreSQL and closed the incident (`oncall/incidents/20261022T192818Z-cbafc00e.json`, committed copy in `reports/evidence/`). |
 
-**Score target:** 20+/24. The pass threshold is 10/24. The honest current score is in epic #180; the
-statuses above are the source of truth.
+**Score target:** 20+/24. The pass threshold is 10/24. The only criterion currently blocked is #8;
+#9–#12 have complete code and local evidence, and #8–#12 gain their strongest form when the public
+instance answers. The statuses above are the source of truth, not the target.
 
 ---
 
@@ -136,9 +170,11 @@ statuses above are the source of truth.
 | Layer | Command | Scope |
 | --- | --- | --- |
 | Backend unit + integration | `cd backend && ./mvnw verify` | 307 tests; Testcontainers PostgreSQL; API, services, storage, validation |
-| Frontend unit + component | `cd frontend && npm run test -- --run` | 515 tests; views, hooks, colour extraction, upload queue, a11y contracts |
-| Static gates | `npm run lint`, `npm run typecheck`, `npm run build` | ESLint (0 warnings), `tsc -b`, production bundle |
-| End-to-end API | `scripts/dev/smoke.sh --base-url ...` | every endpoint, success and refusal, byte-identical image round-trip |
+| Frontend unit + component | `cd frontend && npm run test -- --run` | 518 tests; views, hooks, colour extraction, upload queue, a11y contracts, browser traceparent |
+| Static gates | `npm run lint`, `npm run format:check`, `npm run typecheck`, `npm run build` | ESLint (0 warnings), Prettier, `tsc -b`, production bundle |
+| On-call decision logic | `python3 -m unittest discover -s oncall -p 'test_*.py'` | diagnosis, action selection, incident lifecycle |
+| End-to-end API | `scripts/dev/smoke.sh --base-url ...` | every endpoint, success and refusal, byte-identical image round-trip (29 checks) |
+| Deployment smoke | `scripts/deploy/smoke.sh https://DOMAIN` | TLS/HSTS, headers, SPA, API reads, problem-detail 404, Grafana, containers, local observability |
 | Browser/device | `reports/device-verification-sprint05.md` | Chromium passes; physical iOS/Android explicitly **not** claimed |
 
 CI runs the backend and frontend jobs on every PR to `develop`/`main`; the required status contexts are
@@ -150,36 +186,56 @@ pinned by branch protection. The full suite is also `make verify`.
 
 ### Signals
 
-- **Metrics** — Spring Boot Actuator + Micrometer Prometheus registry: HTTP server requests, JVM,
-  HikariCP, publish/upload counters. Scraped by Prometheus (or Grafana Cloud) and shown in Grafana.
-- **Traces** — Micrometer Tracing bridge to OpenTelemetry, OTLP export to the collector. The frontend
-  creates a W3C `traceparent` for the publish request; the backend continues the trace, so a slow or
-  failed publish is one trace from click to SQL.
-- **Logs** — JSON on stdout in the `prod` profile, with `traceId`/`spanId` from MDC. No file names,
-  image bytes, passwords or tokens are logged.
+- **Metrics** — Spring Boot Actuator + Micrometer Prometheus registry: HTTP server requests (including
+  histogram buckets for p95), JVM, HikariCP. Prometheus scrapes `api:8080/actuator/prometheus`; the
+  endpoint is never proxied publicly.
+- **Traces** — Micrometer Tracing bridge to OpenTelemetry, OTLP export to the collector, Jaeger UI.
+  The frontend creates a W3C `traceparent` for the publish request (`frontend/src/api/traceparent.ts`);
+  the backend continues the trace, so a slow or failed publish is one trace from click to SQL.
+- **Logs** — JSON on stdout in the `prod` profile, with `traceId`/`spanId` from MDC; Promtail ships them
+  to Loki. No file names, image bytes, passwords or tokens are logged.
+- **Dashboard** — Grafana UID `aether-archive`, provisioned from
+  `observability/grafana/dashboards/aether-archive.json`: publish 5xx ratio, publish p95, request
+  outcomes, mutations, alert history, JVM, logs with trace id, and a Jaeger link.
 
-### Alert
+The local-first stack exports nothing. `make observe-up` loads the observability overlay and enables
+tracing; the local UIs bind to `127.0.0.1`. In production only Grafana is published, under `/grafana/`
+with anonymous Viewer access; Prometheus, Alertmanager and Jaeger are reached through an SSH tunnel.
 
-One alert with a **user-impact** condition, not a CPU graph:
+### Alerts
 
-> `publish` journey: 5xx rate > 5 % for 2 minutes, or p95 latency > 2 s for 5 minutes.
+Three rules (`observability/alerts.yml`), all about the publish journey or the API itself:
 
-It routes to the on-call webhook and to a GitHub issue. A synthetic failure flag lets the demo inject a
-real incident without touching user data.
+| Alert | Severity | Condition | For |
+| --- | --- | --- | --- |
+| `AetherPublish5xxRate` | critical | 5xx share of `POST /api/v1/dumps` over 2 min > 5 % | 1 min |
+| `AetherPublishLatency` | warning | publish p95 over 5 min > 2 s | 5 min |
+| `AetherApiDown` | critical | `up{job="aether-api"} == 0` | 1 min |
+
+Alertmanager groups by `alertname` and `journey`, sends `resolved`, routes critical alerts to the
+host-side responder and warnings to the `none` receiver: a slow save is a dashboard signal, not a page.
+The warning route was corrected during the drill after the first rehearsal showed the responder
+receiving a latency alert; the final run is the critical one recorded in the report.
 
 ### On-call responder
 
-`oncall/` is a small service in the production stack:
+`oncall/` is a small **host** process (systemd, `oncall/aether-oncall.service`), not a container. It
+needs the Docker socket to restart services; giving that power to a public-facing container would be a
+larger risk. It listens on `0.0.0.0:9099` behind the Docker host gateway with a bearer token from
+`ONCALL_WEBHOOK_TOKEN`.
 
-1. receives the Grafana webhook (shared secret, idempotent incident id);
-2. reads the current image tag, the last good tag, `/actuator/health`, and the recent error logs;
-3. chooses a remediation: roll back to the last good tag, or disable the failing flag;
-4. waits for health, re-checks the alert condition, and posts the incident summary to GitHub;
-5. if no safe automatic action exists, escalates and leaves the incident open.
+1. receives the Alertmanager webhook (idempotent per fingerprint), returns `202`;
+2. diagnoses Docker health for `api` and `db`, plus the last 60 API log lines;
+3. chooses one action: `restart_db` if the database is unhealthy, `rollback_api` to
+   `state/last-good-image` if the API is unhealthy, otherwise `restart_api`;
+4. waits for health, records `oncall/incidents/<utc>-<fingerprint>.json`, optionally opens one GitHub
+   issue, and closes the record when Alertmanager sends `resolved`;
+5. never runs SQL, never deletes data, never reads photo bytes, and never calls an LLM.
 
-The demo injects a failure, watches the alert fire, and shows the responder rolling back and closing the
-incident. The responder is deterministic by default; an LLM adapter can be enabled with an API key, but
-the safe path never depends on one.
+The drill is real: `scripts/demo/incident-drill.sh` starts a publish load and stops PostgreSQL, with no
+synthetic alert. The 2026-10-22 run produced `AetherPublish5xxRate`, a `restart_db` action, a healthy
+database in 8 seconds, and a resolved incident:
+`reports/observability-incident-drill-20261022.md`.
 
 ---
 
@@ -199,15 +255,18 @@ the safe path never depends on one.
 
 ## 9. Demo script (3–5 minutes)
 
-1. **Splash** — one photo, no chrome; tap; the glass menu.
+1. **Splash** — one photo, no chrome; tap; the menu.
 2. **River** — scroll through a month; the aura changes; leave and return; the scroll position is
-   remembered.
+   remembered. The editorial composition is the redesign the jury asked to see.
 3. **Workshop** — add six photos, reorder one, pick an aura, title, publish; return to the River.
-4. **Production** — open the public URL; show the same flow on the deployed instance.
-5. **Observability** — Grafana dashboard: the publish trace, the request metrics, the JSON log line with
-   the same `traceId`.
-6. **Incident** — enable the failure flag; the alert fires; the on-call responder rolls back; the publish
-   works again; the incident issue is closed.
+4. **Public URL** — open the deployed instance and repeat the flow (after the firewall/DNS step).
+5. **Observability** — Grafana: the publish trace, the request metrics, the JSON log line with the same
+   `traceId`; Jaeger for the click-to-SQL trace.
+6. **Incident** — run the drill: stop PostgreSQL for real; the 5xx alert fires; Alertmanager calls the
+   responder; it restarts the database; the alert resolves; show the incident JSON. The synthetic
+   failure flag is not used because the real path is more convincing.
+7. **Rollback** — `scripts/deploy/rollback.sh` and the recorded history; the on-call automatic
+   rollback of the API image is the narrower path.
 
 ---
 
@@ -219,10 +278,16 @@ the safe path never depends on one.
   prepared but not completed on hardware; the report says so rather than claiming a pass.
 - **The public demo is seeded**, not the owner's real archive. The local-first default remains the
   product.
-- **The VPS deployment is blocked** until the host firewall allows the development machine; the
-  deployment section is deliberately marked BLOCKED, not DONE.
+- **The VPS deployment is blocked** until the host firewall allows the operator and DNS resolves; the
+  deployment criterion is deliberately marked `BLOCKED`, not `DONE`. The release, deploy, smoke,
+  rollback and backup code is complete and exercised locally.
+- **The on-call path is deterministic by design**; it is not a general incident agent. It never runs
+  SQL and never deletes data.
 - **Known frontend issues** #176 (River scroller), #177 (first-publish cache) and #179 (menu history)
-  are tracked. The redesign must not regress them.
+  are tracked. The redesign keeps their acceptance criteria in view and does not claim them fixed
+  without a separate verification.
+- **The observability stack is a single-VPS demo**, not an SLO claim: Jaeger is in-memory, Loki and
+  Prometheus are single instances, and there is no HA.
 
 ---
 
@@ -234,3 +299,18 @@ it is tracked here so it is not forgotten before submission:
 - [ ] Review 1 — project name / URL / findings
 - [ ] Review 2 — project name / URL / findings
 - [ ] Review 3 — project name / URL / findings
+
+---
+
+## 12. Submission checklist
+
+- [x] Repository public; epic #180 and the milestone exist.
+- [x] README, criteria map, architecture, design system, deployment, observability and on-call runbooks.
+- [x] CI green on the branch; the release workflow and deploy scripts are in the repository.
+- [ ] VPS firewall open to the operator; DNS pointed at the host.
+- [ ] `v1.0.0` tag pushed; first release publishes to GHCR and deploys.
+- [ ] Public URL inserted in the README, this document and issue #180.
+- [ ] Production drill re-run; the new incident JSON linked.
+- [ ] 3–5 minute demo video recorded (the script in §9).
+- [ ] Three peer reviews completed.
+- [ ] Final submission before **2026-10-26**.

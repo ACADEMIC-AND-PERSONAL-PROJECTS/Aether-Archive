@@ -28,11 +28,15 @@ review; merge commit only; record the outcome in the sprint doc and `reports/`.
 | Goal | Command |
 | --- | --- |
 | Whole stack, one command | `docker compose up -d --build` → `http://localhost:3000` |
-| Seed the demo | `make seed` |
+| Demo archive | `make demo` (36 attributed photos + 3 dumps); `make seed` for 300 generated photos |
 | Every gate the CI runs | `make verify` |
 | Backend only | `cd backend && ./mvnw verify` |
 | Frontend only | `cd frontend && npm run lint && npm run test -- --run && npm run typecheck && npm run build` |
-| Production overlay | `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build` |
+| Observability | `make observe-up` → Grafana `:3001`; `make oncall` in a second terminal |
+| Incident drill | `scripts/demo/incident-drill.sh` (stops PostgreSQL for real) |
+| Production rehearsal | `make prod-up` (base + observability + Caddy; no published web port) |
+| Deployment smoke | `./scripts/deploy/smoke.sh https://DOMAIN` |
+| Backup / rollback | `make backup` · `make rollback` (VPS state) |
 
 ## Invariants
 

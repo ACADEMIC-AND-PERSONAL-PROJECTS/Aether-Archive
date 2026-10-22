@@ -19,6 +19,7 @@ Images are the product; the UI must be almost invisible.
 | Design system (color, glass, type) | `docs/engineering/DESIGN-SYSTEM.md` |
 | Design references (soft & modern brief, inspiration) | `docs/engineering/DESIGN-REFERENCES.md` |
 | Deployment & containers | `docs/engineering/DEPLOYMENT.md` |
+| Observability, alerting, runbook | `docs/engineering/OBSERVABILITY.md`, `oncall/README.md` |
 | Decision log (ADRs) | `docs/scrum/DECISION-LOG.md` |
 | Sprint plans / retrospectives | `docs/scrum/sprints/`, `retrospectives/` |
 
@@ -30,7 +31,8 @@ user approval; the specs are the contract the backlog is built from.
 - **Backend**: Java 21 + Spring Boot 3, Maven (`./mvnw`), REST under `/api/v1`, RFC 9457 errors.
 - **Database**: PostgreSQL 17, run locally as a Docker container. Dev uses `docker-compose.dev.yml`;
   v1.0 ships the whole stack containerized (`docs/engineering/DEPLOYMENT.md`, ADR-009/010).
-- **Storage**: local filesystem only. Database + images never leave this machine.
+- **Storage**: local filesystem only. The local-first default keeps the database and images on this
+  machine; the public demo profile (ADR-029) runs **seeded** data on a VPS, never the owner's archive.
 - **Frontend**: React + Vite + TypeScript, Tailwind CSS, `@dnd-kit`, TanStack Query.
   **Framer Motion is deliberately not installed** — a substitution under this section's own rule, decided
   with four-build measurements in **ADR-022**: the smallest tree-shaken `motion` import costs +83.9 kB raw
@@ -59,7 +61,10 @@ Backend (from `backend/`): `./mvnw spring-boot:run` · `./mvnw test` · `./mvnw 
 Frontend (from `frontend/`, Node 22.22.2 / 24.15 / 26+ — see `frontend/package.json` `engines`):
 `npm install` · `npm run dev` (dev server on :5173, LAN-bound) · `npm run test` · `npm run lint` · `npm run typecheck` ·
 `npm run format:check` · `npm run build` (static bundle in `frontend/dist/`) · `npm run preview` (serves `dist/` on :4173)
-Dev database (once scaffolded): `docker compose -f docker-compose.dev.yml up -d` · v1.0 stack: `docker compose up`
+Dev database (once scaffolded): `docker compose -f docker-compose.dev.yml up -d` · v1.0 stack: `docker compose up -d --build`
+Demo data: `make demo` (36 attributed photos + 3 dumps) · API walk: `make smoke` · every gate: `make verify`
+Observability: `make observe-up` · `make oncall` (host responder) · `make observe-down` · drill: `scripts/demo/incident-drill.sh`
+Production: `make deploy-smoke BASE_URL=https://DOMAIN` · `make backup` · `make rollback` · release: push a `v*` tag (`.github/workflows/release.yml` → `scripts/deploy/deploy.sh`)
 Full check before a commit: the `verify` skill (`.claude/skills/verify/SKILL.md`).
 **Keep this section accurate** — every story that adds or renames a command updates it here.
 
@@ -77,6 +82,10 @@ Branch model: `main` (released) ← `develop` (integration) ← `feature/*` (one
   `code-reviewer` subagent) and merge with **`gh pr merge <n> --merge`** (merge commit).
 - At the end of a sprint: `/finish-sprint` → security audit gate, retrospective, release PR
   `develop` → `main`, tag `sprint-NN` (see `retrospectives/TEMPLATE.md`).
+- A **public release** is a `v*` tag on `main` after the release PR merges. The tag triggers
+  `.github/workflows/release.yml` (GHCR images + SSH deploy). Never deploy from a feature branch and
+  never build a release by hand on the VPS; the deploy script is the only path that records
+  `state/` and the rollback history.
 
 ### Hard rules (hooks enforce several of these — do not try to bypass them)
 

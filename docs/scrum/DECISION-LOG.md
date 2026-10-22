@@ -1212,21 +1212,38 @@ third-party analytics to the product — would violate the local-first stance.
    Sampling is configurable; the local profile keeps the export off.
 4. **The public demo is best-effort**, documented in `README.md` and `docs/course/FINAL-PROJECT.md`;
    it is not a hosted service and carries no availability promise beyond the course window.
-5. **Delivery**: CI builds and tests every change; CD deploys `develop` to the dev environment
-   automatically and `main` to production with a manual approval. Every deploy records the image tag,
-   is health-gated, and can roll back to the previous good tag. GHCR stores the images; the VPS only
-   pulls them.
-6. **The on-call responder** receives Grafana alerts and performs only safe, reversible actions —
-   rollback to the last good image or disable a failing flag. It records each incident (GitHub issue)
-   and escalates when no safe action exists. The deterministic path never depends on an LLM key.
-7. **One origin** remains: Caddy terminates TLS, nginx serves the SPA and proxies `/api/**` and
-   `/images/**`. The browser's CORS allow-list contains the public origin only.
+5. **Delivery**: CI tests every pull request and push. A `v*` tag triggers `.github/workflows/release.yml`,
+   which builds the API and web images and pushes them to GHCR under both the human tag and the
+   immutable `sha-<full commit>` tag. The deploy job then SSHes to the VPS and runs
+   `scripts/deploy/deploy.sh sha-<full commit>`; branches are never deployed automatically. The script
+   pulls the images, waits for Docker health, runs the public smoke test, seeds the demo once, records
+   the tag in `state/`, and restores the previous tag if any gate fails. `scripts/deploy/rollback.sh`
+   reuses the same path. The VPS only pulls; it never builds a release.
+6. **Observability is self-hosted**, not Grafana Cloud: Prometheus scrapes the API, an OpenTelemetry
+   Collector forwards traces to Jaeger, Promtail ships JSON logs to Loki, and Alertmanager routes two
+   user-impact alerts on the publish journey. Grafana is published read-only under `/grafana/` for the
+   jury; Prometheus, Alertmanager and Jaeger stay bound to `127.0.0.1` behind an SSH tunnel. The
+   local-first stack remains telemetry-free; only the observability overlay enables tracing.
+7. **The on-call responder runs on the host**, as a systemd service, and receives Alertmanager
+   webhooks through a bearer token. It diagnoses Docker health for the API and the database, then
+   performs one safe action: restart the database, restart the API, or roll the API back to
+   `state/last-good-image`. It records an incident JSON, optionally opens one GitHub issue, and closes
+   the record when Alertmanager sends `resolved`. It never runs SQL, deletes data or calls an LLM; the
+   deterministic path needs no API key.
+8. **One origin** remains: Caddy terminates TLS, nginx serves the SPA and proxies `/api/**` and
+   `/images/**`, and `/grafana/*` goes to Grafana with `serve_from_sub_path`. The browser's CORS
+   allow-list contains the public origin only.
 
 **Consequences.** "No telemetry" is now scoped to the local-first default, not to the demo profile;
-`CLAUDE.md`, `ARCHITECTURE.md` and the README say so explicitly. The deployment introduces a domain,
-TLS certificates, a VPS firewall rule and host secrets, which are documented in
-`docs/engineering/DEPLOYMENT.md`. The archive's storage model does not change: media stays on a local
-volume, and the database stays PostgreSQL.
+`CLAUDE.md`, `ARCHITECTURE.md` and the README say so explicitly. The older deployment sketch that named
+Grafana Cloud, a synthetic failure flag and a containerised on-call agent is superseded by the
+implementation described in `docs/engineering/DEPLOYMENT.md` and
+`docs/engineering/OBSERVABILITY.md`: the on-call path is a deterministic host process, and the failure
+drill is a real PostgreSQL stop. The deployment introduces a domain, TLS certificates, a VPS firewall
+rule and host secrets. The Alertmanager token is a mounted file with mode 0644 because its container
+runs unprivileged; the host is single-user and `.env` holds the same value. The archive's storage model
+does not change: media stays on a local volume, and the database stays PostgreSQL. The public instance
+remains **pending** until the VPS firewall and DNS are reachable; the code path is complete.
 
 ---
 

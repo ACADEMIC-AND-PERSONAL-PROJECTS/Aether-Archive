@@ -6,15 +6,25 @@ paths:
   - "frontend/**/*.css"
 ---
 
-# Design language — Dark Glassmorphism (loaded for UI files)
+# Design language — editorial archive (loaded for UI files)
 
 Full specification: `docs/engineering/DESIGN-SYSTEM.md`. Procedure to implement or extend it:
 `.claude/skills/design-system/SKILL.md`. **Inspiration to consult at the start of every UI story:
 `docs/engineering/DESIGN-REFERENCES.md`** (fetch 2–3 references, extract principles, cite them in the
 PR; development-time only — nothing from them is ever loaded or requested at runtime).
+
+## Current look — 2026-10-22 recalibration
+
+The four views were recast as an **editorial print object**: ink/paper tokens, full-bleed photography,
+Cormorant Garamond display, Manrope UI, small-caps kickers, hairline rules, CSS-numbered slots, a
+restrained grain. The menu is a paper index sheet on mobile and a right-hand editorial column on
+desktop. Glass is history; the image-derived aura remains the only colour source, and the tested
+accessibility/text contracts must not change. Implementation: `frontend/src/styles/global.css`,
+`frontend/src/styles/editorial.css`, `frontend/src/components/ArchiveBar.tsx`. The older "soft &
+modern / glass" notes below remain for the extraction, typography, motion and anti-pattern rules.
 Hard rules:
 
-## The brief: soft & modern
+## The original brief: soft & modern
 
 - **Soft** — low-contrast elegance: never pure black or pure white (base `#0B0B0D`–`#121215`, text
   `#E8E6E3`); muted, desaturated accents; generous negative space; rounded organic geometry
@@ -33,11 +43,10 @@ Hard rules:
 
 - **Images first, UI invisible.** No persistent header, footer, navbar, borders, cards or chrome.
   The only text on screen is intentional: month/year markers and Dump titles.
-- **Dark Glassmorphism** only: dark tinted glass (`rgba(0,0,0,0.4)`), `backdrop-filter: blur(15px)`,
-  hairline highlights (`1px solid rgba(255,255,255,0.08)`), generous negative space.
-  **Exception, by ADR-023:** a page whose aura the curator chose may use the inverse tint — white
-  glass with a dark hairline — because the dark tint cannot carry one text colour legibly on a light
-  page. The tint always follows the text; `themeFromBackground` owns the arithmetic.
+- **One surface system** (current): flat ink-on-paper chrome, paper panels, hairline rules and the
+  archive's aura as the field; photography is the material, never a card. The tint follows the text;
+  `themeFromBackground` owns the arithmetic. The historical glass recipe (dark tint `rgba(0,0,0,0.4)`,
+  `backdrop-filter: blur(15px)`) remains in the token history and ADR-023, not as the current look.
   No heavy drop shadows, no neon, no decorative gradients, no emoji in the UI.
 - **Motion is soft and tactile**: fade + small upward drift (12–16 px; transitions 300–600 ms,
   micro-feedback 180 ms), `cubic-bezier(0.22, 1, 0.36, 1)`. No bounce, no attention-seeking loops,
