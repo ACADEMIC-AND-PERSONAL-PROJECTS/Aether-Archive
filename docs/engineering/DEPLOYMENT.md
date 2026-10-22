@@ -131,9 +131,11 @@ Repository secrets (preferably in the `production` environment):
 Repository variable (optional): `PUBLIC_URL=https://<DOMAIN>` so the Actions deployment links to the
 live instance.
 
-The workflow logs in to GHCR with the run's `GITHUB_TOKEN` to push. The VPS must be able to pull: make
-both packages public in the repository's package settings (recommended for the course demo), or run
-`docker login ghcr.io` once on the VPS with a `read:packages` token.
+The workflow logs in to GHCR with the run's `GITHUB_TOKEN` to push. The packages may stay private:
+the deploy job passes that same short-lived token over SSH stdin, and `deploy.sh` logs in with a
+temporary `DOCKER_CONFIG` that is removed on exit. No long-lived registry credential is stored on the
+VPS. A manual deploy can export `GHCR_TOKEN`/`GHCR_USER` for the command (not in `.env`) or run
+`docker login` once as an operator. A token exported for the run wins over a stale value in `.env`.
 
 ## 5. Release: tag → images → deploy
 
@@ -148,9 +150,9 @@ git push origin v1.0.0
    `ghcr.io/academic-and-personal-projects/aether-archive-{api,web}:v1.0.0` and the immutable
    `:sha-<full commit>` tag;
 2. deploys only if the four VPS secrets exist; otherwise it publishes the images and emits a warning;
-3. opens an SSH connection with `StrictHostKeyChecking=yes`, fetches the exact release commit,
-   detaches at `GITHUB_SHA`, aborts on a dirty checkout, asserts `git rev-parse HEAD` equals the
-   release commit, and only then runs
+3. opens an SSH connection with `StrictHostKeyChecking=yes`, passes the run's short-lived token on
+   stdin, fetches the exact release commit, detaches at `GITHUB_SHA`, aborts on a dirty checkout,
+   asserts `git rev-parse HEAD` equals the release commit, and only then runs
    `cd /opt/aether && ./scripts/deploy/deploy.sh 'sha-<full commit>'`.
 
 `deploy.sh` runs on the VPS and is the only deployment path (the workflow does not recreate the
@@ -269,7 +271,7 @@ Details, alert rules and the runbook: `docs/engineering/OBSERVABILITY.md`; respo
 - [ ] Only 22 (operator), 80 and 443 are open; 9090/9093/16686 are not reachable publicly.
 - [ ] Caddy HSTS is on; the nginx CSP and `X-Content-Type-Options: nosniff` are present.
 - [ ] Grafana anonymous access is Viewer only; the admin password is strong and not the default.
-- [ ] GHCR packages are public or the VPS has a read-only login; no push token on the VPS.
+- [ ] GHCR pulls use the release job's short-lived token with a temporary `DOCKER_CONFIG`; no push token is stored on the VPS.
 - [ ] The deploy key is dedicated, not the operator's personal key; `VPS_KNOWN_HOSTS` was verified.
 - [ ] `state/`, `backups/`, `oncall/incidents/`, `oncall/webhook-token` are gitignored.
 - [ ] The public demo contains seeded photography only, with attribution in

@@ -7,8 +7,10 @@
 #
 # GitHub Actions calls exactly this script over SSH after publishing the images to GHCR
 # (.github/workflows/release.yml). It is also the manual path, so there is no hidden deploy state:
-# the history and the current tag live in `state/` (gitignored), the credentials live in `.env`, and
-# the Compose files are the ones in the repository.
+# the history and the current tag live in `state/` (gitignored), the application credentials live in
+# `.env`, and the Compose files are the ones in the repository. With private images, export GHCR_TOKEN
+# (and optionally GHCR_USER) for the command; do not store it in `.env`. The script logs in with a
+# temporary DOCKER_CONFIG and removes it on exit.
 #
 # A failed health check or smoke test restores the previous tag instead of leaving a half-deployed
 # archive online. A failed rollback still exits non-zero and the alerting path takes over.
@@ -36,10 +38,15 @@ if [ ! -f .env ]; then
   echo "deploy: .env is missing; copy .env.example and fill the production values" >&2
   exit 1
 fi
+# A token exported for this run must win over a stale value in `.env`: the release pipes a fresh one.
+ghcr_token_inherited="${GHCR_TOKEN:-}"
+ghcr_user_inherited="${GHCR_USER:-}"
 set -a
 # shellcheck disable=SC1091
 . ./.env
 set +a
+if [ -n "$ghcr_token_inherited" ]; then GHCR_TOKEN="$ghcr_token_inherited"; fi
+if [ -n "$ghcr_user_inherited" ]; then GHCR_USER="$ghcr_user_inherited"; fi
 
 : "${DOMAIN:?deploy: DOMAIN must be set in .env}"
 if [ -n "${SMOKE_INSECURE:-}" ] && [ "${SMOKE_INSECURE}" != "0" ]; then
@@ -70,6 +77,20 @@ export AETHER_WEB_IMAGE="$WEB_IMAGE"
 
 BASE_URL="https://${DOMAIN}"
 COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.observability.yml -f docker-compose.prod.yml)
+
+# The release workflow pipes its short-lived GITHUB_TOKEN over the SSH stdin. Log in with a
+# run-scoped Docker config and remove it on exit: no long-lived registry credential is stored on
+# the VPS, and a manual deploy without GHCR_TOKEN behaves exactly as before.
+if [ -n "${GHCR_TOKEN:-}" ]; then
+  GHCR_USER="${GHCR_USER:-github-actions}"
+  DOCKER_CONFIG="$(mktemp -d)"
+  export DOCKER_CONFIG
+  cleanup_ghcr() { rm -rf "$DOCKER_CONFIG"; }
+  trap cleanup_ghcr EXIT
+  printf '%s' "$GHCR_TOKEN" | docker login "$REGISTRY" --username "$GHCR_USER" --password-stdin >/dev/null
+  unset GHCR_TOKEN
+  echo "deploy: authenticated to $REGISTRY with the run-scoped token"
+fi
 STATE_DIR="state"
 mkdir -p "$STATE_DIR"
 
@@ -124,7 +145,7 @@ fi
 # 3. Pull and start. --wait makes Compose the first health gate; the smoke test is the second.
 if ! "${COMPOSE[@]}" pull api web; then
   echo "deploy: could not pull $TAG from $REGISTRY." >&2
-  echo "deploy: make the GHCR packages public, or run 'docker login $REGISTRY' on the VPS." >&2
+  echo "deploy: check the run-scoped GHCR credential, or make the packages public / run 'docker login $REGISTRY' on the VPS." >&2
   record failed
   exit 1
 fi
