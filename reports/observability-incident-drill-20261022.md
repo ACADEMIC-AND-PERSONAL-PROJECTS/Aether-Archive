@@ -2,9 +2,9 @@
 
 **Scope:** local production-shaped stack (base + local override + observability overlay), commit range
 `5c8e21e` plus the observability work on `feature/zoomcamp-final`.
-**Not production:** the public VPS instance is still blocked by the provider firewall/domain. This
-drill is the reproducible evidence for the alerting and on-call criteria until the public deploy runs
-the same path.
+**Not production:** the Oracle VPS is reachable on 22/80/443 and `168.138.70.166.nip.io` resolves, but
+the first public release is still pending. This drill is the reproducible evidence for the alerting and
+on-call criteria until the public deploy runs the same path.
 
 ## Scenario
 
@@ -27,7 +27,7 @@ The load publishes the same six photos every five seconds. Reused ids return `40
 database is healthy; they are client errors and do not feed the 5xx alert. During the stop, the same
 request fails before validation and returns `500` — that is the signal.
 
-## Recorded timeline (UTC, final run)
+## Recorded timeline (UTC, 19:26 run)
 
 | Time | Event |
 | --- | --- |
@@ -37,8 +37,34 @@ request fails before validation and returns `500` — that is the signal.
 | 19:28:08.655 | `AetherPublish5xxRate` starts firing: 100 % of publishes failed over the 2-minute window |
 | 19:28:18.663 | Alertmanager `POST /alerts` accepted by the responder (HTTP 202) |
 | 19:28:19 | diagnosis: `api` healthy, `db` stopped (`restart_db`) |
-| 19:28:19–19:28:26 | `docker compose up -d --no-deps db`; container healthy |
+| 19:28:19–19:28:26 | the responder repaired the database container; container healthy |
 | 19:30:18.666 | Alertmanager sends `resolved`; the incident is closed |
+
+## Re-run after the review fixes (UTC, 20:55 run)
+
+The review found that `up -d --no-deps` is a no-op for an existing unhealthy container. The responder
+now runs `docker compose restart <service>` and records the container identity before and after. The
+same drill was run again on the fixed code:
+
+| Time | Event |
+| --- | --- |
+| 20:54:23 | publish load and warning latency alert start |
+| 20:55:23 | `AetherPublish5xxRate` fires; PostgreSQL stopped |
+| 20:55:34 | Alertmanager accepted (`202`); diagnosis `db: missing`; action `restart_db` |
+| 20:55:34–20:55:42 | `docker compose restart db`; `StartedAt` changed, same container id, healthy |
+| 20:58:03 | `resolved`; incident closed |
+
+The new incident JSON proves the fix:
+
+```json
+"action": {
+  "command": "docker compose -f docker-compose.yml -f docker-compose.override.yml -f docker-compose.observability.yml restart db",
+  "before": { "id": "6c105ee…", "startedAt": "2026-10-22T19:28:19.689235397Z" },
+  "after":  { "id": "6c105ee…", "startedAt": "2026-10-22T20:55:34.95857673Z" },
+  "changed": true,
+  "serviceHealth": { "running": true, "health": "healthy" }
+}
+```
 
 The alert-to-webhook latency is **10 s**; the database is back in **8 s**; the record closes
 **110 s** later, which is the 2-minute rate window plus the 1-minute `for` plus the Alertmanager
@@ -88,13 +114,15 @@ notification closed the record; the responder did not need to guess that the out
 | Alertmanager: the critical route, the webhook, the resolved notification | [`evidence/alertmanager.png`](evidence/alertmanager.png) |
 | Jaeger search for `http post /api/v1/dumps` | [`evidence/jaeger-publish-search.png`](evidence/jaeger-publish-search.png) |
 | The publish trace, including the browser-started `traceparent` | [`evidence/jaeger-trace.png`](evidence/jaeger-trace.png) |
-| Incident JSON (status `resolved`, action `restart_db`) | [`evidence/incident-20261022T192818Z.json`](evidence/incident-20261022T192818Z.json) |
+| Incident JSON (first run) | [`evidence/incident-20261022T192818Z.json`](evidence/incident-20261022T192818Z.json) |
+| Incident JSON (fixed code, 20:55 run; `restart` + changed identity) | [`evidence/incident-20261022T205533Z.json`](evidence/incident-20261022T205533Z.json) |
 | Publish load log (final run from 19:26:03; the 5xx window and the recovery) | [`evidence/publish-load.log`](evidence/publish-load.log) |
 | Responder log (accept, remediate, resolve) | [`evidence/oncall.log`](evidence/oncall.log) |
 
-The live copy of the incident is `oncall/incidents/20261022T192818Z-cbafc00e.json`; that directory is
-gitignored, so the reviewed copy above is committed as evidence. It contains a stack trace and trace
-ids, no request bodies, no credentials and no image bytes.
+The live copies are `oncall/incidents/20261022T192818Z-cbafc00e.json` and
+`oncall/incidents/20261022T205533Z-cbafc00e.json`; that directory is gitignored, so the reviewed copies
+above are committed as evidence. They contain a stack trace and trace ids, no request bodies, no
+credentials and no image bytes.
 
 ## Checks after the drill
 
@@ -131,11 +159,13 @@ ids, no request bodies, no credentials and no image bytes.
 
 ## Production follow-up
 
-The same alert rules, responder and drill apply on the VPS. The remaining steps are operational, not
-code:
+The same alert rules, responder and drill apply on the VPS. The VPS is reachable on 22/80/443, DNS
+resolves, and the responder service is installed and active; the remaining steps are the first public
+release and the same drill against the public origin:
 
-- open 22 from the operator and 80/443 publicly, point DNS at the host;
-- set `ONCALL_WEBHOOK_TOKEN`, install `oncall/aether-oncall.service`, verify `/healthz`;
-- run the drill once against the public origin and attach the new incident JSON here.
+- run the first `v*` release and `./scripts/deploy/smoke.sh https://168.138.70.166.nip.io`;
+- run `scripts/demo/incident-drill.sh BASE_URL=https://168.138.70.166.nip.io` once and attach the new
+  incident JSON here;
+- keep 9090/9093/16686 on the SSH tunnel.
 
 Until then this report claims a **verified local drill**, not a production incident.
