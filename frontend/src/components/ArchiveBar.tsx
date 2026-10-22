@@ -46,7 +46,7 @@ export function ArchiveBar({ current, photoCount, dumpCount }: ArchiveBarProps) 
         <span className="font-display text-[1.35rem] leading-none tracking-display text-paper">
           Aether
         </span>
-        <span className="text-[0.58rem] uppercase tracking-[0.34em] text-paper/45 transition-colors group-hover:text-paper/70">
+        <span className="text-[0.58rem] uppercase tracking-[0.34em] text-paper/70 transition-colors group-hover:text-paper/70">
           Archive
         </span>
       </Link>
@@ -62,7 +62,7 @@ export function ArchiveBar({ current, photoCount, dumpCount }: ArchiveBarProps) 
               className={`aether-kicker relative py-2 transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-paper ${
                 isCurrent
                   ? "text-paper after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-paper"
-                  : "text-paper/45 hover:text-paper/80"
+                  : "text-paper/70 hover:text-paper/80"
               }`}
             >
               {label}
@@ -71,7 +71,7 @@ export function ArchiveBar({ current, photoCount, dumpCount }: ArchiveBarProps) 
         })}
       </nav>
 
-      {counts ? <p className="aether-kicker hidden text-paper/35 lg:block">{counts}</p> : null}
+      {counts ? <p className="aether-kicker hidden text-paper/70 lg:block">{counts}</p> : null}
     </header>
   );
 }

@@ -588,18 +588,18 @@ export function WorkshopView() {
         {phase === "idle" ? (
           <div className="relative z-10 flex flex-1 flex-col justify-between px-6 py-10 sm:px-10 lg:px-16 lg:py-14">
             <div className="flex items-center justify-between gap-4">
-              <p className="aether-kicker text-aura-text/50">The Curator&rsquo;s Workshop</p>
-              <p className="aether-kicker text-aura-text/30">No. 00</p>
+              <p className="aether-kicker text-aura-muted">The Curator&rsquo;s Workshop</p>
+              <p className="aether-kicker text-aura-muted">No. 00</p>
             </div>
 
             <div className="max-w-4xl py-16 sm:py-24">
               <p className="max-w-3xl font-display text-3xl leading-[1.02] tracking-display text-aura-text sm:text-4xl">
                 A blank page is a beginning.
               </p>
-              <p className="mt-7 max-w-md text-base leading-relaxed text-aura-text/75">
+              <p className="mt-7 max-w-md text-base leading-relaxed text-aura-muted">
                 Add photos to your archive.
               </p>
-              <p className="mt-2 max-w-md text-sm leading-relaxed text-aura-text/50">
+              <p className="mt-2 max-w-md text-sm leading-relaxed text-aura-muted">
                 Six photographs become a dump: one aura, one month, one memory.
               </p>
               <label className={`${CHOOSE_ACTION} mt-10`}>
@@ -629,8 +629,8 @@ export function WorkshopView() {
             </div>
 
             <div className="flex items-end justify-between gap-4 border-t border-aura-text/15 pt-5">
-              <p className="aether-kicker text-aura-text/40">Six photographs · one aura</p>
-              <p className="aether-kicker hidden text-aura-text/25 sm:block">Local-first</p>
+              <p className="aether-kicker text-aura-muted">Six photographs · one aura</p>
+              <p className="aether-kicker hidden text-aura-muted sm:block">Local-first</p>
             </div>
           </div>
         ) : (
@@ -641,7 +641,7 @@ export function WorkshopView() {
                   <h2 className="font-display text-2xl tracking-display text-aura-text sm:text-3xl">
                     The selection
                   </h2>
-                  <p className="aether-kicker text-aura-text/40">
+                  <p className="aether-kicker text-aura-muted">
                     {items.length} / {DUMP_PHOTO_COUNT}
                   </p>
                 </div>
@@ -655,7 +655,7 @@ export function WorkshopView() {
                   onPreviewError={markPreviewBroken}
                 />
                 <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-                  <p className="aether-kicker text-aura-text/40">Drag to reorder · tap to select</p>
+                  <p className="aether-kicker text-aura-muted">Drag to reorder · tap to select</p>
                   {phase !== "uploading" ? (
                     <label className={QUIET_ACTION}>
                       <input
@@ -698,16 +698,16 @@ export function WorkshopView() {
                       <div className="flex flex-col gap-3 border-b border-aura-text/15 pb-4">
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex min-w-0 flex-col gap-1">
-                            <p className="aether-kicker text-aura-text/45">Inspector</p>
+                            <p className="aether-kicker text-aura-muted">Inspector</p>
                             <p className="mt-1 break-words font-display text-2xl tracking-display text-aura-text">
                               {selectedItem.file.name || "Selected photo"}
                             </p>
-                            <p className="text-xs text-aura-text/60">
+                            <p className="text-xs text-aura-muted">
                               {selectedIndex === 0 ? "Cover" : "Photo"} · {selectedIndex + 1} of{" "}
                               {items.length}
                             </p>
                           </div>
-                          <span aria-hidden="true" className="aether-kicker text-aura-text/30">
+                          <span aria-hidden="true" className="aether-kicker text-aura-muted">
                             {String(selectedIndex + 1).padStart(2, "0")}
                           </span>
                         </div>
@@ -767,7 +767,7 @@ export function WorkshopView() {
                       <>
                         <p
                           data-testid="workshop-notice"
-                          className="text-sm leading-relaxed text-aura-text/75"
+                          className="text-sm leading-relaxed text-aura-muted"
                         >
                           {panelSentence}
                         </p>
@@ -798,7 +798,7 @@ export function WorkshopView() {
                             className="flex flex-col gap-4 border-t border-aura-text/15 pt-5"
                           >
                             <div className="flex flex-col gap-2">
-                              <label htmlFor={titleId} className="aether-kicker text-aura-text/50">
+                              <label htmlFor={titleId} className="aether-kicker text-aura-muted">
                                 Title
                               </label>
                               <input
@@ -809,7 +809,7 @@ export function WorkshopView() {
                                 placeholder="Optional"
                                 autoComplete="off"
                                 disabled={publishing}
-                                className="min-h-11 w-full border-b border-aura-text/25 bg-transparent pb-2 font-display text-xl tracking-display text-aura-text placeholder:text-aura-text/30 focus-visible:border-aura-text focus-visible:outline-none"
+                                className="min-h-11 w-full border-b border-aura-text/25 bg-transparent pb-2 font-display text-xl tracking-display text-aura-text placeholder:text-aura-muted focus-visible:border-aura-text focus-visible:outline-none"
                               />
                             </div>
                             <button

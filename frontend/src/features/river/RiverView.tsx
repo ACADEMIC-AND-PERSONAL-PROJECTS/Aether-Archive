@@ -51,7 +51,7 @@ function DumpSection({
     <article data-dump-id={dump.id} className="mb-24 last:mb-0 lg:mb-28">
       <header className="mb-7 flex flex-col gap-5 border-t border-aura-text/15 pt-6 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <p className="aether-kicker text-aura-text/45">
+          <p className="aether-kicker text-aura-muted">
             Dump {String(index + 1).padStart(2, "0")} · {dump.photos.length} photographs
           </p>
           {dump.title !== null && (
@@ -66,7 +66,7 @@ function DumpSection({
             className="h-2 w-2 rounded-full"
             style={{ backgroundColor: dump.backgroundColor }}
           />
-          <span className="aether-kicker text-aura-text/40">{dump.backgroundColor}</span>
+          <span className="aether-kicker text-aura-muted">{dump.backgroundColor}</span>
         </div>
       </header>
 
@@ -130,7 +130,7 @@ function MonthHeading({ label }: { readonly label: string }) {
     <h2 className="mt-3 break-normal font-display text-2xl tracking-display text-aura-text sm:text-3xl">
       <span className="block">{name}</span>{" "}
       {year !== "" ? (
-        <span className="mt-1 block font-ui text-xs uppercase tracking-[0.3em] text-aura-text/45">
+        <span className="mt-1 block font-ui text-xs uppercase tracking-[0.3em] text-aura-muted">
           {year}
         </span>
       ) : null}
@@ -275,13 +275,13 @@ export function RiverView() {
                 className="mb-24 grid grid-cols-1 items-start gap-6 last:mb-0 sm:gap-8 lg:mb-32 lg:grid-cols-[minmax(14rem,0.2fr)_minmax(0,1fr)] lg:gap-16 xl:gap-24"
               >
                 <div className="lg:sticky lg:top-8 lg:self-start">
-                  <p className="aether-kicker text-aura-text/45">
+                  <p className="aether-kicker text-aura-muted">
                     {String(monthIndex + 1).padStart(2, "0")} /{" "}
                     {String(feed.length).padStart(2, "0")}
                   </p>
                   <MonthHeading label={month.label} />
                   <div className="mt-5 h-px w-12 bg-aura-text/25" />
-                  <p className="aether-kicker mt-4 hidden text-aura-text/40 lg:block">
+                  <p className="aether-kicker mt-4 hidden text-aura-muted lg:block">
                     {month.entries.length} {month.entries.length === 1 ? "entry" : "entries"}
                   </p>
                 </div>
@@ -293,10 +293,10 @@ export function RiverView() {
             ))}
 
             <footer className="mt-24 flex flex-col gap-6 border-t border-aura-text/15 pt-8 sm:flex-row sm:items-end sm:justify-between">
-              <p className="aether-kicker text-aura-text/40">End of the river</p>
+              <p className="aether-kicker text-aura-muted">End of the river</p>
               <Link
                 to="/curate"
-                className="group inline-flex items-center gap-3 font-display text-xl tracking-display text-aura-text transition-colors hover:text-aura-text/70 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-aura-text"
+                className="group inline-flex items-center gap-3 font-display text-xl tracking-display text-aura-text transition-colors hover:text-aura-text focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-aura-text"
               >
                 Curate a dump
                 <span

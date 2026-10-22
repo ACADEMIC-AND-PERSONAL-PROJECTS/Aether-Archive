@@ -41,7 +41,9 @@ Hard rules:
 
 ## Aesthetic contract
 
-- **Images first, UI invisible.** No persistent header, footer, navbar, borders, cards or chrome.
+- **Images first, chrome subordinate.** The ArchiveBar is the one persistent chrome element: a single
+  hairline row (wordmark, three destinations, counts) that stays out of the photograph's way. No other
+  persistent header, footer, navbar, borders, cards or chrome.
   The only text on screen is intentional: month/year markers and Dump titles.
 - **One surface system** (current): flat ink-on-paper chrome, paper panels, hairline rules and the
   archive's aura as the field; photography is the material, never a card. The tint follows the text;
