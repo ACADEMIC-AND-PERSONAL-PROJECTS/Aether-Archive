@@ -40,7 +40,7 @@ identifiers. The public demo is seeded; it is not a real archive.
        │              Prometheus ◀── scrape api:8080          Loki ◀── Promtail ◀ Docker logs
        │                    │                                        ▲
        │                    ▼                                        │
-       │              Alertmanager ── webhook ──▶ host on-call responder (127.0.0.1:9099)
+       │              Alertmanager ── webhook ──▶ host responder (Docker bridge:9099)
        │                    │                                        │
        │                    └── resolved ──▶ incident closed         └── docker compose restart/rollback
        │
@@ -51,8 +51,8 @@ identifiers. The public demo is seeded; it is not a real archive.
   to `127.0.0.1` and are reached through an SSH tunnel; they are operational tools.
 - **The responder runs on the host**, not in a container. It needs to inspect and restart services;
   giving that power to a container means mounting a writable Docker socket into something reachable
-  from the network. The host process is reachable only through Docker's host gateway and a bearer
-  token.
+  from the network. The process binds `127.0.0.1` (host health checks) and the Docker bridge gateway
+  (Alertmanager's `host.docker.internal`), never `0.0.0.0`, and requires a bearer token.
 - **One compose overlay** (`docker-compose.observability.yml`) adds all of it to the base stack. The
   production file adds Caddy and the Grafana sub-path.
 

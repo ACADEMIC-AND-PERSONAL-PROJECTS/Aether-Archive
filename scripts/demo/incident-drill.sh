@@ -27,6 +27,8 @@ cleanup() {
     kill "$LOAD_PID" 2>/dev/null || true
     wait "$LOAD_PID" 2>/dev/null || true
   fi
+  # A failed drill must not leave PostgreSQL stopped for the next run.
+  "${COMPOSE[@]}" start db >/dev/null 2>&1 || true
   if [ "$STARTED_RESPONDER" -eq 1 ] && [ -n "${RESPONDER_PID:-}" ]; then
     echo "responder left running as pid $RESPONDER_PID (log: $RESPONDER_LOG)"
   fi

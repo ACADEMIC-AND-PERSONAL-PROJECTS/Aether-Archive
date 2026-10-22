@@ -34,13 +34,19 @@ The diagnosis reads Docker's state, not a guess:
 
 | Observed state | Action | Why |
 | --- | --- | --- |
-| `db` stopped or unhealthy | `restart_db` (`docker compose up -d --no-deps db`) | Most publish failures are a database that is not there; the API recovers by itself. |
-| `api` unhealthy or stopped | `rollback_api` to `state/last-good-image` | A bad image is the likely cause; the previous image is known to pass the smoke test. |
-| Both healthy, critical publish alert | `restart_api` | A wedged process or a flapping dependency; the least destructive next step. |
+| `db` stopped or unhealthy | `restart_db` (`docker compose restart db`; `up -d` only when the container is missing) | Most publish failures are a database that is not there; the API recovers by itself. |
+| `api` unhealthy or stopped | `rollback_api` to `state/last-good-image` (`up -d --force-recreate`) | A bad image is the likely cause; the previous image is known to pass the smoke test. Without a recorded image the API is restarted. |
+| Both healthy, critical publish alert | `restart_api` (`docker compose restart api`) | A wedged process or a flapping dependency; the least destructive next step. |
 | A warning (`AetherPublishLatency`) | no page | Latency is a dashboard signal, not an outage; the Alertmanager route sends warnings to `none`. |
 
+`compose up -d --no-deps svc` is a no-op for a container that already exists, even when it is
+unhealthy. The responder therefore restarts existing containers and records the container id and
+`StartedAt` before and after the command; a command that changed neither is recorded as
+`remediation_not_applied` and the incident is escalated. The health gate checks the service the action
+was meant to repair — a rollback is never marked healthy because PostgreSQL is up.
+
 The database is **never** rolled back automatically: a restart is safe, replacing its volume is not.
-If the smoke test after a remediation still fails, the incident is marked `escalated` and the operator
+If the health gate after a remediation still fails, the incident is marked `escalated` and the operator
 follows the runbook.
 
 ## Incident record
@@ -55,8 +61,13 @@ One JSON file per incident under `oncall/incidents/` (gitignored):
   "receivedAt": "2026-10-22T19:28:18Z",
   "alert": { "name": "AetherPublish5xxRate", "severity": "critical", "journey": "publish", "…": "…" },
   "diagnosis": { "api": { "running": true, "health": "healthy" }, "db": { "running": false, "health": "missing" }, "logExcerpt": "…" },
-  "action": { "kind": "restart_db", "returnCode": 0, "serviceHealth": { "running": true, "health": "healthy" } },
-  "history": ["received", "diagnosed:restart_db", "remediation_healthy", "alertmanager_resolved"],
+  "action": { "kind": "restart_db", "returnCode": 0, "changed": true, "before": { "id": "…", "startedAt": "…" }, "after": { "id": "…", "startedAt": "…" }, "serviceHealth": { "running": true, "health": "healthy" } },
+  "history": [
+    { "at": "2026-10-22T19:28:18Z", "event": "received" },
+    { "at": "2026-10-22T19:28:20Z", "event": "diagnosed:restart_db" },
+    { "at": "2026-10-22T19:30:12Z", "event": "remediation_healthy" },
+    { "at": "2026-10-22T19:30:18Z", "event": "alertmanager_resolved" }
+  ],
   "resolvedAt": "2026-10-22T19:30:18Z"
 }
 ```
@@ -71,10 +82,14 @@ make observe-up          # the stack and Alertmanager
 make oncall              # in a second terminal; reads .env
 ```
 
-`oncall/run.sh` sources `.env`, writes `oncall/webhook-token` (mode 0644, the only readable-by-container
-copy; the host is single-user and `.env` holds the same value), and starts the responder on
-`0.0.0.0:9099`. The port is reachable from the Docker bridge and is not published by Caddy or the VPS
-firewall.
+`oncall/run.sh` sources `.env`, writes `oncall/webhook-token` (mode 0644: Alertmanager runs as an
+unprivileged container user and must be able to read the file; it contains only the webhook token,
+which `.env` already holds), and starts the responder on two explicit addresses: `127.0.0.1` for the
+host health check and the Docker bridge gateway (normally `172.17.0.1`, discovered with
+`docker network inspect bridge`) for Alertmanager's `host.docker.internal`. It never binds `0.0.0.0`.
+Neither address is published by Caddy or the VPS firewall; the bearer token still travels over plain
+HTTP inside the host. Verify the boundary with `ss -ltnp | grep 9099`: exactly the two addresses, never
+`*:9099`.
 
 Test the decision functions without Docker:
 
@@ -89,7 +104,7 @@ token="$(grep '^ONCALL_WEBHOOK_TOKEN=' .env | cut -d= -f2-)"
 curl -sS -X POST http://127.0.0.1:9099/alerts \
   -H "Authorization: Bearer $token" \
   -H 'Content-Type: application/json' \
-  -d '{"alerts":[{"status":"resolved","fingerprint":"synthetic","labels":{"alertname":"Synthetic"}}]}'
+  -d '{"alerts":[{"status":"resolved","fingerprint":"0123456789abcdef","labels":{"alertname":"Synthetic"}}]}'
 ```
 
 The real drill is `scripts/demo/incident-drill.sh`; it stops PostgreSQL, waits for
@@ -102,15 +117,18 @@ Prerequisites: the checkout is `/opt/aether`, the deploy user owns it and is in 
 and `.env` contains `ONCALL_WEBHOOK_TOKEN` (generate with `openssl rand -hex 24`).
 
 ```bash
-sudo cp /opt/aether/oncall/aether-oncall.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now aether-oncall.service
+sudo /opt/aether/oncall/install-service.sh ubuntu
 systemctl status aether-oncall.service --no-pager
 curl -fsS http://127.0.0.1:9099/healthz
+ss -ltnp | grep 9099
 ```
 
-The unit passes `AETHER_COMPOSE_ARGS` for the production overlay, so a restart or rollback targets the
-same project the deploy uses. `journalctl -u aether-oncall -f` is the live log.
+`install-service.sh` substitutes the real deploy user and checkout path into the unit (the template's
+`User=deploy` and `/opt/aether` are documentation defaults), allows TCP 9099 only from Docker's
+private ranges (`172.16.0.0/12`) through the host firewall, persists the rule when
+`netfilter-persistent` is installed, and enables the service. Adjust the user if the VPS login is not
+`ubuntu`. The unit passes `AETHER_COMPOSE_ARGS` for the production overlay, so a restart or rollback
+targets the same project the deploy uses. `journalctl -u aether-oncall -f` is the live log.
 
 ## Limits
 

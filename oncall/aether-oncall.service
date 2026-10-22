@@ -18,7 +18,8 @@ Restart=on-failure
 RestartSec=5
 # The deploy user owns the checkout and belongs to the docker group. The responder needs the Docker
 # socket to restart the API and PostgreSQL; running it as a host service keeps a writable socket out
-# of every container.
+# of every container. oncall/install-service.sh replaces this placeholder with the real user and
+# substitutes the checkout path.
 User=deploy
 Group=docker
 NoNewPrivileges=true

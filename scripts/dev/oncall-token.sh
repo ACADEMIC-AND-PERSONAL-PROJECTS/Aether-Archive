@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Materialise the Alertmanager webhook token from .env into a root-only file.
+# Materialise the Alertmanager webhook token from .env into a container-readable file.
 #
 # Alertmanager 0.28 does not expand environment variables in its configuration; mounting a file is
 # both simpler and safer than embedding the token in a YAML file. The responder reads the same value
-# from .env, so the two sides always agree.
+# from .env, so the two sides always agree. Mode 0644 is deliberate: the Alertmanager container runs
+# as an unprivileged user and must read the file, which contains no secret beyond this webhook token.
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."
