@@ -309,6 +309,14 @@ describe("RiverView — feed rendering", () => {
     expect(article).not.toBeNull();
     const dumpImages = article?.querySelectorAll("img") ?? [];
     expect(dumpImages).toHaveLength(6);
+    const essay = article?.querySelector("[data-photo-essay]");
+    expect(essay).toHaveClass("flex", "flex-col");
+    for (const image of dumpImages) {
+      expect(image).toHaveClass("aspect-[3/2]", "object-contain");
+    }
+    expect(dumpImages[0]).toHaveAttribute("data-photo-order", "1");
+    expect(dumpImages[5]).toHaveAttribute("data-photo-order", "6");
+    expect(dumpTitle).toHaveClass("text-2xl");
   });
 
   it("should render dump sections without a title heading when title is null", async () => {
@@ -372,9 +380,11 @@ describe("RiverView — feed rendering", () => {
 
     await waitFor(() => expect(mainEl()).toHaveAttribute("data-state", "ready"));
 
-    const images = container.querySelectorAll("img");
+    const images = [...container.querySelectorAll("img")];
     expect(images.length).toBeGreaterThan(0);
-    for (const img of images) {
+    expect(images[0]).toHaveAttribute("loading", "eager");
+    expect(images[0]).toHaveAttribute("decoding", "async");
+    for (const img of images.slice(1)) {
       expect(img).toHaveAttribute("loading", "lazy");
       expect(img).toHaveAttribute("decoding", "async");
     }

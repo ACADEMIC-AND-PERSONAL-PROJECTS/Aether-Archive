@@ -32,12 +32,11 @@ import type { UploadProgress } from "../../api/uploadPhoto";
  * ## The screen
  *
  * With nothing picked, the view is one display-serif sentence and one quiet action. Once photos are
- * picked, the photos are the screen: a grid of square thumbnails and one glass editing surface. The
- * grid is the focal point; the panel is the only chrome, and everything in it is `--aura-text` because
- * it sits on glass (DESIGN-SYSTEM §2.2, the E3-S2 measurement). The controls stack below the images on
- * a phone and sit alongside them on desktop. Each tile carries its own scrim, so a remove control and
- * a failed preview always have a known backdrop. There is no spinner and no per-tile progress: the only
- * progress signal is E4-S1B's one 2 px line, which always describes the request actually in flight.
+ * picked, the six-image contact sheet leads; a glass inspector follows it on phones and shares an
+ * asymmetric canvas on desktop. Its real backdrop is the selected local object URL, softly held behind
+ * the panel rather than replaced by a flat black surface. The first tile is the cover until the curator
+ * chooses another image. Waiting is encoded in the accessible tile state but not repeated as six
+ * visible captions; upload, success and error states remain visible on their photos.
  *
  * ## The cap
  *
@@ -143,6 +142,7 @@ const PICKER_LABEL_FOCUS =
 
 export function WorkshopView() {
   const [items, setItems] = useState<SelectionItem[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [notice, setNotice] = useState("");
   const [progress, setProgress] = useState<UploadProgress>({ loaded: 0, total: 0 });
@@ -187,6 +187,11 @@ export function WorkshopView() {
       : items.length > 0
         ? "selected"
         : "idle";
+  const selectedIndex = Math.max(
+    0,
+    items.findIndex((item) => item.id === selectedId),
+  );
+  const selectedItem = items[selectedIndex] ?? null;
 
   /*
    * The aura (E4-S4C): suggestions off the selection and the preview on this view's root. Extraction
@@ -279,6 +284,7 @@ export function WorkshopView() {
     if (plan.accepted.length > 0) {
       const added = addItems(plan.accepted);
       setItems((previous) => [...previous, ...added]);
+      setSelectedId((previous) => previous ?? added[0]?.id ?? null);
     }
     // Every refusal is named and every overflow is counted; an empty plan clears the previous sentence.
     setNotice(selectionNotices(plan).join(" "));
@@ -313,6 +319,9 @@ export function WorkshopView() {
     }
     revokePreview(item.previewUrl);
     setItems((previous) => previous.filter((candidate) => candidate.id !== id));
+    if (selectedId === id) {
+      setSelectedId(items.find((candidate) => candidate.id !== id)?.id ?? null);
+    }
     setNotice("");
   };
 
@@ -534,9 +543,29 @@ export function WorkshopView() {
       <main
         ref={mainRef}
         data-state={phase}
+        data-selected-photo={selectedItem?.id}
+        style={
+          selectedItem === null
+            ? undefined
+            : {
+                backgroundImage: `url("${selectedItem.previewUrl}")`,
+                backgroundPosition: "center",
+                backgroundRepeat: "no-repeat",
+                backgroundSize: "cover",
+              }
+        }
         className="relative flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain bg-aura-bg lg:overflow-hidden"
       >
         <h1 className="sr-only">Curator&rsquo;s Workshop</h1>
+
+        {selectedItem !== null ? (
+          // This theme wash softens the full-bleed local photo without obscuring the contact sheet.
+          <div
+            data-testid="workshop-photo-wash"
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 z-0 bg-aura-bg/55"
+          />
+        ) : null}
 
         {phase === "idle" ? (
           <div className="relative z-10 flex flex-1 flex-col items-center justify-center gap-6 px-8 text-center">
@@ -562,13 +591,15 @@ export function WorkshopView() {
             ) : null}
           </div>
         ) : (
-          <div className="relative z-10 grid min-h-full w-full grid-cols-1 lg:h-full lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_minmax(21rem,27rem)]">
-            <div className="flex min-w-0 flex-col justify-center px-4 py-8 sm:px-6 lg:min-h-0 lg:overflow-y-auto lg:px-10 lg:py-12">
-              <div className="mx-auto w-full max-w-5xl">
+          <div className="relative z-10 grid min-h-full w-full grid-cols-1 lg:h-full lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]">
+            <div className="flex min-w-0 flex-col justify-center px-4 py-8 sm:px-6 lg:min-h-0 lg:overflow-y-auto lg:px-10 lg:py-10">
+              <div className="mx-auto w-full max-w-6xl">
                 <SelectionGrid
                   items={items}
+                  selectedId={selectedItem?.id ?? null}
                   busy={busy}
                   onMove={moveSelection}
+                  onSelect={setSelectedId}
                   onRemove={removeItem}
                   onPreviewError={markPreviewBroken}
                 />
@@ -576,117 +607,161 @@ export function WorkshopView() {
             </div>
 
             <div className="w-full px-4 pb-[calc(var(--safe-bottom)_+_1.25rem)] pt-2 sm:px-6 lg:min-h-0 lg:overflow-y-auto lg:px-6 lg:py-8 xl:px-8">
-              <GlassPanel
-                className={`mx-auto flex w-full max-w-xl flex-col gap-3 px-4 py-4 sm:px-5 lg:gap-4 ${ENTER_FADE_BASE}`}
-              >
-                {phase === "uploading" ? (
-                  <>
-                    <p className="text-sm text-aura-text">Uploading</p>
-                    {/* `data-total` is the byte total the line is computed against — for the tests
-                        and the probe. It is never painted, and the user never reads a percentage. */}
-                    <div
-                      role="progressbar"
-                      aria-label="Upload progress"
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                      {...(percent === null ? {} : { "aria-valuenow": percent })}
-                      data-total={progress.total}
-                      className="h-0.5 w-full overflow-hidden rounded-full bg-aura-text/15"
-                    >
-                      {percent === null ? (
-                        <div className={`h-full w-full bg-aura-text opacity-25 ${LOADING_PULSE}`} />
-                      ) : (
-                        <div className="h-full bg-aura-text" style={{ width: `${percent}%` }} />
-                      )}
-                    </div>
-                    <button
-                      ref={cancelRef}
-                      type="button"
-                      onClick={cancelUpload}
-                      className={QUIET_ACTION}
-                    >
-                      Cancel
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <p
-                      data-testid="workshop-notice"
-                      className="text-base break-words text-aura-text"
-                    >
-                      {panelSentence}
-                    </p>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {queueable ? (
+              <div className="relative mx-auto w-full max-w-xl">
+                <div
+                  data-testid="workshop-inspector-wash"
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 rounded-[20px] bg-aura-bg/70"
+                />
+                <GlassPanel
+                  role="region"
+                  aria-label="Photo inspector"
+                  data-testid="photo-inspector"
+                  className={`relative z-10 flex w-full flex-col gap-3 px-4 py-4 sm:px-5 lg:gap-4 ${ENTER_FADE_BASE}`}
+                >
+                  {selectedItem !== null ? (
+                    <div className="flex flex-col gap-3">
+                      <div className="flex min-w-0 flex-col gap-1">
+                        <p className="break-words font-display text-xl tracking-display text-aura-text">
+                          {selectedItem.file.name || "Selected photo"}
+                        </p>
+                        <p className="text-sm text-aura-text">
+                          {selectedIndex === 0 ? "Cover" : "Photo"} · {selectedIndex + 1} of{" "}
+                          {items.length}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
                         <button
-                          ref={primaryRef}
                           type="button"
-                          onClick={startUpload}
-                          className={QUIET_ACTION}
+                          onClick={() => moveSelection(selectedIndex, selectedIndex - 1)}
+                          disabled={busy || selectedIndex === 0}
+                          className={`${QUIET_ACTION} disabled:cursor-default disabled:decoration-transparent`}
                         >
-                          {phase === "error" ? "Try again" : "Upload"}
+                          Move earlier
                         </button>
-                      ) : null}
-                      <label className={QUIET_ACTION}>
-                        <input
-                          ref={panelInputRef}
-                          type="file"
-                          multiple
-                          accept={ACCEPT_ATTRIBUTE}
-                          onChange={handlePick}
-                          disabled={publishing}
-                          className="peer sr-only"
-                        />
-                        <span className={PICKER_LABEL_FOCUS}>Add photos</span>
-                      </label>
+                        <button
+                          type="button"
+                          onClick={() => moveSelection(selectedIndex, selectedIndex + 1)}
+                          disabled={busy || selectedIndex === items.length - 1}
+                          className={`${QUIET_ACTION} disabled:cursor-default disabled:decoration-transparent`}
+                        >
+                          Move later
+                        </button>
+                      </div>
                     </div>
-                    <AuraPicker
-                      chosen={aura.chosen}
-                      suggestions={aura.suggestions}
-                      onChoose={aura.choose}
-                      onReset={aura.reset}
-                    />
-                    {items.length === DUMP_PHOTO_COUNT ? (
-                      // The publish group (ADR-024 decision 2): with the sixth tile the panel offers
-                      // the save; a click it cannot send is answered with one sentence.
-                      <section
-                        aria-label="Publish"
-                        className="flex flex-col gap-2 border-t border-aura-text/15 pt-3"
+                  ) : null}
+
+                  {phase === "uploading" ? (
+                    <>
+                      <p className="text-sm text-aura-text">Uploading</p>
+                      {/* `data-total` is the byte total the line is computed against — for the tests
+                        and the probe. It is never painted, and the user never reads a percentage. */}
+                      <div
+                        role="progressbar"
+                        aria-label="Upload progress"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        {...(percent === null ? {} : { "aria-valuenow": percent })}
+                        data-total={progress.total}
+                        className="h-0.5 w-full overflow-hidden rounded-full bg-aura-text/15"
                       >
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                          <label
-                            htmlFor={titleId}
-                            className="text-xs tracking-wide text-aura-text uppercase"
-                          >
-                            Title
-                          </label>
-                          <input
-                            id={titleId}
-                            type="text"
-                            value={title}
-                            onChange={(event) => setTitle(event.target.value)}
-                            placeholder="Optional"
-                            autoComplete="off"
-                            disabled={publishing}
-                            className="min-h-11 min-w-40 flex-1 rounded-[10px] bg-transparent px-3 text-sm text-aura-text [border:var(--aura-hairline)] placeholder:text-aura-text focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-aura-text/70 disabled:opacity-60"
+                        {percent === null ? (
+                          <div
+                            className={`h-full w-full bg-aura-text opacity-25 ${LOADING_PULSE}`}
                           />
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
+                        ) : (
+                          <div className="h-full bg-aura-text" style={{ width: `${percent}%` }} />
+                        )}
+                      </div>
+                      <button
+                        ref={cancelRef}
+                        type="button"
+                        onClick={cancelUpload}
+                        className={QUIET_ACTION}
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p
+                        data-testid="workshop-notice"
+                        className="text-base break-words text-aura-text"
+                      >
+                        {panelSentence}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {queueable ? (
                           <button
+                            ref={primaryRef}
                             type="button"
-                            onClick={saveArchive}
-                            disabled={publishing}
-                            aria-busy={publishing}
-                            className={`${QUIET_ACTION} disabled:opacity-60`}
+                            onClick={startUpload}
+                            className={QUIET_ACTION}
                           >
-                            {publishing ? "Saving…" : "Save archive"}
+                            {phase === "error" ? "Try again" : "Upload"}
                           </button>
-                        </div>
-                      </section>
-                    ) : null}
-                  </>
-                )}
-              </GlassPanel>
+                        ) : null}
+                        <label className={QUIET_ACTION}>
+                          <input
+                            ref={panelInputRef}
+                            type="file"
+                            multiple
+                            accept={ACCEPT_ATTRIBUTE}
+                            onChange={handlePick}
+                            disabled={publishing}
+                            className="peer sr-only"
+                          />
+                          <span className={PICKER_LABEL_FOCUS}>Add photos</span>
+                        </label>
+                      </div>
+                      <AuraPicker
+                        chosen={aura.chosen}
+                        suggestions={aura.suggestions}
+                        onChoose={aura.choose}
+                        onReset={aura.reset}
+                      />
+                      {items.length === DUMP_PHOTO_COUNT ? (
+                        // The publish group (ADR-024 decision 2): with the sixth tile the panel offers
+                        // the save; a click it cannot send is answered with one sentence.
+                        <section
+                          aria-label="Publish"
+                          className="flex flex-col gap-2 border-t border-aura-text/15 pt-3"
+                        >
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <label
+                              htmlFor={titleId}
+                              className="text-xs tracking-wide text-aura-text uppercase"
+                            >
+                              Title
+                            </label>
+                            <input
+                              id={titleId}
+                              type="text"
+                              value={title}
+                              onChange={(event) => setTitle(event.target.value)}
+                              placeholder="Optional"
+                              autoComplete="off"
+                              disabled={publishing}
+                              className="min-h-11 min-w-40 flex-1 rounded-[10px] bg-transparent px-3 text-sm text-aura-text [border:var(--aura-hairline)] placeholder:text-aura-text focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-aura-text/70"
+                            />
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={saveArchive}
+                              disabled={publishing}
+                              aria-busy={publishing}
+                              className={QUIET_ACTION}
+                            >
+                              {publishing ? "Saving…" : "Save archive"}
+                            </button>
+                          </div>
+                        </section>
+                      ) : null}
+                    </>
+                  )}
+                </GlassPanel>
+              </div>
             </div>
           </div>
         )}

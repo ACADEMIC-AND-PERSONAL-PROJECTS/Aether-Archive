@@ -11,7 +11,7 @@ import { ENTER_DRIFT_BASE, ENTER_FADE_BASE } from "../../lib/motion/tokens";
  * ## What it is made of
  *
  * One `GlassPanel` — the single material (§3) — floating above a full-screen veil. The veil is the
- * theme's own darkest tone at 70 % (`bg-aura-bg/70`), not decoration: over a *photo*, the material's
+ * theme's own darkest tone at 60 % (`bg-aura-bg/60`), not decoration: over a *photo*, the material's
  * `rgba(0, 0, 0, 0.4)` alone cannot promise legible text, because the pixels underneath are the user's
  * and may be white (NN/g's finding, DESIGN-REFERENCES §7: glass readability is a foreground-text
  * problem, and "components that appear over varied contexts must account for the many possible
@@ -19,15 +19,11 @@ import { ENTER_DRIFT_BASE, ENTER_FADE_BASE } from "../../lib/motion/tokens";
  * names: it is a *sibling* of the panel, so a tap on the panel never reaches the veil's handler and a
  * tap anywhere else closes.
  *
- * **Every entry is text, none is muted — measured, not preferred.** `--aura-muted` is the theme's
- * "secondary text / quiet labels" token, and the generator raises it until it clears 4.5:1 *on the
- * background* (§2.2). Over the veil that guarantee does not survive: for the generator's worst case —
- * the lightest background its bands allow (L 0.18) under the veil at 70 % over a *white* photo — the
- * panel is `rgb(46, 56, 57)`, where the text token reads 7.97:1 and the muted token **4.11:1** (the
- * probe photo's own theme reads 8.07:1 and 4.14:1, painted; both pairs are in the verification report,
- * and they are two palettes rather than two measurements of one) — under AA, and
- * under it for the one entry a user reaches when the other two are wrong (`GlassMenu.test.tsx` pins
- * the pair). So the dialog's words sit on `--aura-text`; the muted token's home is the page, not glass.
+ * **Every entry is text, none is muted.** `--aura-muted` is generated for the page background, not for
+ * every possible photo beneath glass. The menu keeps its controls on `--aura-text`, and the material
+ * test composites the current 60 % veil and glass over a white photo for the generator's least
+ * favourable text/background pair. The photo remains perceptible through the combined layers without
+ * making the words depend on its pixels.
  *
  * The dialog element is the positioned wrapper, not the material inside it: `GlassPanel`'s props are
  * React's own div attributes, which carry no `ref` (probed with `tsc`: TS2322 against
@@ -84,7 +80,7 @@ export interface GlassMenuProps {
  * Its entry is §5's fade-in-place (`ENTER_FADE_BASE`) — the drift is the panel's, so the scrim never
  * uncovers an edge.
  */
-const VEIL_CLASS = `fixed inset-0 z-30 bg-aura-bg/70 ${ENTER_FADE_BASE}`;
+const VEIL_CLASS = `fixed inset-0 z-30 bg-aura-bg/60 ${ENTER_FADE_BASE}`;
 
 /**
  * The dialog fills the viewport so its panel can sit thumb-close to the bottom on a phone and centre
@@ -100,8 +96,12 @@ const SHEET_CLASS = `fixed inset-0 z-40 flex items-end justify-center px-4 pt-[c
  * The press feedback is §5's `duration-quick`, read as the variable rather than as `180ms`, so a
  * change to the token moves this too.
  */
-const ENTRY_CLASS =
-  "flex min-h-16 w-full items-center rounded-2xl px-5 text-xl font-medium tracking-wide text-aura-text transition-colors duration-[var(--motion-duration-quick)] active:bg-aura-text/6 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/70 md:px-7 md:text-2xl";
+const ENTRY_BASE_CLASS =
+  "flex min-h-16 w-full items-center rounded-2xl px-5 text-aura-text transition-colors duration-[var(--motion-duration-quick)] active:bg-aura-text/6 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-aura-text/70 md:px-7";
+
+const RIVER_CLASS = `${ENTRY_BASE_CLASS} min-h-20 font-display text-2xl tracking-display`;
+const CURATE_CLASS = `${ENTRY_BASE_CLASS} text-lg font-medium tracking-wide md:text-xl`;
+const CLOSE_CLASS = `${ENTRY_BASE_CLASS} text-sm tracking-wide`;
 
 export function GlassMenu({ onClose, returnFocusTo }: GlassMenuProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -183,14 +183,14 @@ export function GlassMenu({ onClose, returnFocusTo }: GlassMenuProps) {
         tabIndex={-1}
         className={SHEET_CLASS}
       >
-        <GlassPanel className="glass-menu flex w-full max-w-xl flex-col gap-1 p-3 sm:p-4 md:p-6">
-          <Link to="/river" className={ENTRY_CLASS}>
+        <GlassPanel className="glass-menu flex w-full max-w-xl flex-col gap-1 p-4 sm:p-5 md:p-7">
+          <Link to="/river" className={RIVER_CLASS}>
             The River
           </Link>
-          <Link to="/curate" className={ENTRY_CLASS}>
+          <Link to="/curate" className={CURATE_CLASS}>
             Curate
           </Link>
-          <button type="button" onClick={onClose} className={ENTRY_CLASS}>
+          <button type="button" onClick={onClose} className={CLOSE_CLASS}>
             Close
           </button>
         </GlassPanel>

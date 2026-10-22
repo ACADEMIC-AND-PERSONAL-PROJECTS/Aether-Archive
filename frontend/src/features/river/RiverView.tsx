@@ -21,34 +21,38 @@ import type { Dump, Photo } from "../../types/api";
 
 type RiverState = "loading" | "empty" | "error" | "ready";
 
-const DUMP_IMG_SIZES =
-  "(min-width: 64rem) min(22rem, calc((100vw - 25rem) / 3)), calc((100vw - 2.5rem) / 2)";
-const SINGLE_IMG_SIZES = "(min-width: 64rem) min(42rem, calc(100vw - 25rem)), calc(100vw - 2.5rem)";
+const DUMP_IMG_SIZES = "(min-width: 64rem) min(54rem, calc(100vw - 25rem)), calc(100vw - 2rem)";
+const SINGLE_IMG_SIZES = "(min-width: 64rem) min(54rem, calc(100vw - 18rem)), calc(100vw - 2rem)";
 
 function hideOnError(e: SyntheticEvent<HTMLImageElement>): void {
   const img = e.currentTarget;
   img.style.display = "none";
 }
 
-function DumpSection({ dump }: { readonly dump: Dump }) {
+function DumpSection({
+  dump,
+  firstPhotoId,
+}: {
+  readonly dump: Dump;
+  readonly firstPhotoId: string | null;
+}) {
   return (
-    <article data-dump-id={dump.id} className="mb-14">
+    <article data-dump-id={dump.id} className="mb-20 max-w-[56rem]">
       {dump.title !== null && (
-        <h3 className="mb-4 font-display text-xl tracking-display text-aura-text sm:text-2xl">
-          {dump.title}
-        </h3>
+        <h3 className="mb-6 font-display text-2xl tracking-display text-aura-text">{dump.title}</h3>
       )}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3">
-        {dump.photos.map((photo) => (
+      <div data-photo-essay className="flex max-w-3xl flex-col gap-7 sm:gap-9">
+        {dump.photos.map((photo, index) => (
           <img
             key={photo.id}
+            data-photo-order={index + 1}
             src={photo.url}
             alt=""
-            loading="lazy"
+            loading={photo.id === firstPhotoId ? "eager" : "lazy"}
             decoding="async"
             sizes={DUMP_IMG_SIZES}
             onError={hideOnError}
-            className="aspect-square w-full rounded-xl object-cover"
+            className="aspect-[3/2] w-full rounded-2xl object-contain"
             style={{ backgroundColor: dump.backgroundColor }}
           />
         ))}
@@ -57,17 +61,23 @@ function DumpSection({ dump }: { readonly dump: Dump }) {
   );
 }
 
-function SinglePhoto({ photo }: { readonly photo: Photo }) {
+function SinglePhoto({
+  photo,
+  firstPhotoId,
+}: {
+  readonly photo: Photo;
+  readonly firstPhotoId: string | null;
+}) {
   return (
-    <div className="mb-10 lg:max-w-2xl">
+    <div className="mb-16 max-w-[56rem]">
       <img
         src={photo.url}
         alt=""
-        loading="lazy"
+        loading={photo.id === firstPhotoId ? "eager" : "lazy"}
         decoding="async"
         sizes={SINGLE_IMG_SIZES}
         onError={hideOnError}
-        className="aspect-[3/4] w-full rounded-xl object-cover bg-aura-surface"
+        className="aspect-[3/2] w-full rounded-2xl bg-aura-surface object-contain"
       />
     </div>
   );
@@ -94,6 +104,20 @@ export function RiverView() {
     () => (photoData && dumpData ? buildFeed(photoData, dumpData) : []),
     [photoData, dumpData],
   );
+  const firstPhotoId = useMemo(() => {
+    for (const month of feed) {
+      for (const entry of month.entries) {
+        if (entry.kind === "photo") {
+          return entry.photo.id;
+        }
+        const firstDumpPhoto = entry.dump.photos[0];
+        if (firstDumpPhoto !== undefined) {
+          return firstDumpPhoto.id;
+        }
+      }
+    }
+    return null;
+  }, [feed]);
 
   const isEmpty = !isPending && !isError && feed.length === 0;
 
@@ -137,18 +161,18 @@ export function RiverView() {
             <section
               key={month.key}
               aria-label={month.label}
-              className="mb-20 grid grid-cols-1 items-start gap-6 sm:gap-8 lg:grid-cols-[minmax(10rem,0.24fr)_minmax(0,1fr)] lg:gap-12 xl:gap-16"
+              className="mb-20 grid grid-cols-1 items-start gap-5 sm:gap-8 lg:grid-cols-[minmax(8rem,0.18fr)_minmax(0,1fr)] lg:gap-12 xl:gap-16"
             >
-              <h2 className="font-display text-2xl tracking-display text-aura-text lg:sticky lg:top-12 lg:mb-0 lg:pt-1">
+              <h2 className="font-display text-lg tracking-display text-aura-muted sm:text-xl lg:sticky lg:top-12 lg:mb-0 lg:pt-1">
                 {month.label}
               </h2>
               <div className="min-w-0">
                 {month.entries.map((entry) => {
                   const key = entryKey(entry);
                   if (entry.kind === "dump") {
-                    return <DumpSection key={key} dump={entry.dump} />;
+                    return <DumpSection key={key} dump={entry.dump} firstPhotoId={firstPhotoId} />;
                   }
-                  return <SinglePhoto key={key} photo={entry.photo} />;
+                  return <SinglePhoto key={key} photo={entry.photo} firstPhotoId={firstPhotoId} />;
                 })}
               </div>
             </section>

@@ -66,7 +66,7 @@ describe("GlassMenu — the dialog", () => {
     renderMenu();
 
     for (const target of [entry("The River"), entry("Curate"), closeEntry()]) {
-      expect(target).toHaveClass("min-h-16");
+      expect(target.className).toMatch(/(?:^|\s)min-h-(?:16|20)(?:\s|$)/);
       expect(target).toHaveClass("w-full");
     }
   });
@@ -216,22 +216,21 @@ describe("GlassMenu — the material over a photo (the scrim rule)", () => {
     ],
   });
   const WHITE = { r: 255, g: 255, b: 255 };
-  const VEIL_ALPHA = 0.7;
+  const VEIL_ALPHA = 0.6;
 
   it("should keep every entry legible over a white photo, for the lightest theme the generator allows", () => {
     /*
      * The splash's background is the user's photo, and a photo can be white. An entry sits on the veil
-     * (`bg-aura-bg/70`) plus the panel's glass (`rgba(0, 0, 0, 0.4)`), composited here the way a browser
+     * (`bg-aura-bg/60`) plus the panel's glass (`rgba(0, 0, 0, 0.4)`), composited here the way a browser
      * composites it, through the repo's own generator and contrast functions.
      */
     renderMenu();
     const veil = screen.getByTestId("menu-veil");
     // The drift guard for the arithmetic below: change the scrim's alpha in the component and this
     // fails before the numbers do.
-    expect(veil).toHaveClass("bg-aura-bg/70");
-    // ...and the token every entry wears. `--aura-muted` over this veil measures **4.11:1** for the
-    // lightest legal theme — under AA — which is why "Close" is not the quiet one (measured in the
-    // report; the generator guarantees muted against the page background, not against glass).
+    expect(veil).toHaveClass("bg-aura-bg/60");
+    // Every entry uses the stronger text token: muted is generated for the page background, not for
+    // every possible photo beneath glass.
     for (const target of [entry("The River"), entry("Curate"), closeEntry()]) {
       expect(target).toHaveClass("text-aura-text");
     }
