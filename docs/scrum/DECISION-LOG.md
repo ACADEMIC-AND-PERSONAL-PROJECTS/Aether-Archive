@@ -1278,26 +1278,32 @@ visibility control or a pull-through mirror is introduced.
 
 **Date**: 2026-10-24 · **Status**: Accepted
 
-**Context.** The v1.0.0 release published both immutable images, but its deploy job started the full
-observability stack on the 1 GB Oracle VPS. The Spring Boot cold start took about 18 minutes under
-memory pressure; starting Jaeger, Loki, Promtail and the OTel Collector made the API unresponsive
-again, and the public smoke timed out. The rubric needs observability and alerting, not every
-trace/log backend on the smallest demo host.
+**Context.** The v1.0.0 release published both immutable images. Two different failures were
+initially described as one “cold-start timeout”:
+
+1. The first manual deploy used the old 240-second health gate. The API container started at
+   `2026-10-22T22:39:00Z` and Spring Boot logged `Started AetherArchiveApplication in 1093.293
+   seconds` at `22:58:23Z`; the deploy had already recorded `failed` at `22:43:28Z`.
+2. The release deploy job started at `22:59:48Z` with that API container already warm. Its
+   healthcheck was green at `23:09:03Z`, but the public smoke's DB-backed reads failed and the
+   Jaeger UI was unreachable; the job ended `failure` at `23:22:32Z` with the full trace/log stack
+   running on the 1 GB host.
 
 **Decision.** The public deploy starts the **core profile** by default: PostgreSQL, API, web, Caddy,
-Prometheus, Grafana and Alertmanager. The full trace/log stack remains defined in
-`docker-compose.observability.yml` and runs locally (`make observe-up`) or on a larger host with
-`AETHER_FULL_OBSERVABILITY=1`. `deploy.sh` waits up to `AETHER_WAIT_TIMEOUT` seconds (default 1800)
-for the cold JVM; the release deploy job timeout is 50 minutes. `smoke.sh` reports absent trace/log
-containers as `SKIP` with `SMOKE_PUBLIC_PROFILE=1`, which the deploy script sets for the core profile.
-Grafana no longer has a startup `depends_on` for Loki; the full stack still starts Loki, and the
-datasource connects when it is ready.
+Prometheus, Grafana, Alertmanager and Loki. Loki stays because it backs Grafana's log datasource;
+Promtail (the shipper), Jaeger and the OTel Collector are full-profile only. The full trace/log stack
+remains defined in `docker-compose.observability.yml` and runs locally (`make observe-up`) or on a
+larger host with `AETHER_FULL_OBSERVABILITY=1`. `deploy.sh` waits up to `AETHER_WAIT_TIMEOUT` seconds
+(default 1800, measured from the 1093-second start) and the release deploy job timeout is 50 minutes.
+`smoke.sh` reports absent shipper/trace containers as `SKIP` with `SMOKE_PUBLIC_PROFILE=1`, which the
+deploy script sets for the core profile. Grafana no longer has a startup `depends_on` for Loki; the
+datasource connects when Loki is ready.
 
 **Consequences.** The public demo fits 1 GB, the public smoke is stable, and the metrics/alerting path
-the rubric measures is live. Traces and logs are still demonstrated locally and documented; the
-public `/grafana/` is metrics-first. The first v1.0.0 deploy job remains recorded as failed — the fix
-is the default for later releases, not a rewrite of history. Revisit if the VPS is resized or the
-trace/log stack becomes a hard public requirement.
+the rubric measures is live. The public log datasource is healthy but empty because the shipper is
+full-profile; traces and logs are demonstrated locally and documented. The first v1.0.0 deploy job
+remains recorded as failed — the fix is the default for later releases, not a rewrite of history.
+Revisit if the VPS is resized or the trace/log stack becomes a hard public requirement.
 
 ---
 

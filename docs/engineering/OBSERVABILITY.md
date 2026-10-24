@@ -90,10 +90,10 @@ overlay sets it to `true` and points `OTEL_EXPORTER_OTLP_ENDPOINT` at the collec
 ## 4. Production access
 
 The public demo is live at `https://168.138.70.166.nip.io/grafana/` (anonymous Viewer; admin password
-from `GRAFANA_ADMIN_PASSWORD`). It runs the **core profile**: Prometheus, Grafana and Alertmanager,
-with the API and PostgreSQL. The trace/log stack (Jaeger, Loki, Promtail and the OTel Collector) is
-the **full profile** and runs locally / on a larger host (`AETHER_FULL_OBSERVABILITY=1`); it is
-intentionally absent from the 1 GB public host. See ADR-031.
+from `GRAFANA_ADMIN_PASSWORD`). It runs the **core profile**: Prometheus, Grafana, Alertmanager and
+Loki, with the API and PostgreSQL. Loki keeps the log datasource healthy; Promtail is full-profile
+only, so the public log view is empty by design. Jaeger, Promtail and the OTel Collector are the
+**full profile** and run locally / on a larger host (`AETHER_FULL_OBSERVABILITY=1`). See ADR-031.
 
 - Grafana: `https://168.138.70.166.nip.io/grafana/`.
 - Prometheus, Alertmanager, Jaeger: SSH tunnel from the operator machine (Jaeger is full-profile

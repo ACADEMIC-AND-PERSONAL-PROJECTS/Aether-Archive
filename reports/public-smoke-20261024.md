@@ -2,8 +2,9 @@
 
 URL: `https://168.138.70.166.nip.io`
 Command: `SMOKE_PUBLIC_PROFILE=1 ./scripts/deploy/smoke.sh https://168.138.70.166.nip.io`
-Result: **all checks passed, 0 warnings**. The four trace/log containers and Jaeger are expected
-`SKIP`s on the public 1 GB core profile (ADR-031), not failures.
+Result: **all checks passed, 0 warnings**. The eight core containers, including Loki, are running.
+Jaeger, Promtail and the OTel Collector are expected `SKIP`s on the public 1 GB core profile
+(ADR-031), not failures.
 
 ```text
 smoke: https://168.138.70.166.nip.io
@@ -25,8 +26,8 @@ PASS  container: caddy running
 PASS  container: prometheus running
 PASS  container: grafana running
 PASS  container: alertmanager running
+PASS  container: loki running
 SKIP  container: jaeger (full observability profile only)
-SKIP  container: loki (full observability profile only)
 SKIP  container: promtail (full observability profile only)
 SKIP  container: otel-collector (full observability profile only)
 PASS  prometheus: /-/healthy

@@ -110,16 +110,18 @@ green, public incident drill resolved.**
 The target is the existing Oracle Cloud VPS `168.138.70.166` (Ubuntu 24.04, 2 vCPU, 1 GB RAM plus a
 2 GB swap added for the stack). SSH works as `ubuntu` with the local `~/.ssh/digital_ocean` key; Docker
 29.8.1 and Compose are installed. TCP 22, 80 and 443 answer; Caddy obtained a normal certificate for
-`168.138.70.166.nip.io`. The v1.0.0 release published the immutable images. Its first deploy job
-started the full observability stack and hit the 1 GB cold-start limit; the same
-`sha-9b6e3a215f03...` images were deployed with the core profile (ADR-031), now the default in
-`deploy.sh`. The on-call responder is installed as a systemd unit and bound to loopback + the Docker
-bridge only.
+`168.138.70.166.nip.io`. The v1.0.0 release published the immutable images. Its first deploy job ran
+the full trace/log stack and failed the public smoke (API reads and the Jaeger UI) while that stack
+competed for the 1 GB host; the same `sha-9b6e3a215f03...` images were then deployed with the core
+profile (ADR-031), now the default in `deploy.sh`. The API's measured first cold start was 1093 s
+inside the process, which is why the deploy gate is 1800 s. The on-call responder is installed as a
+systemd unit and bound to loopback + the Docker bridge only.
 
-Evidence: `reports/public-smoke-20261024.md`, `reports/public-deploy-history.tsv`,
-`reports/public-incident-20261022T235204Z.json` and `reports/public-observability-profile-20261024.md`.
+Evidence: `reports/public-smoke-20261024.md`, `reports/public-cold-start-20261022.md`,
+`reports/public-deploy-history.tsv`, `reports/public-incident-20261022T235204Z.json` and
+`reports/public-observability-profile-20261024.md`.
 
-The code path is complete and does not depend on that network fix:
+Release path:
 
 - `.github/workflows/release.yml` — a `v*` tag builds and pushes both images to GHCR, then (when the
   VPS secrets exist) SSHes to `/opt/aether` and runs the deploy script.
@@ -132,12 +134,12 @@ The code path is complete and does not depend on that network fix:
 - `docs/engineering/DEPLOYMENT.md` — the VPS preparation, secrets, first release, rollback, restore
   and security checklist.
 
-The live host runs the **core profile** (`db api web caddy prometheus grafana alertmanager`): the
-public smoke checks the public origin and the core containers, while `SMOKE_PUBLIC_PROFILE=1` reports
-the trace/log services as intentionally absent. The full trace/log stack (Jaeger, Loki, Promtail,
-OTel Collector) remains the local `make observe-up` profile and is enabled with
-`AETHER_FULL_OBSERVABILITY=1` on a larger host. The deploy waits up to `AETHER_WAIT_TIMEOUT` seconds
-(default 1800) for the cold JVM; the release job has a 50-minute timeout.
+The live host runs the **core profile** (`db api web caddy prometheus grafana alertmanager loki`):
+the public smoke checks the public origin and the core containers, while `SMOKE_PUBLIC_PROFILE=1`
+reports the absent shipper/trace services as intentional `SKIP`s. Loki backs Grafana's log datasource;
+Promtail, Jaeger and the OTel Collector remain the local `make observe-up` profile and are enabled
+with `AETHER_FULL_OBSERVABILITY=1` (set in `.env` or exported for one command) on a larger host. The deploy waits up to `AETHER_WAIT_TIMEOUT`
+seconds (default 1800) for the cold JVM; the release job has a 50-minute timeout.
 
 The public incident drill stopped PostgreSQL, fired `AetherPublish5xxRate`, the responder chose
 `restart_db`, the health gate passed and Alertmanager resolved the incident at 23:55:06Z. The archive
@@ -158,15 +160,15 @@ still serves its intended 36 photos and 3 dumps; the drill's load did not leave 
 | 5 | **Application** | DONE | The four views, upload/publish, one-command stack; editorial redesign screenshots in `reports/evidence/`; verified by the backend/frontend suites and the real-browser axe pass at 320/768/1280 (`frontend/e2e/a11y.spec.ts`). The physical-device pass is a separate, explicitly unclaimed check. |
 | 6 | **Testing** | DONE | `make verify`; backend `./mvnw verify` (307 tests, Testcontainers PostgreSQL), frontend `npm run test` (518 tests), lint/typecheck/build in CI, on-call unit tests, deploy shell checks. Evidence: `reports/`, `/tmp/opencode/mvn-verify.log` (local). |
 | 7 | **Containerization** | DONE | `backend/Dockerfile`, `frontend/Dockerfile`, `docker-compose.yml`, healthchecks, persistent volumes, non-root API, bounded logs; base stack healthy on `http://localhost:3000`. |
-| 8 | **Deployment** | **DONE** | `docker-compose.prod.yml`, `docker/Caddyfile`, `docs/engineering/DEPLOYMENT.md`; live at `https://168.138.70.166.nip.io` with 36 photos and 3 dumps; public smoke green (`reports/public-smoke-20261024.md`); core 1 GB profile (ADR-031); recorded deploy state (`reports/public-deploy-history.tsv`). |
-| 9 | **CI/CD** | **DONE (pipeline + publish); 1 GB deploy caveat** | `.github/workflows/ci.yml` (tests on every PR), `.github/workflows/release.yml` (GHCR build/push + SSH deploy), `scripts/deploy/{deploy,rollback,smoke,backup}.sh`; release run `39865156018` published both images. Its first deploy job started the full stack and hit the 1 GB cold-start limit; the same images were deployed with the core profile (ADR-031), now default; the deploy job timeout is 50 minutes. |
+| 8 | **Deployment** | **DONE** | `docker-compose.prod.yml`, `docker/Caddyfile`, `docs/engineering/DEPLOYMENT.md`; live at `https://168.138.70.166.nip.io` with 36 photos and 3 dumps; public smoke green (`reports/public-smoke-20261024.md`); core 1 GB profile with Loki (ADR-031); recorded deploy state (`reports/public-deploy-history.tsv`); measured cold start (`reports/public-cold-start-20261022.md`). |
+| 9 | **CI/CD** | **DONE (pipeline + publish); full-profile smoke caveat** | `.github/workflows/ci.yml` (tests on every PR), `.github/workflows/release.yml` (GHCR build/push + SSH deploy), `scripts/deploy/{deploy,rollback,smoke,backup}.sh`; release run `39865156018` published both images. Its first deploy job ran the full stack; the API healthcheck was green but the public smoke failed on API reads and Jaeger UI, so the same images were deployed with the core profile (ADR-031), now default. Measured cold start 1093 s; deploy gate 1800 s; job timeout 50 min. |
 | 10 | **Observability** | **DONE (public core + local full)** | `docker-compose.observability.yml`, `observability/`, `backend/src/main/resources/application-prod.yml`, `logback-spring.xml`, `frontend/src/api/traceparent.ts`; public Grafana at `https://168.138.70.166.nip.io/grafana/` with Prometheus + Alertmanager; dashboard and traces in `reports/evidence/`; runbook in `docs/engineering/OBSERVABILITY.md`; full trace/log profile local (ADR-031). |
 | 11 | **Alerting** | **DONE (local + public)** | `observability/alerts.yml`, `observability/alertmanager.yml`; the public drill fired `AetherPublish5xxRate` against the live origin; the responder chose `restart_db`, the health gate passed and Alertmanager resolved it at 23:55:06Z (`reports/public-incident-20261022T235204Z.json`). |
 | 12 | **On-Call Agent** | **DONE (local + production)** | `oncall/` responder + tests + systemd unit + runbook; installed on the VPS as `aether-oncall`, listening only on `127.0.0.1:9099` and `172.17.0.1:9099` (external 9099 closed); the public drill restarted PostgreSQL and closed the incident (`reports/public-incident-20261022T235204Z.json`). |
 
 **Score target:** 20+/24. The pass threshold is 10/24. All twelve criteria now have evidence; the
-only operational caveat is the first release deploy job's 1 GB cold-start failure, documented above
-and addressed by the core profile. The statuses above are the source of truth, not the target.
+only operational caveat is the first release deploy job's full-profile smoke failure, documented
+above and addressed by the core profile. The statuses above are the source of truth, not the target.
 
 ---
 
@@ -179,7 +181,7 @@ and addressed by the core profile. The statuses above are the source of truth, n
 | Static gates | `npm run lint`, `npm run format:check`, `npm run typecheck`, `npm run build` | ESLint (0 warnings), Prettier, `tsc -b`, production bundle |
 | On-call decision logic | `python3 -m unittest discover -s oncall -p 'test_*.py'` | diagnosis, action selection, incident lifecycle |
 | End-to-end API | `scripts/dev/smoke.sh --base-url ...` | every endpoint, success and refusal, byte-identical image round-trip (29 checks) |
-| Deployment smoke | `scripts/deploy/smoke.sh https://DOMAIN` | TLS/HSTS, headers, SPA, API reads, problem-detail 404, Grafana, containers, local observability |
+| Deployment smoke | `SMOKE_PUBLIC_PROFILE=1 scripts/deploy/smoke.sh https://DOMAIN` | TLS/HSTS, headers, SPA, API reads, problem-detail 404, Grafana, core containers, local Prometheus/Alertmanager |
 | Browser/device | `reports/device-verification-sprint05.md` | Chromium passes; physical iOS/Android explicitly **not** claimed |
 
 CI runs the backend and frontend jobs on every PR to `develop`/`main`; the required status contexts are
@@ -286,9 +288,10 @@ database in 8 seconds, and a resolved incident:
 - **The public demo is live** at `https://168.138.70.166.nip.io`; the deployment criterion is
   `DONE` on the public smoke and the public incident drill. The 1 GB VPS runs the core profile; the
   trace/log stack is demonstrated locally, not on the public host. The first release deploy job
-  (`39865156018`) failed at the full-profile cold start before the core profile became the default;
-  the same images were deployed with the core profile. This is a documented capacity limit, not a
-  hidden success.
+  (`39865156018`) passed the API healthcheck but failed the public smoke while the full trace/log
+  stack was running; the same images were deployed with the core profile. The measured cold start is
+  in `reports/public-cold-start-20261022.md`. This is a documented capacity limit, not a hidden
+  success.
 - **The on-call path is deterministic by design**; it is not a general incident agent. It never runs
   SQL and never deletes data.
 - **Known frontend issues** #176 (River scroller), #177 (first-publish cache) and #179 (menu history)
@@ -317,8 +320,8 @@ it is tracked here so it is not forgotten before submission:
 - [x] README, criteria map, architecture, design system, deployment, observability and on-call runbooks.
 - [x] CI green on the branch; the release workflow and deploy scripts are in the repository.
 - [x] VPS firewall open to the operator; DNS pointed at the host.
-- [x] `v1.0.0` tag pushed; both images published to GHCR. The first deploy job hit the 1 GB
-      full-profile cold start; the same images were deployed with the core profile (ADR-031).
+- [x] `v1.0.0` tag pushed; both images published to GHCR. The first deploy job failed the public
+      smoke with the full profile; the same images were deployed with the core profile (ADR-031).
 - [x] Public URL inserted in the README, this document and issue #180.
 - [x] Production drill re-run; the public incident JSON is linked in §4 and §5.
 - [ ] 3–5 minute demo video recorded (the script in §9).

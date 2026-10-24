@@ -92,15 +92,18 @@ if [ -n "${GHCR_TOKEN:-}" ]; then
   echo "deploy: authenticated to $REGISTRY with the run-scoped token"
 fi
 
-# The public demo VPS has 1 GB of RAM. The default profile keeps the metrics and alerting path
-# (Prometheus, Grafana, Alertmanager) but leaves the trace/log stack for a full host. Set
-# AETHER_FULL_OBSERVABILITY=1 to start every service, as the local `make observe-up` does.
+# The public demo VPS has 1 GB of RAM. The default profile keeps the metrics, alerting and log
+# datasource path (Prometheus, Grafana, Alertmanager, Loki) but leaves the shipper/trace stack for a
+# full host. Set AETHER_FULL_OBSERVABILITY=1 to start every service, as `make observe-up` does.
 if [ "${AETHER_FULL_OBSERVABILITY:-0}" = "1" ]; then
   PUBLIC_PROFILE=0
   UP_SERVICES=()
 else
   PUBLIC_PROFILE=1
-  UP_SERVICES=(db api web caddy prometheus grafana alertmanager)
+  # Loki is the storage behind Grafana's log datasource; without it the public dashboard shows a
+  # broken panel. It is light enough for 1 GB. Promtail (the shipper), Jaeger and the OTel Collector
+  # remain full-profile only.
+  UP_SERVICES=(db api web caddy prometheus grafana alertmanager loki)
 fi
 WAIT_TIMEOUT="${AETHER_WAIT_TIMEOUT:-1800}"
 smoke() { SMOKE_PUBLIC_PROFILE="$PUBLIC_PROFILE" ./scripts/deploy/smoke.sh "$BASE_URL"; }
@@ -165,7 +168,9 @@ fi
 
 if [ "$PUBLIC_PROFILE" = "1" ]; then
   # A previous full-profile deploy may have left these running; the 1 GB host cannot serve both.
-  "${COMPOSE[@]}" stop jaeger loki promtail otel-collector >/dev/null 2>&1 || true
+  if ! "${COMPOSE[@]}" stop jaeger promtail otel-collector >/dev/null 2>&1; then
+    echo "deploy: warning: could not stop one or more optional observability services" >&2
+  fi
 fi
 if ! "${COMPOSE[@]}" up -d --wait --wait-timeout "$WAIT_TIMEOUT" "${UP_SERVICES[@]}"; then
   echo "deploy: the stack did not become healthy" >&2

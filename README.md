@@ -135,7 +135,7 @@ tests**; the reports live in `reports/`. Browser-dependent checks (safe areas, a
 physical iOS/Android) are documented in `reports/device-verification-sprint05.md` and are not claimed
 as automated coverage.
 
-The production smoke test is `./scripts/deploy/smoke.sh https://DOMAIN`; it checks TLS/HSTS, the
+The production smoke test is `SMOKE_PUBLIC_PROFILE=1 ./scripts/deploy/smoke.sh https://DOMAIN`; it checks TLS/HSTS, the
 security headers, the SPA and its hashed entry, the API reads, the problem-detail 404, Grafana under
 `/grafana/`, the eleven containers and the local observability endpoints. A deployment that cannot
 pass it is rolled back.
@@ -185,9 +185,9 @@ restrained motion. The course slice adds containers, the public deployment profi
 the self-hosted observability stack, the publish alert, the on-call responder and the deploy/rollback
 path. The public instance is live at **https://168.138.70.166.nip.io**. The release workflow publishes the
 GHCR images, and the same smoke test used locally passes against the public origin. The 1 GB VPS runs
-the core profile (PostgreSQL, API, web, Caddy, Prometheus, Grafana, Alertmanager); the full trace/log
-stack remains the local/`make observe-up` profile. Known frontend findings remain tracked as issues
-#176, #177 and #179.
+the core profile (PostgreSQL, API, web, Caddy, Prometheus, Grafana, Alertmanager, Loki); the trace
+shippers (Jaeger, Promtail, OTel Collector) remain the local/`make observe-up` profile. Known frontend
+findings remain tracked as issues #176, #177 and #179.
 
 ## License
 

@@ -1,10 +1,11 @@
 # Deployment and containers — Aether Archive
 
 > Status: **live at `https://168.138.70.166.nip.io`** — 36 attributed photos, 3 dumps, public smoke
-> green. The 1 GB host runs the core profile (ADR-031); the full trace/log stack remains the local
-> `make observe-up` profile. The v1.0.0 release published the images; the first release deploy job
-> started the full stack and hit the 1 GB cold-start limit, so the same `sha-9b6e3a2...` images were
-> deployed with the core profile now default in `deploy.sh`.
+> green. The 1 GB host runs the core profile (ADR-031): `db`, `api`, `web`, `caddy`, `prometheus`,
+> `grafana`, `alertmanager` and `loki`. The v1.0.0 release published the images; its first deploy job
+> ran the full trace/log stack and failed the public smoke (API reads and the Jaeger UI). The same
+> `sha-9b6e3a2...` images were deployed with the core profile, now the default in `deploy.sh`. The
+> measured cold start and the job failure are recorded in `reports/public-cold-start-20261022.md`.
 >
 > Decisions: ADR-009 (PostgreSQL), ADR-010 (containerized delivery), ADR-029 (public demo and the
 > observability profile), ADR-030 (private GHCR pull), ADR-031 (public 1 GB profile).
@@ -79,17 +80,24 @@ the Vite bundle and serves it with nginx; both base tags are pinned, and every s
 ### Deployment profiles
 
 The public demo host has 1 GB of RAM and 2 GB of swap. `deploy.sh` starts the **core profile** by
-default: `db api web caddy prometheus grafana alertmanager`. That keeps the metrics and alerting path
-the rubric measures without starving the API. The trace/log services (`jaeger`, `loki`, `promtail`,
-`otel-collector`) stay defined in `docker-compose.observability.yml` and run in the local/full
-profile; set `AETHER_FULL_OBSERVABILITY=1` to start them on a host with enough memory. `smoke.sh`
-with `SMOKE_PUBLIC_PROFILE=1` (which the deploy script sets for the core profile) reports the absent
-trace/log containers as `SKIP`, never `FAIL`.
+default: `db api web caddy prometheus grafana alertmanager loki`. That keeps the metrics and alerting
+path the rubric measures without starving the API. Loki is included because it backs Grafana's log
+datasource; without it, the public Grafana shows an unhealthy datasource. Promtail (the shipper),
+Jaeger and the OTel Collector stay full-profile only, so the public log view is healthy but empty by
+design. They remain defined in `docker-compose.observability.yml`; set `AETHER_FULL_OBSERVABILITY=1`
+in `.env` (or export it before one command) on a host with enough memory. `smoke.sh` with
+`SMOKE_PUBLIC_PROFILE=1` (which the deploy script sets for the core profile) reports the absent
+shipper/trace containers as `SKIP`, never `FAIL`.
 
-The first cold start of the Spring Boot API on this host can take several minutes while the JVM loads
-and the swap warms. `deploy.sh` waits up to `AETHER_WAIT_TIMEOUT` seconds (default `1800`); the
-release deploy job has a 50-minute timeout. Warm requests are fast; the public smoke uses bounded
-retries so a cold JVM does not mask a real failure.
+The API's first start on this host is slow. On 2026-10-22 the container started at `22:39:00Z` and
+Spring Boot logged `Started AetherArchiveApplication in 1093.293 seconds` at `22:58:23Z` — 18 m 13 s
+inside the process, 19 m 22 s from container start. The first manual deploy used the old 240-second
+gate and failed at `22:43:28Z` while the API was still starting. `deploy.sh` now waits up to
+`AETHER_WAIT_TIMEOUT` seconds (default `1800`), and the release deploy job has a 50-minute timeout.
+The v1.0.0 release deploy job did not fail at that gate: its API healthcheck was green at `23:09:03Z`,
+but the public smoke's DB-backed reads timed out while the full trace/log stack was running, and the
+job failed at `23:22:30Z`. The later successful core-profile deploy reused the warm API container.
+Full timeline: `reports/public-cold-start-20261022.md`.
 
 ## 4. Prepare the VPS (once)
 
@@ -197,8 +205,8 @@ cd /opt/aether
 ./scripts/deploy/deploy.sh sha-<full-commit> --skip-seed
 ```
 
-On the 1 GB public host the core profile is the default. Export `AETHER_FULL_OBSERVABILITY=1` only
-when the host can run the trace/log stack as well.
+On the 1 GB public host the core profile is the default. Set `AETHER_FULL_OBSERVABILITY=1` in `.env`
+(or export it for one command) only when the host can run the trace/log stack as well.
 
 First deploy without a release tag: build locally once with
 `docker compose -f docker-compose.yml -f docker-compose.observability.yml -f docker-compose.prod.yml up -d --build`,
@@ -210,8 +218,8 @@ normal one. The deploy script is the path that records state and rollback metada
 The same script runs in the deploy and by hand:
 
 ```bash
-./scripts/deploy/smoke.sh https://DOMAIN
-make deploy-smoke BASE_URL=https://DOMAIN
+SMOKE_PUBLIC_PROFILE=1 ./scripts/deploy/smoke.sh https://DOMAIN
+SMOKE_PUBLIC_PROFILE=1 make deploy-smoke BASE_URL=https://DOMAIN
 ```
 
 It checks HSTS, CSP, `X-Content-Type-Options`, the SPA shell and the hashed JavaScript entry, the
@@ -308,7 +316,7 @@ Details, alert rules and the runbook: `docs/engineering/OBSERVABILITY.md`; respo
   issuance can take a minute.
 - The automated rollback covers the API image only; a bad migration needs the backup and a human.
 - The on-call responder is deterministic by design; it is not a general incident agent.
-- The public demo runs the core observability profile on the 1 GB VPS. Jaeger, Loki, Promtail and the
-  OTel Collector are exercised locally (and on a larger host with `AETHER_FULL_OBSERVABILITY=1`), not
-  on the public host. The 1 GB cold start is documented above; the first v1.0.0 release deploy job
-  hit that limit before the core profile became the default.
+- The public demo runs the core observability profile on the 1 GB VPS. Loki is present for Grafana's
+  log datasource; Promtail, Jaeger and the OTel Collector are exercised locally (and on a larger host
+  with `AETHER_FULL_OBSERVABILITY=1`), not on the public host. The measured cold start and the
+  v1.0.0 deploy-job smoke failure are documented above.
