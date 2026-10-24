@@ -13,6 +13,16 @@ Criteria evidence: [`docs/course/FINAL-PROJECT.md`](docs/course/FINAL-PROJECT.md
 
 ![The River, desktop](reports/evidence/app-river-1440.png)
 
+## Demo video — 3:12
+
+[Watch `aether.mp4`](https://github.com/ACADEMIC-AND-PERSONAL-PROJECTS/Aether-Archive/releases/download/v1.0.0/aether.mp4)
+· [release notes](https://github.com/ACADEMIC-AND-PERSONAL-PROJECTS/Aether-Archive/releases/tag/v1.0.0)
+
+Recorded on 2026-10-24 against the one-command stack and the public deployment: the four views, the
+palette/aura flow, Grafana, the on-call drill and the release run. English narration, 1920×1080.
+The scene-by-scene storyboard and the deliberate omissions are in
+[`docs/course/FINAL-PROJECT.md` §9](docs/course/FINAL-PROJECT.md#9-demo-video-312).
+
 ## The problem
 
 Personal photos accumulate faster than anyone curates them. Camera rolls are a stream; cloud galleries
@@ -189,7 +199,7 @@ path. The public instance is live at **https://168.138.70.166.nip.io**. The rele
 GHCR images, and the same smoke test used locally passes against the public origin. The 1 GB VPS runs
 the core profile (PostgreSQL, API, web, Caddy, Prometheus, Grafana, Alertmanager, Loki); the trace
 shippers (Jaeger, Promtail, OTel Collector) remain the local/`make observe-up` profile. Known frontend
-findings remain tracked as issues #176, #177 and #179.
+findings remain tracked as issues #176, #177, #179 and #189; #187 (menu lede) is fixed.
 
 ## License
 
