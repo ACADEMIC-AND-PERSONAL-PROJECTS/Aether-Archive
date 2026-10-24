@@ -194,7 +194,9 @@ export function GlassMenu({ onClose, returnFocusTo }: GlassMenuProps) {
             </div>
 
             <div className="px-6 md:px-10">
-              <p className="max-w-[18rem] font-display text-2xl leading-[1.04] tracking-display text-aura-text sm:text-3xl">
+              {/* 25rem holds "photographs." at the 3xl clamp (76.8px); the earlier 18rem measure
+                  split the word mid-glyph once the editorial type scale raised the token. */}
+              <p className="max-w-[25rem] font-display text-2xl leading-[1.04] tracking-display text-aura-text sm:text-3xl">
                 A quiet place for your photographs.
               </p>
             </div>
