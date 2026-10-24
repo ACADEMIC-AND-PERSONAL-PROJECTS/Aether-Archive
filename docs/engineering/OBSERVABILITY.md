@@ -246,7 +246,8 @@ scripts/demo/incident-drill.sh        # takes ~5 minutes
   `backups/` (7-day retention). Copy that directory off the VPS; it is gitignored.
 - The public core profile provisions the Jaeger datasource but not Jaeger. Opening that datasource
   reports it unavailable; the dashboard only links to the trace search, so no panel breaks. Jaeger is
-  live in the full profile. The authoritative public datasources are Prometheus, Loki and Alertmanager.
+  live in the full profile. The public Grafana datasources are Prometheus and Loki; Alertmanager is
+  not a Grafana datasource.
 - Limits of this single-VPS setup: no HA, Jaeger is not durable, Loki is a single instance, and the
   Grafana dashboards are anonymous read-only. That is deliberate for a demo, not a claim of a
   production SLO.
