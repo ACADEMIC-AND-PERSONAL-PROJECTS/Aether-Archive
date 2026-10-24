@@ -20,10 +20,11 @@ All times UTC; the measured evidence is in [`public-cold-start-20261022.md`](pub
   the deploy recorded `failed` at `22:43:28`. The API kept starting and logged `Started
   AetherArchiveApplication in 1093.293 seconds` at `22:58:23` — 18 m 13 s inside the process.
 - The release deploy job started at `22:59:48` with that API container already warm. Its healthcheck
-  was green at `23:09:03`, but the public smoke failed the DB-backed API reads and the Jaeger UI, and
+  was green at `23:09:03`, but the public smoke failed the API reads and the Jaeger UI, and
   the job ended `failure` at `23:22:32` with the full trace/log stack running on the 1 GB host.
-- The same `sha-9b6e3a215f03...` images were deployed with the **core profile** at
-  `2026-10-22T23:42:55Z`; `state/history.tsv` records `success`. This deploy reused the warm API
+- A manual retry recorded `failed` at `23:40:21Z` for the short tag `sha-9b6e3a2`; the same
+  `sha-9b6e3a215f03...` images were then deployed with the **core profile** at
+  `2026-10-22T23:42:55Z`, and `state/history.tsv` records `success`. This deploy reused the warm API
   container, so it added no second cold start.
 - The public smoke passed every check: HTML/SPA, hashed asset, 36 photos, 3 dumps, random photo,
   `404 application/problem+json`, Grafana health, the eight core containers, Prometheus, Alertmanager
@@ -62,7 +63,7 @@ TCP 9099 is closed (connection timeout). `/healthz` answers on both bind address
 ## Why the core profile
 
 The 1 GB Oracle VPS could not pass the public smoke with the full trace/log stack: the release job's
-API healthcheck was green, but its DB-backed reads failed and the Jaeger UI was unreachable under that
+API healthcheck was green, but its API reads failed and the Jaeger UI was unreachable under that
 load. The core profile keeps the metrics and alerting path the rubric measures and includes Loki for
 the log datasource. The full stack remains the local `make observe-up` profile and is available on a
 larger host with `AETHER_FULL_OBSERVABILITY=1`.
@@ -70,9 +71,12 @@ larger host with `AETHER_FULL_OBSERVABILITY=1`.
 ## Known limits (honest)
 
 - The v1.0.0 release deploy job remains a failed run in GitHub history; the same images were deployed
-  manually with the core profile. A later release uses the reviewed profile fix and a 50-minute
+  manually with the core profile. A later release will use the reviewed profile fix and a 50-minute
   deploy-job timeout, but it was not re-tagged here to avoid a second 18-minute public cold start.
 - The public host is a single 1 GB VPS with 2 GB swap; warm requests are fast, the first JVM start is
   slow (1093 s measured). This is a course demo, not an availability claim.
 - The public log datasource is healthy but empty: Promtail is not part of the core profile.
+- Grafana also provisions the Jaeger datasource, but Jaeger is full-profile only. If that datasource is
+  opened on the public host it reports unavailable; the dashboard only links to the trace search, so
+  no panel breaks. This mirrors the Loki decision and is deliberate.
 - The physical iOS/Android pass remains explicitly unclaimed.

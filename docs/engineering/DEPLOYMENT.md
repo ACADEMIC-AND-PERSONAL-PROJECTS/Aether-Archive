@@ -95,7 +95,7 @@ inside the process, 19 m 22 s from container start. The first manual deploy used
 gate and failed at `22:43:28Z` while the API was still starting. `deploy.sh` now waits up to
 `AETHER_WAIT_TIMEOUT` seconds (default `1800`), and the release deploy job has a 50-minute timeout.
 The v1.0.0 release deploy job did not fail at that gate: its API healthcheck was green at `23:09:03Z`,
-but the public smoke's DB-backed reads timed out while the full trace/log stack was running, and the
+but the public smoke's API reads timed out while the full trace/log stack was running, and the
 job failed at `23:22:30Z`. The later successful core-profile deploy reused the warm API container.
 Full timeline: `reports/public-cold-start-20261022.md`.
 

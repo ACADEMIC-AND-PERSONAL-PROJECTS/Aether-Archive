@@ -36,7 +36,7 @@ review; merge commit only; record the outcome in the sprint doc and `reports/`.
 | Observability | `make observe-up` → Grafana `:3001`; `make oncall` in a second terminal |
 | Incident drill | `scripts/demo/incident-drill.sh` (stops PostgreSQL for real) |
 | Production rehearsal | `make prod-up` (base + observability + Caddy; no published web port) |
-| Deployment smoke | `./scripts/deploy/smoke.sh https://DOMAIN` |
+| Deployment smoke | `SMOKE_PUBLIC_PROFILE=1 ./scripts/deploy/smoke.sh https://DOMAIN` |
 | Backup / rollback | `make backup` · `make rollback` (VPS state) |
 
 ## Invariants

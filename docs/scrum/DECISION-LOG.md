@@ -1285,7 +1285,7 @@ initially described as one “cold-start timeout”:
    `2026-10-22T22:39:00Z` and Spring Boot logged `Started AetherArchiveApplication in 1093.293
    seconds` at `22:58:23Z`; the deploy had already recorded `failed` at `22:43:28Z`.
 2. The release deploy job started at `22:59:48Z` with that API container already warm. Its
-   healthcheck was green at `23:09:03Z`, but the public smoke's DB-backed reads failed and the
+   healthcheck was green at `23:09:03Z`, but the public smoke's API reads failed and the
    Jaeger UI was unreachable; the job ended `failure` at `23:22:32Z` with the full trace/log stack
    running on the 1 GB host.
 

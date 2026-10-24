@@ -64,7 +64,7 @@ Frontend (from `frontend/`, Node 22.22.2 / 24.15 / 26+ — see `frontend/package
 Dev database (once scaffolded): `docker compose -f docker-compose.dev.yml up -d` · v1.0 stack: `docker compose up -d --build`
 Demo data: `make demo` (36 attributed photos + 3 dumps) · API walk: `make smoke` · every gate: `make verify`
 Observability: `make observe-up` · `make oncall` (host responder) · `make observe-down` · drill: `scripts/demo/incident-drill.sh`
-Production: `make deploy-smoke BASE_URL=https://DOMAIN` · `make backup` · `make rollback` · release: push a `v*` tag (`.github/workflows/release.yml` → `scripts/deploy/deploy.sh`)
+Production: `SMOKE_PUBLIC_PROFILE=1 make deploy-smoke BASE_URL=https://DOMAIN` · `make backup` · `make rollback` · release: push a `v*` tag (`.github/workflows/release.yml` → `scripts/deploy/deploy.sh`)
 Full check before a commit: the `verify` skill (`.claude/skills/verify/SKILL.md`).
 **Keep this section accurate** — every story that adds or renames a command updates it here.
 

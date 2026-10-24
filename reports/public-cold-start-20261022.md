@@ -13,15 +13,17 @@ Source: `docker inspect aether-archive-api-1` and `docker logs aether-archive-ap
 | Time | Event |
 | --- | --- |
 | `22:39:00.691` | API container started (`State.StartedAt`). |
-| `22:42:11.278` | JVM start: `Starting AetherArchiveApplication v0.1.0-SNAPSHOT using Java 21.0.12.1`. |
+| `22:42:11.278` | Spring Boot start log (after the JVM launched): `Starting AetherArchiveApplication v0.1.0-SNAPSHOT using Java 21.0.12.1`. |
 | `22:43:28` | First manual deploy recorded `failed` in `state/history.tsv`; the old health gate was 240 s. |
 | `22:58:11.881` | `Tomcat started on port 8080 (http) with context path '/'`. |
 | `22:58:23.386` | `Started AetherArchiveApplication in 1093.293 seconds (process running for 1136.302)`. |
 | `23:42:55` | Core-profile deploy recorded `success`; the API container was still the one started at `22:39:00` (warm), so this deploy did not cold-start a second API. |
 
 The measured cold start is therefore **18 m 13 s inside the process** and **19 m 22 s from container
-start**. The 240-second gate was too short; the API kept starting after the deploy had already
-recorded the failure. `deploy.sh` now defaults `AETHER_WAIT_TIMEOUT` to 1800 seconds.
+start**. The same log line says `process running for 1136.302` seconds, which puts the process start at
+about `22:39:27` — 26 seconds after the container start, i.e. the entrypoint. The 240-second gate was
+too short; the API kept starting after the deploy had already recorded the failure. `deploy.sh` now
+defaults `AETHER_WAIT_TIMEOUT` to 1800 seconds.
 
 ## What failed in the release deploy job
 
@@ -42,7 +44,7 @@ Source: `gh run view 39865156018 --job 120137770217 --log`.
 
 The release job did **not** fail at the cold-start health gate: the API healthcheck was green. It
 failed the public smoke while the full trace/log stack was running on the 1 GB host. The smoke's
-DB-backed reads did not answer within their bounded retries, and Jaeger's UI was not reachable. The
+API reads did not answer within their bounded retries, and Jaeger's UI was not reachable. The
 exact cause of the API read timeouts is not proven by this log; the supported statement is that the
 full-profile stack did not pass the public smoke on this host.
 

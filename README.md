@@ -135,10 +135,12 @@ tests**; the reports live in `reports/`. Browser-dependent checks (safe areas, a
 physical iOS/Android) are documented in `reports/device-verification-sprint05.md` and are not claimed
 as automated coverage.
 
-The production smoke test is `SMOKE_PUBLIC_PROFILE=1 ./scripts/deploy/smoke.sh https://DOMAIN`; it checks TLS/HSTS, the
-security headers, the SPA and its hashed entry, the API reads, the problem-detail 404, Grafana under
-`/grafana/`, the eleven containers and the local observability endpoints. A deployment that cannot
-pass it is rolled back.
+The production smoke test is `SMOKE_PUBLIC_PROFILE=1 ./scripts/deploy/smoke.sh https://DOMAIN`; it checks
+TLS/HSTS, the security headers, the SPA and its hashed entry, the API reads, the problem-detail 404,
+Grafana under `/grafana/` and the local observability endpoints. On the VPS it also checks the eight
+core containers; the three full-profile containers and the Jaeger UI are `SKIP`s. Run from a
+workstation, the container checks are host-local and are expected to be skipped or noisy. A
+deployment that cannot pass the host run is rolled back.
 
 ## How the work is done
 
