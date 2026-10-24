@@ -17,6 +17,9 @@ if [ -z "$BASE_URL" ]; then
   exit 2
 fi
 BASE_URL="${BASE_URL%/}"
+# The public 1 GB profile intentionally omits the log shipper and trace stack; report them as SKIP,
+# not FAIL. Loki is part of the core profile and is therefore required.
+PUBLIC_PROFILE="${SMOKE_PUBLIC_PROFILE:-0}"
 
 failures=0
 warnings=0
@@ -133,8 +136,17 @@ fi
 # ── Local stack (production host only) ───────────────────────────────────────
 if command -v docker >/dev/null 2>&1 &&
   docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^aether-archive-'; then
-  for service in db api web caddy prometheus grafana alertmanager jaeger loki promtail otel-collector; do
+  for service in db api web caddy prometheus grafana alertmanager loki; do
     if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^aether-archive-${service}-"; then
+      pass "container: $service running"
+    else
+      fail "container: $service not running"
+    fi
+  done
+  for service in jaeger promtail otel-collector; do
+    if [ "$PUBLIC_PROFILE" = "1" ]; then
+      skip "container: $service (full observability profile only)"
+    elif docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^aether-archive-${service}-"; then
       pass "container: $service running"
     else
       fail "container: $service not running"
@@ -151,7 +163,9 @@ if command -v docker >/dev/null 2>&1 &&
   else
     fail "alertmanager: local health endpoint unreachable"
   fi
-  if curl -fsS --max-time 5 -o /dev/null http://127.0.0.1:16686/; then
+  if [ "$PUBLIC_PROFILE" = "1" ]; then
+    skip "jaeger: UI (full observability profile only)"
+  elif curl -fsS --max-time 5 -o /dev/null http://127.0.0.1:16686/; then
     pass "jaeger: UI reachable"
   else
     fail "jaeger: UI unreachable"

@@ -89,11 +89,15 @@ overlay sets it to `true` and points `OTEL_EXPORTER_OTLP_ENDPOINT` at the collec
 
 ## 4. Production access
 
-The first public deploy is pending; once it exists:
+The public demo is live at `https://168.138.70.166.nip.io/grafana/` (anonymous Viewer; admin password
+from `GRAFANA_ADMIN_PASSWORD`). It runs the **core profile**: Prometheus, Grafana, Alertmanager and
+Loki, with the API and PostgreSQL. Loki keeps the log datasource healthy; Promtail is full-profile
+only, so the public log view is empty by design. Jaeger, Promtail and the OTel Collector are the
+**full profile** and run locally / on a larger host (`AETHER_FULL_OBSERVABILITY=1`). See ADR-031.
 
-- Grafana: `https://DOMAIN/grafana/` (anonymous Viewer; admin password from
-  `GRAFANA_ADMIN_PASSWORD`).
-- Prometheus, Alertmanager, Jaeger: SSH tunnel from the operator machine:
+- Grafana: `https://168.138.70.166.nip.io/grafana/`.
+- Prometheus, Alertmanager, Jaeger: SSH tunnel from the operator machine (Jaeger is full-profile
+  only):
 
   ```bash
   ssh -N \
@@ -105,7 +109,13 @@ The first public deploy is pending; once it exists:
   ```
 
 The on-call responder is a systemd unit on the VPS (`oncall/aether-oncall.service`), reachable only
-from the Docker bridge. Its runbook is `oncall/README.md`.
+from loopback and the Docker bridge (`127.0.0.1:9099` and `172.17.0.1:9099`; never `0.0.0.0`). Its
+runbook is `oncall/README.md`.
+
+The public drill on 2026-10-22 stopped PostgreSQL, fired `AetherPublish5xxRate`, the responder chose
+`restart_db`, passed its health gate and Alertmanager resolved the incident. Evidence:
+`reports/public-incident-20261022T235204Z.json`; the deploy smoke is
+`reports/public-smoke-20261024.md`.
 
 ## 5. Alert rules
 
@@ -234,6 +244,10 @@ scripts/demo/incident-drill.sh        # takes ~5 minutes
   manual edits.
 - The database and media are backed up before every deploy by `scripts/deploy/backup.sh` into
   `backups/` (7-day retention). Copy that directory off the VPS; it is gitignored.
+- The public core profile provisions the Jaeger datasource but not Jaeger. Opening that datasource
+  reports it unavailable; the dashboard only links to the trace search, so no panel breaks. Jaeger is
+  live in the full profile. The public Grafana datasources are Prometheus and Loki; Alertmanager is
+  not a Grafana datasource.
 - Limits of this single-VPS setup: no HA, Jaeger is not durable, Loki is a single instance, and the
   Grafana dashboards are anonymous read-only. That is deliberate for a demo, not a claim of a
   production SLO.

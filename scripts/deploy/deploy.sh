@@ -91,6 +91,22 @@ if [ -n "${GHCR_TOKEN:-}" ]; then
   unset GHCR_TOKEN
   echo "deploy: authenticated to $REGISTRY with the run-scoped token"
 fi
+
+# The public demo VPS has 1 GB of RAM. The default profile keeps the metrics, alerting and log
+# datasource path (Prometheus, Grafana, Alertmanager, Loki) but leaves the shipper/trace stack for a
+# full host. Set AETHER_FULL_OBSERVABILITY=1 to start every service, as `make observe-up` does.
+if [ "${AETHER_FULL_OBSERVABILITY:-0}" = "1" ]; then
+  PUBLIC_PROFILE=0
+  UP_SERVICES=()
+else
+  PUBLIC_PROFILE=1
+  # Loki is the storage behind Grafana's log datasource; without it the public dashboard shows a
+  # broken panel. It is light enough for 1 GB. Promtail (the shipper), Jaeger and the OTel Collector
+  # remain full-profile only.
+  UP_SERVICES=(db api web caddy prometheus grafana alertmanager loki)
+fi
+WAIT_TIMEOUT="${AETHER_WAIT_TIMEOUT:-1800}"
+smoke() { SMOKE_PUBLIC_PROFILE="$PUBLIC_PROFILE" ./scripts/deploy/smoke.sh "$BASE_URL"; }
 STATE_DIR="state"
 mkdir -p "$STATE_DIR"
 
@@ -125,8 +141,8 @@ restore_previous() {
   fi
   echo "deploy: restoring $current_tag"
   AETHER_API_IMAGE="$current_api_image" AETHER_WEB_IMAGE="$current_web_image" \
-    "${COMPOSE[@]}" up -d --no-deps --wait --wait-timeout 240 api web
-  ./scripts/deploy/smoke.sh "$BASE_URL"
+    "${COMPOSE[@]}" up -d --no-deps --wait --wait-timeout "$WAIT_TIMEOUT" api web
+  smoke
 }
 
 echo "deploy: tag=$TAG api=$API_IMAGE"
@@ -150,14 +166,20 @@ if ! "${COMPOSE[@]}" pull api web; then
   exit 1
 fi
 
-if ! "${COMPOSE[@]}" up -d --wait --wait-timeout 240; then
+if [ "$PUBLIC_PROFILE" = "1" ]; then
+  # A previous full-profile deploy may have left these running; the 1 GB host cannot serve both.
+  if ! "${COMPOSE[@]}" stop jaeger promtail otel-collector >/dev/null 2>&1; then
+    echo "deploy: warning: could not stop one or more optional observability services" >&2
+  fi
+fi
+if ! "${COMPOSE[@]}" up -d --wait --wait-timeout "$WAIT_TIMEOUT" "${UP_SERVICES[@]}"; then
   echo "deploy: the stack did not become healthy" >&2
   restore_previous || true
   record failed
   exit 1
 fi
 
-if ! ./scripts/deploy/smoke.sh "$BASE_URL"; then
+if ! smoke; then
   echo "deploy: smoke test failed on $BASE_URL" >&2
   restore_previous || true
   record failed
@@ -166,8 +188,7 @@ fi
 
 # 4. Seed the public demo exactly once. A redeploy with data never touches it.
 if [ "$SKIP_SEED" -eq 0 ]; then
-  if ! photo_count="$(curl -fsS --retry 5 --retry-delay 3 --retry-all-errors --max-time 20 \
-      "$BASE_URL/api/v1/photos" |
+  if ! photo_count="$(curl -fsS --retry 5 --retry-delay 3 --retry-all-errors --max-time 60 "$BASE_URL/api/v1/photos" |
       python3 -c 'import json, sys; data = json.load(sys.stdin); assert isinstance(data, list); print(len(data))')"; then
     echo "deploy: could not read /api/v1/photos before seeding" >&2
     restore_previous || true
@@ -187,7 +208,7 @@ if [ "$SKIP_SEED" -eq 0 ]; then
   fi
 fi
 
-if ! ./scripts/deploy/smoke.sh "$BASE_URL"; then
+if ! smoke; then
   echo "deploy: final smoke test failed on $BASE_URL" >&2
   restore_previous || true
   record failed
