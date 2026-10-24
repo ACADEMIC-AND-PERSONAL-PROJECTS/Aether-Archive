@@ -187,3 +187,15 @@ order is deliberate:
   `709727b` is a `wip` commit. History is not rewritten — the repository forbids rebase/force on shared
   branches — so this is recorded as a retrospective action instead: story id in every final-slice
   commit message, no `wip` on a release branch.
+- 2026-10-24 — **Public profile follow-up merged (`468edf8`, PR #184)** at APPROVE WITH NITS after two
+  delta rounds. The public 1 GB host now defaults to the core profile `db api web caddy prometheus
+  grafana alertmanager loki`; Loki keeps Grafana's log datasource healthy, while Promtail, Jaeger and
+  the OTel Collector stay full-profile only. The deploy gate is 1800 s and the release deploy job
+  timeout is 50 minutes, supported by the measured 1093-second manual cold start — not by the release
+  job, whose API healthcheck was green but whose full-profile smoke failed API reads and the Jaeger
+  UI. The review's one blocking finding was a PR-body count (25 PASS vs the committed 22); the
+  committed evidence is **22 PASS / 4 SKIP / 0 warnings**. Size: **559 total / 490 hand-written**
+  (69-line generated incident JSON excluded) — over the ~400 ideal, accepted as course evidence under
+  the E6-FINAL atomic-story exception. Loki was started on the public host (1.09 s, `/ready`, ~407 MB
+  still available) and the public smoke reran green; no new tag/release was created, so the API was
+  not recreated.
