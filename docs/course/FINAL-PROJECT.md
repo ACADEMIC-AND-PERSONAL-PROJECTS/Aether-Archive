@@ -273,17 +273,17 @@ deployment. English narration, 1920×1080, 30 fps, 3 min 12 s. The UI is real; t
 | Time | Scene | What the viewer sees |
 | --- | --- | --- |
 | 00:00 | Intro | The splash: one photograph, no chrome; the problem the archive answers. |
-| 00:10 | Menu | Two rooms — the River and the Workshop — and no account or onboarding. |
+| 00:11 | Menu | Two rooms — the River and the Workshop — and no account or onboarding. |
 | 00:19 | River | Three spreads; the aura changes from slate to clay to sage; scroll memory and the printed-object composition. |
 | 00:43 | Workshop | Six photographs, one palette, one line of text; the keyboard path. |
 | 00:52 | Pick | Six October frames chosen; previews stay local until Upload. |
 | 01:00 | Upload | Upload and dominant-colour extraction: six photos become a palette. |
 | 01:07 | Compose | An aura suggested from the cover, then chosen, titled and ordered. |
 | 01:19 | Publish | Save; the new dump returns to the top of the River. |
-| 01:33 | Operations | Grafana: request rate, 5xx, latency and the log stream. |
+| 01:33 | Operations | Grafana: request rate, 5xx and latency; the log panel reads `No data` on this take. |
 | 01:48 | Public | The public URL: 36 photographs, 3 dumps, read-only Grafana. |
 | 02:12 | Incident | The recorded drill: the 5xx alert fires, the responder restarts PostgreSQL, the alert resolves, the report. |
-| 02:33 | Delivery | CI gates, the immutable GHCR image, the release run, backup/rollback and the public smoke. |
+| 02:33 | Delivery | CI gates, the immutable GHCR image and the release run (the deploy job's steps are collapsed). |
 | 02:59 | Closing | The archive as the object; back to October light. |
 
 ### What the video deliberately leaves out
@@ -294,6 +294,9 @@ deployment. English narration, 1920×1080, 30 fps, 3 min 12 s. The UI is real; t
 - **The raw incident JSON.** The human-readable report is on screen; the JSON is linked from §4 and §5.
   The drill is shown from the recorded run rather than re-run for the camera — stopping PostgreSQL on
   the public host again adds risk without adding evidence.
+- **A populated log panel.** The `API logs` panel reads `No data` in this take, so the row above says
+  so. The metrics, the alert path and the incident evidence are live; the structured-log pipeline is
+  documented in `docs/engineering/OBSERVABILITY.md`.
 - **Physical-device checks.** They were prepared but not completed on hardware; §10 says so.
 - **A universal contrast claim.** Pale auras expose a real inspector defect (§10, issue #189); the
   video uses dark covers and the narration does not claim otherwise.
@@ -319,8 +322,9 @@ deployment. English narration, 1920×1080, 30 fps, 3 min 12 s. The UI is real; t
   SQL and never deletes data.
 - **Pale auras are not fully readable in the Workshop inspector.** `themeFromBackground` correctly
   flips `--aura-text` to near-black on a pale cover, but the inspector keeps a fixed `bg-ink/80` wash
-  (`WorkshopView.tsx:694`). Over `#f1eee8` the composited panel is `#373636`, so the dark text lands at
-  **1.63:1** — below the 4.5:1 floor; the River is unaffected (16.98:1). Tracked as issue #189. The fix
+  (`WorkshopView.tsx:694`). Over `#f1eee8`, the glass layer plus the `bg-ink/80` wash composite to
+  `#383737`, so the dark text lands at about **1.66:1** — below the 4.5:1 floor; the River is
+  unaffected (16.98:1). Tracked as issue #189. The fix
   needs a design decision (theme the wash, or pin the inspector to the inverted token) plus a
   pale-theme contrast test, so it is not claimed fixed in this slice.
 - **Known frontend issues** #176 (River scroller), #177 (first-publish cache) and #179 (menu history)
