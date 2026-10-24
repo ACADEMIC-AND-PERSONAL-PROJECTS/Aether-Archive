@@ -5,6 +5,8 @@
 **Repository:** https://github.com/ACADEMIC-AND-PERSONAL-PROJECTS/Aether-Archive
 **Public tracker:** epic [#180](https://github.com/ACADEMIC-AND-PERSONAL-PROJECTS/Aether-Archive/issues/180),
 milestone `Zoomcamp Final Project` (#7)
+**Demo video:** [`aether.mp4`](https://github.com/ACADEMIC-AND-PERSONAL-PROJECTS/Aether-Archive/releases/download/v1.0.0/aether.mp4)
+— 3:12, English narration; storyboard in §9.
 
 This document is the reviewer's map: every rubric criterion points at a file, a URL or a command.
 Statuses are updated as the work lands; a claim without evidence is marked `WIP`, never `DONE`.
@@ -260,20 +262,41 @@ database in 8 seconds, and a resolved incident:
 
 ---
 
-## 9. Demo script (3–5 minutes)
+## 9. Demo video (3:12)
 
-1. **Splash** — one photo, no chrome; tap; the menu.
-2. **River** — scroll through a month; the aura changes; leave and return; the scroll position is
-   remembered. The editorial composition is the redesign the jury asked to see.
-3. **Workshop** — add six photos, reorder one, pick an aura, title, publish; return to the River.
-4. **Public URL** — open the deployed instance and repeat the flow (after the firewall/DNS step).
-5. **Observability** — Grafana: the publish trace, the request metrics, the JSON log line with the same
-   `traceId`; Jaeger for the click-to-SQL trace.
-6. **Incident** — run the drill: stop PostgreSQL for real; the 5xx alert fires; Alertmanager calls the
-   responder; it restarts the database; the alert resolves; show the incident JSON. The synthetic
-   failure flag is not used because the real path is more convincing.
-7. **Rollback** — `scripts/deploy/rollback.sh` and the recorded history; the on-call automatic
-   rollback of the API image is the narrower path.
+**Watch:** [`aether.mp4`](https://github.com/ACADEMIC-AND-PERSONAL-PROJECTS/Aether-Archive/releases/download/v1.0.0/aether.mp4)
+· [release v1.0.0](https://github.com/ACADEMIC-AND-PERSONAL-PROJECTS/Aether-Archive/releases/tag/v1.0.0)
+
+Recorded on 2026-10-24 against the one-command stack, seeded with the 36-photo demo, and the public
+deployment. English narration, 1920×1080, 30 fps, 3 min 12 s. The UI is real; there are no mockups.
+
+| Time | Scene | What the viewer sees |
+| --- | --- | --- |
+| 00:00 | Intro | The splash: one photograph, no chrome; the problem the archive answers. |
+| 00:10 | Menu | Two rooms — the River and the Workshop — and no account or onboarding. |
+| 00:19 | River | Three spreads; the aura changes from slate to clay to sage; scroll memory and the printed-object composition. |
+| 00:43 | Workshop | Six photographs, one palette, one line of text; the keyboard path. |
+| 00:52 | Pick | Six October frames chosen; previews stay local until Upload. |
+| 01:00 | Upload | Upload and dominant-colour extraction: six photos become a palette. |
+| 01:07 | Compose | An aura suggested from the cover, then chosen, titled and ordered. |
+| 01:19 | Publish | Save; the new dump returns to the top of the River. |
+| 01:33 | Operations | Grafana: request rate, 5xx, latency and the log stream. |
+| 01:48 | Public | The public URL: 36 photographs, 3 dumps, read-only Grafana. |
+| 02:12 | Incident | The recorded drill: the 5xx alert fires, the responder restarts PostgreSQL, the alert resolves, the report. |
+| 02:33 | Delivery | CI gates, the immutable GHCR image, the release run, backup/rollback and the public smoke. |
+| 02:59 | Closing | The archive as the object; back to October light. |
+
+### What the video deliberately leaves out
+
+- **Jaeger.** The recorded request path produces single-span traces, so a trace UI would suggest more
+  than the evidence shows. The trace path is documented in `docs/engineering/OBSERVABILITY.md` and
+  exercised on the local full profile.
+- **The raw incident JSON.** The human-readable report is on screen; the JSON is linked from §4 and §5.
+  The drill is shown from the recorded run rather than re-run for the camera — stopping PostgreSQL on
+  the public host again adds risk without adding evidence.
+- **Physical-device checks.** They were prepared but not completed on hardware; §10 says so.
+- **A universal contrast claim.** Pale auras expose a real inspector defect (§10, issue #189); the
+  video uses dark covers and the narration does not claim otherwise.
 
 ---
 
@@ -294,9 +317,15 @@ database in 8 seconds, and a resolved incident:
   success.
 - **The on-call path is deterministic by design**; it is not a general incident agent. It never runs
   SQL and never deletes data.
+- **Pale auras are not fully readable in the Workshop inspector.** `themeFromBackground` correctly
+  flips `--aura-text` to near-black on a pale cover, but the inspector keeps a fixed `bg-ink/80` wash
+  (`WorkshopView.tsx:694`). Over `#f1eee8` the composited panel is `#373636`, so the dark text lands at
+  **1.63:1** — below the 4.5:1 floor; the River is unaffected (16.98:1). Tracked as issue #189. The fix
+  needs a design decision (theme the wash, or pin the inspector to the inverted token) plus a
+  pale-theme contrast test, so it is not claimed fixed in this slice.
 - **Known frontend issues** #176 (River scroller), #177 (first-publish cache) and #179 (menu history)
   are tracked. The redesign keeps their acceptance criteria in view and does not claim them fixed
-  without a separate verification.
+  without a separate verification. #187 (menu lede) is fixed in `81f0f7e`.
 - **The observability stack is a single-VPS demo**, not an SLO claim: Jaeger is in-memory, Loki and
   Prometheus are single instances, and there is no HA. The public host runs the core profile; the
   trace/log backends are local/full-profile only.
@@ -324,6 +353,7 @@ it is tracked here so it is not forgotten before submission:
       smoke with the full profile; the same images were deployed with the core profile (ADR-031).
 - [x] Public URL inserted in the README, this document and issue #180.
 - [x] Production drill re-run; the public incident JSON is linked in §4 and §5.
-- [ ] 3–5 minute demo video recorded (the script in §9).
+- [x] Demo video recorded — 3:12, English narration, published as the `aether.mp4` asset on the
+      `v1.0.0` release; storyboard and omissions in §9.
 - [ ] Three peer reviews completed.
 - [ ] Final submission before **2026-10-26**.
