@@ -1,12 +1,13 @@
 # Deployment and containers — Aether Archive
 
-> Status: **shipped code, public instance pending**. The images, the Compose stack, the release
-> workflow, the deploy/rollback/backup scripts and the smoke test are in the repository and verified
-> locally. The first public deploy is blocked on the VPS firewall/domain, not on missing code; this
-> document marks the public URL as pending until it answers.
+> Status: **live at `https://168.138.70.166.nip.io`** — 36 attributed photos, 3 dumps, public smoke
+> green. The 1 GB host runs the core profile (ADR-031); the full trace/log stack remains the local
+> `make observe-up` profile. The v1.0.0 release published the images; the first release deploy job
+> started the full stack and hit the 1 GB cold-start limit, so the same `sha-9b6e3a2...` images were
+> deployed with the core profile now default in `deploy.sh`.
 >
 > Decisions: ADR-009 (PostgreSQL), ADR-010 (containerized delivery), ADR-029 (public demo and the
-> observability profile).
+> observability profile), ADR-030 (private GHCR pull), ADR-031 (public 1 GB profile).
 
 ## 1. Topology
 
@@ -74,6 +75,21 @@ expects the `grafana` service from the observability overlay.
 The API image is a multi-stage Maven/Temurin build and runs as a non-root user. The web image builds
 the Vite bundle and serves it with nginx; both base tags are pinned, and every service has a bounded
 `json-file` log (`10m × 3`).
+
+### Deployment profiles
+
+The public demo host has 1 GB of RAM and 2 GB of swap. `deploy.sh` starts the **core profile** by
+default: `db api web caddy prometheus grafana alertmanager`. That keeps the metrics and alerting path
+the rubric measures without starving the API. The trace/log services (`jaeger`, `loki`, `promtail`,
+`otel-collector`) stay defined in `docker-compose.observability.yml` and run in the local/full
+profile; set `AETHER_FULL_OBSERVABILITY=1` to start them on a host with enough memory. `smoke.sh`
+with `SMOKE_PUBLIC_PROFILE=1` (which the deploy script sets for the core profile) reports the absent
+trace/log containers as `SKIP`, never `FAIL`.
+
+The first cold start of the Spring Boot API on this host can take several minutes while the JVM loads
+and the swap warms. `deploy.sh` waits up to `AETHER_WAIT_TIMEOUT` seconds (default `1800`); the
+release deploy job has a 50-minute timeout. Warm requests are fast; the public smoke uses bounded
+retries so a cold JVM does not mask a real failure.
 
 ## 4. Prepare the VPS (once)
 
@@ -161,8 +177,10 @@ logic):
 1. validates the tag, `.env`, `DOMAIN`, the database password and the two generated secrets;
 2. regenerates `oncall/webhook-token` for Alertmanager;
 3. backs up PostgreSQL and the media volume into `backups/` (skipped on the first deploy);
-4. `docker compose pull api web`, then `up -d --wait` for the whole stack;
-5. runs `scripts/deploy/smoke.sh https://DOMAIN` (public HTML/assets/API/Grafana + local containers);
+4. `docker compose pull api web`, then `up -d --wait` for the core profile (or the whole stack with
+   `AETHER_FULL_OBSERVABILITY=1`);
+5. runs `scripts/deploy/smoke.sh https://DOMAIN` with the public-profile flag (public
+   HTML/assets/API/Grafana + the core local containers);
 6. seeds 36 attributed photos and 3 dumps exactly once, when `/api/v1/photos` is empty;
 7. runs the smoke again, writes `state/current-image`, `state/last-good-image` and the append-only
    `state/history.tsv`.
@@ -175,9 +193,12 @@ Manual deploy, same script:
 
 ```bash
 cd /opt/aether
-./scripts/deploy/deploy.sh sha-<commit>          # images must already be in GHCR
-./scripts/deploy/deploy.sh sha-<commit> --skip-seed
+./scripts/deploy/deploy.sh sha-<full-commit>     # images must already be in GHCR
+./scripts/deploy/deploy.sh sha-<full-commit> --skip-seed
 ```
+
+On the 1 GB public host the core profile is the default. Export `AETHER_FULL_OBSERVABILITY=1` only
+when the host can run the trace/log stack as well.
 
 First deploy without a release tag: build locally once with
 `docker compose -f docker-compose.yml -f docker-compose.observability.yml -f docker-compose.prod.yml up -d --build`,
@@ -195,9 +216,11 @@ make deploy-smoke BASE_URL=https://DOMAIN
 
 It checks HSTS, CSP, `X-Content-Type-Options`, the SPA shell and the hashed JavaScript entry, the
 photo/dump reads, the random photo, the `404 application/problem+json` shape, the Grafana health under
-`/grafana/`, the eleven production containers and the local Prometheus/Alertmanager/Jaeger endpoints.
-The host-side on-call responder is reported as `WARN` if it is not installed; the public checks are
-hard failures. A deployment that cannot pass it is rolled back, not announced.
+`/grafana/`, the core production containers and the local Prometheus/Alertmanager endpoints. In the
+full profile it also checks the trace/log containers and Jaeger; on the public 1 GB profile those are
+reported as `SKIP` via `SMOKE_PUBLIC_PROFILE=1`. The host-side on-call responder is reported as `WARN`
+if it is not installed; the public checks are hard failures. A deployment that cannot pass it is
+rolled back, not announced.
 
 ## 7. Rollback
 
@@ -285,3 +308,7 @@ Details, alert rules and the runbook: `docs/engineering/OBSERVABILITY.md`; respo
   issuance can take a minute.
 - The automated rollback covers the API image only; a bad migration needs the backup and a human.
 - The on-call responder is deterministic by design; it is not a general incident agent.
+- The public demo runs the core observability profile on the 1 GB VPS. Jaeger, Loki, Promtail and the
+  OTel Collector are exercised locally (and on a larger host with `AETHER_FULL_OBSERVABILITY=1`), not
+  on the public host. The 1 GB cold start is documented above; the first v1.0.0 release deploy job
+  hit that limit before the core profile became the default.

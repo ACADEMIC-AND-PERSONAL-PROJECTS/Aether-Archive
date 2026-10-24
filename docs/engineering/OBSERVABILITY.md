@@ -89,11 +89,15 @@ overlay sets it to `true` and points `OTEL_EXPORTER_OTLP_ENDPOINT` at the collec
 
 ## 4. Production access
 
-The first public deploy is pending; once it exists:
+The public demo is live at `https://168.138.70.166.nip.io/grafana/` (anonymous Viewer; admin password
+from `GRAFANA_ADMIN_PASSWORD`). It runs the **core profile**: Prometheus, Grafana and Alertmanager,
+with the API and PostgreSQL. The trace/log stack (Jaeger, Loki, Promtail and the OTel Collector) is
+the **full profile** and runs locally / on a larger host (`AETHER_FULL_OBSERVABILITY=1`); it is
+intentionally absent from the 1 GB public host. See ADR-031.
 
-- Grafana: `https://DOMAIN/grafana/` (anonymous Viewer; admin password from
-  `GRAFANA_ADMIN_PASSWORD`).
-- Prometheus, Alertmanager, Jaeger: SSH tunnel from the operator machine:
+- Grafana: `https://168.138.70.166.nip.io/grafana/`.
+- Prometheus, Alertmanager, Jaeger: SSH tunnel from the operator machine (Jaeger is full-profile
+  only):
 
   ```bash
   ssh -N \
@@ -105,7 +109,13 @@ The first public deploy is pending; once it exists:
   ```
 
 The on-call responder is a systemd unit on the VPS (`oncall/aether-oncall.service`), reachable only
-from the Docker bridge. Its runbook is `oncall/README.md`.
+from loopback and the Docker bridge (`127.0.0.1:9099` and `172.17.0.1:9099`; never `0.0.0.0`). Its
+runbook is `oncall/README.md`.
+
+The public drill on 2026-10-22 stopped PostgreSQL, fired `AetherPublish5xxRate`, the responder chose
+`restart_db`, passed its health gate and Alertmanager resolved the incident. Evidence:
+`reports/public-incident-20261022T235204Z.json`; the deploy smoke is
+`reports/public-smoke-20261024.md`.
 
 ## 5. Alert rules
 

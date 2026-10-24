@@ -1243,7 +1243,8 @@ drill is a real PostgreSQL stop. The deployment introduces a domain, TLS certifi
 rule and host secrets. The Alertmanager token is a mounted file with mode 0644 because its container
 runs unprivileged; the host is single-user and `.env` holds the same value. The archive's storage model
 does not change: media stays on a local volume, and the database stays PostgreSQL. The public instance
-remains **pending** until the VPS firewall and DNS are reachable; the code path is complete.
+went live on 2026-10-22 at `https://168.138.70.166.nip.io`; the 1 GB host profile is recorded in
+ADR-031.
 
 ---
 
@@ -1270,6 +1271,33 @@ workflow token expires with the job. The deploy depends on the token being passe
 a mode-700 temporary Docker config and the deploy process environment for the run, not as a persistent
 credential; a `SIGKILL` can leave the directory until reboot. Revisit if the organization API gains
 visibility control or a pull-through mirror is introduced.
+
+---
+
+## ADR-031 — Public 1 GB host: core observability profile
+
+**Date**: 2026-10-24 · **Status**: Accepted
+
+**Context.** The v1.0.0 release published both immutable images, but its deploy job started the full
+observability stack on the 1 GB Oracle VPS. The Spring Boot cold start took about 18 minutes under
+memory pressure; starting Jaeger, Loki, Promtail and the OTel Collector made the API unresponsive
+again, and the public smoke timed out. The rubric needs observability and alerting, not every
+trace/log backend on the smallest demo host.
+
+**Decision.** The public deploy starts the **core profile** by default: PostgreSQL, API, web, Caddy,
+Prometheus, Grafana and Alertmanager. The full trace/log stack remains defined in
+`docker-compose.observability.yml` and runs locally (`make observe-up`) or on a larger host with
+`AETHER_FULL_OBSERVABILITY=1`. `deploy.sh` waits up to `AETHER_WAIT_TIMEOUT` seconds (default 1800)
+for the cold JVM; the release deploy job timeout is 50 minutes. `smoke.sh` reports absent trace/log
+containers as `SKIP` with `SMOKE_PUBLIC_PROFILE=1`, which the deploy script sets for the core profile.
+Grafana no longer has a startup `depends_on` for Loki; the full stack still starts Loki, and the
+datasource connects when it is ready.
+
+**Consequences.** The public demo fits 1 GB, the public smoke is stable, and the metrics/alerting path
+the rubric measures is live. Traces and logs are still demonstrated locally and documented; the
+public `/grafana/` is metrics-first. The first v1.0.0 deploy job remains recorded as failed — the fix
+is the default for later releases, not a rewrite of history. Revisit if the VPS is resized or the
+trace/log stack becomes a hard public requirement.
 
 ---
 
