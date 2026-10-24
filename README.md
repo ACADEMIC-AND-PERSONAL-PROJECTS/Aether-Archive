@@ -6,8 +6,9 @@
 [![CI](https://github.com/ACADEMIC-AND-PERSONAL-PROJECTS/Aether-Archive/actions/workflows/ci.yml/badge.svg)](https://github.com/ACADEMIC-AND-PERSONAL-PROJECTS/Aether-Archive/actions/workflows/ci.yml)
 
 **Final project — DataTalksClub AI Dev Tools Zoomcamp (2026).**
-Public demo: **pending the VPS firewall/domain step** (the code path is complete; see
-[Deployment §4](docs/engineering/DEPLOYMENT.md)).
+Public demo: **https://168.138.70.166.nip.io** — 36 attributed photos and 3 dumps, seeded for
+evaluation; the 1 GB host runs the core metrics/alerting profile. See
+[Deployment §4](docs/engineering/DEPLOYMENT.md).
 Criteria evidence: [`docs/course/FINAL-PROJECT.md`](docs/course/FINAL-PROJECT.md).
 
 ![The River, desktop](reports/evidence/app-river-1440.png)
@@ -134,10 +135,12 @@ tests**; the reports live in `reports/`. Browser-dependent checks (safe areas, a
 physical iOS/Android) are documented in `reports/device-verification-sprint05.md` and are not claimed
 as automated coverage.
 
-The production smoke test is `./scripts/deploy/smoke.sh https://DOMAIN`; it checks TLS/HSTS, the
-security headers, the SPA and its hashed entry, the API reads, the problem-detail 404, Grafana under
-`/grafana/`, the eleven containers and the local observability endpoints. A deployment that cannot
-pass it is rolled back.
+The production smoke test is `SMOKE_PUBLIC_PROFILE=1 ./scripts/deploy/smoke.sh https://DOMAIN`; it checks
+TLS/HSTS, the security headers, the SPA and its hashed entry, the API reads, the problem-detail 404,
+Grafana under `/grafana/` and the local observability endpoints. On the VPS it also checks the eight
+core containers; the three full-profile containers and the Jaeger UI are `SKIP`s. Run from a
+workstation, the container checks are host-local and are expected to be skipped or noisy. A
+deployment that cannot pass the host run is rolled back.
 
 ## How the work is done
 
@@ -182,9 +185,11 @@ The four views (splash, menu, River, Workshop) are complete, tested, and redesig
 print object: ink and paper surfaces, full-bleed photography, serif display type, hairline rules and
 restrained motion. The course slice adds containers, the public deployment profile, CI/CD with GHCR,
 the self-hosted observability stack, the publish alert, the on-call responder and the deploy/rollback
-path. The public instance is blocked on the VPS provider firewall and DNS, not on code; the first
-release will publish the GHCR images and run the same smoke test used locally. Known frontend findings
-remain tracked as issues #176, #177 and #179.
+path. The public instance is live at **https://168.138.70.166.nip.io**. The release workflow publishes the
+GHCR images, and the same smoke test used locally passes against the public origin. The 1 GB VPS runs
+the core profile (PostgreSQL, API, web, Caddy, Prometheus, Grafana, Alertmanager, Loki); the trace
+shippers (Jaeger, Promtail, OTel Collector) remain the local/`make observe-up` profile. Known frontend
+findings remain tracked as issues #176, #177 and #179.
 
 ## License
 
