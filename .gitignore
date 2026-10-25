@@ -34,6 +34,8 @@ frontend/.vite/
 frontend/test-results/
 frontend/playwright-report/
 frontend/blob-report/
+video/node_modules/
+video/out/
 npm-debug.log*
 yarn-error.log*
 *.tsbuildinfo
