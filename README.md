@@ -37,7 +37,7 @@ cards, local-first geometry and the final brand lockup. No screenshots. No audio
 
 <center>
 
-<video src="https://github.com/ACADEMIC-AND-PERSONAL-PROJECTS/Aether-Archive/releases/download/v1.0.0/aether-archive-marketing.mp4" width="720" controls playsinline preload="metadata"></video>
+<video src="https://github.com/user-attachments/assets/e70f6351-10c4-4a84-9b96-bda5eb4dadc7" width="720" controls playsinline preload="metadata"></video>
 
 36-second silent product film using the River, Workshop and observability evidence captures.
 
@@ -239,7 +239,7 @@ See [`reports/verify-final-20261022.md`](reports/verify-final-20261022.md) for t
 ```text
 backend/       Spring Boot REST API, services, persistence and storage
 frontend/      React/Vite application and editorial design system
-video/         Remotion product film and pure-motion brand film
+release assets  Product film and pure-motion brand film
 observability/ Prometheus, Grafana, Loki, Alertmanager and OTel configuration
 oncall/        Host-side incident responder and runbook
 scripts/       Demo seeding, smoke checks, deployment, backup and rollback
