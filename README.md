@@ -23,7 +23,7 @@ AI Dev Tools Zoomcamp · **Release:** [v1.0.0](https://github.com/ACADEMIC-AND-P
 
 <center>
 
-<video src="https://github.com/ACADEMIC-AND-PERSONAL-PROJECTS/Aether-Archive/releases/download/v1.0.0/aether-archive-brand-film.mp4" width="820" controls playsinline preload="metadata"></video>
+<video src="https://github.com/user-attachments/assets/8737d617-8312-4994-9c6c-dd50a4b605a8" width="820" controls playsinline preload="metadata"></video>
 
 **Brand film — 44 seconds**
 
