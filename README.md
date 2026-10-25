@@ -74,6 +74,16 @@ The ritual is deliberately small: **open → look → curate → publish → ret
 <img src="reports/evidence/app-river-1440.png" width="820" alt="The River showing October and the After the rain photo dump">
 </center>
 
+### Captured on a real phone
+
+The archive is designed for the quiet, thumb-first moment: six real photographs selected on a phone,
+ready to become one ordered monthly memory. This is a live capture from the public deployment, not a
+mockup.
+
+<center>
+<img src="assets/aether-mobile-workshop.png" width="390" alt="Aether Archive Workshop captured on a phone with six coastal photographs selected">
+</center>
+
 <details>
 <summary><b>See the Workshop and the visual system</b></summary>
 
