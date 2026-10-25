@@ -80,9 +80,11 @@ The archive is designed for the quiet, thumb-first moment: six real photographs 
 ready to become one ordered monthly memory. This is a live capture from the public deployment, not a
 mockup.
 
+<div align="center">
 <center>
 <img src="assets/aether-mobile-workshop.png" width="390" alt="Aether Archive Workshop captured on a phone with six coastal photographs selected">
 </center>
+</div>
 
 <details>
 <summary><b>See the Workshop and the visual system</b></summary>
